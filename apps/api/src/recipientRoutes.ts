@@ -16,6 +16,7 @@ import {
   type WalkProposal,
 } from "./domain/types.js";
 import { processWalk, type WalkDeps } from "./enrich/processWalk.js";
+import { MAX_PHOTO_BYTES, MAX_PHOTOS, processPhotos } from "./enrich/processPhotos.js";
 import type { NameTranslator } from "./enrich/translate.js";
 import type { TestCallIssuer } from "./voice/testCall.js";
 import { planRoute } from "./onboarding/routePlan.js";
@@ -34,6 +35,8 @@ const DOOR_SAME_AS_CUE_M = 15;
 const PHOTO_URL_TTL_S = 3600;
 export const MAX_WALK_S = 180;
 const SUGGESTION_TTL_MS = 60 * 60_000;
+/** A walk record made from photos instead of a video. */
+const PHOTO_SET = "image/jpeg";
 
 type Env = { Variables: { identity: RecipientIdentity } };
 
@@ -423,6 +426,55 @@ export function recipientRoutes(deps: {
     return c.json({ walk: publicWalk(walk), upload: { path: upload.path, token: upload.token } }, 201);
   });
 
+  /**
+   * Photos instead of a walk video: up to 8 JPEGs (phone photos or screenshots)
+   * plus the gate's position, as multipart form data. Becomes a walk with no
+   * video, processed in the background; poll GET /walks/:id like a walk.
+   */
+  app.post("/photos", async (c) => {
+    const recipient = await me(c);
+    if (!recipient) return fail(c, 404, "PROFILE_NOT_SET_UP", "Save your profile first");
+    const form = await c.req.parseBody({ all: true }).catch(() => null);
+    if (!form) return fail(c, 400, "INVALID_BODY", "Send the photos as multipart form data");
+    const lat = Number(form.lat);
+    const lon = Number(form.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return fail(c, 400, "INVALID_BODY", "lat and lon of your gate are required");
+    try {
+      encodeDigipin({ lat, lon });
+    } catch {
+      return fail(c, 400, "INVALID_BODY", "Your gate is outside India");
+    }
+    const files = ([] as unknown[]).concat(form.photo ?? []).filter((f): f is File => f instanceof File);
+    if (files.length === 0) return fail(c, 400, "INVALID_BODY", "Add at least one photo");
+    if (files.length > MAX_PHOTOS) return fail(c, 400, "INVALID_BODY", `Up to ${MAX_PHOTOS} photos at a time`);
+    const photos: Buffer[] = [];
+    for (const f of files) {
+      if (f.size > MAX_PHOTO_BYTES) return fail(c, 400, "INVALID_BODY", `"${f.name}" is over 6 MB`);
+      const bytes = Buffer.from(await f.arrayBuffer());
+      // JPEG only (the app converts every photo before upload); checked by content, not the declared type.
+      if (bytes[0] !== 0xff || bytes[1] !== 0xd8) return fail(c, 400, "INVALID_BODY", `"${f.name}" isn't a JPEG image`);
+      photos.push(bytes);
+    }
+    const id = `walk_${deps.newId()}`;
+    const walk: Walk = {
+      id,
+      recipientId: recipient.id,
+      videoPath: `photos/${recipient.id}/${id}`,
+      contentType: PHOTO_SET,
+      durationS: 0,
+      track: [],
+      status: "processing",
+      error: null,
+      createdAt: deps.now(),
+      processedAt: null,
+      // No video is ever stored for a photo set, so the video sweep skips it.
+      videoDeletedAt: deps.now(),
+    };
+    await store.createWalk(walk);
+    deps.background(() => processPhotos(walkDeps, id, photos, { lat, lon }));
+    return c.json({ walk: publicWalk(walk) }, 202);
+  });
+
   /** Call after the upload finishes. Processing runs in the background; poll GET /walks/:id. */
   app.post("/walks/:id/process", async (c) => {
     const walk = await ownWalk(c);
@@ -430,6 +482,7 @@ export function recipientRoutes(deps: {
     if (walk.status === "processing" || walk.status === "ready") {
       return fail(c, 409, "WALK_ALREADY_PROCESSED", `This walk is already ${walk.status}`);
     }
+    if (walk.contentType === PHOTO_SET) return fail(c, 409, "PHOTOS_NOT_KEPT", "Photos aren't kept after a failed try. Add them again.");
     const processing: Walk = { ...walk, status: "processing", error: null };
     await store.updateWalk(processing);
     deps.background(() => processWalk(walkDeps, walk.id));

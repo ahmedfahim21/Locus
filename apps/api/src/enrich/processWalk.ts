@@ -10,11 +10,11 @@ import type { Store } from "../store/store.js";
 import { sampleAlongTrack, WalkError } from "./track.js";
 import { MAX_PROPOSALS, type LandmarkVision, type VisionLandmark } from "./vision.js";
 
-const DEVANAGARI = /[\u0900-\u097F]/;
-const KANNADA = /[\u0C80-\u0CFF]/;
+export const DEVANAGARI = /[\u0900-\u097F]/;
+export const KANNADA = /[\u0C80-\u0CFF]/;
 
 /** The name if every letter is in the expected script (the model sometimes mixes scripts), else null. */
-function inScript(name: string, script: RegExp): string | null {
+export function inScript(name: string, script: RegExp): string | null {
   const trimmed = name.trim();
   const letters = [...trimmed].filter((ch) => /\p{L}|\p{M}/u.test(ch));
   return letters.length > 0 && letters.every((ch) => script.test(ch)) ? trimmed : null;

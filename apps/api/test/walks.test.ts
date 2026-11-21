@@ -388,3 +388,95 @@ describe("walks: video sweep", () => {
     expect(logs).toEqual([{ event: "walk.sweep", deleted: 1 }]);
   });
 });
+
+describe("photos instead of a walk", () => {
+  const jpeg = (n: number) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(`photo-${n}`)]);
+  const gateForm = (photos: Buffer[], extra: Record<string, string> = {}) => {
+    const form = new FormData();
+    form.set("lat", String(GATE.lat));
+    form.set("lon", String(GATE.lon));
+    for (const [k, v] of Object.entries(extra)) form.set(k, v);
+    photos.forEach((p, i) => form.append("photo", new Blob([new Uint8Array(p)], { type: "image/jpeg" }), `p${i}.jpg`));
+    return form;
+  };
+  async function upload(t: Awaited<ReturnType<typeof signedUp>>, form: FormData, token = TOKEN) {
+    const res = await t.app.request("/me/photos", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: form });
+    return { status: res.status, body: (await res.json()) as Record<string, unknown> };
+  }
+  const blueGate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: ["neela gate"], kind: "gate", color: "#1F5FBF" };
+
+  it("turns photos into proposals, placing known places from the map and the rest at the gate", async () => {
+    const t = await signedUp();
+    t.vision.answer = [{ ...bakery, frame: 0 }, blueGate];
+    const res = await upload(t, gateForm([jpeg(0), jpeg(1)]));
+    expect(res).toEqual({
+      status: 202,
+      body: { walk: { id: "walk_2", status: "processing", error: null, createdAt: T0.toISOString(), processedAt: null } },
+    });
+    await t.settle();
+
+    expect(t.vision.seen[0]!.map((f) => [f.index, f.label, f.jpeg.toString()])).toEqual([
+      [0, "Photo 0", jpeg(0).toString()],
+      [1, "Photo 1", jpeg(1).toString()],
+    ]);
+    const got = await t.call("GET", "/me/walks/walk_2", undefined, TOKEN);
+    expect(got.body).toEqual({
+      walk: { id: "walk_2", status: "ready", error: null, createdAt: T0.toISOString(), processedAt: T0.toISOString() },
+      proposals: [
+        {
+          id: "prp_3", ordinal: 1, name: "Iyengar bakery", nameHi: "अयंगर बेकरी", nameKn: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
+          aliases: ["Iyengar Bakery & Sweets"], kind: "food", color: "#b8401c",
+          // Found by name on the map: placed at the mapped bakery.
+          location: { lat: 13.0345, lon: 77.5975 }, osmId: "node/102", atS: 0, status: "proposed",
+          photoUrl: "https://storage.test/frames/rcp_1/walk_2/1.jpg?exp=3600",
+        },
+        {
+          id: "prp_4", ordinal: 2, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್",
+          // "neela gate" is the matcher's synonym for the name itself, so it adds nothing.
+          aliases: [], kind: "gate", color: "#1f5fbf",
+          // Not on the map: starts at the gate for the recipient to move.
+          location: GATE, osmId: null, atS: 1, status: "proposed",
+          photoUrl: "https://storage.test/frames/rcp_1/walk_2/2.jpg?exp=3600",
+        },
+      ],
+    });
+    expect(t.storage.objects.get("frames/rcp_1/walk_2/2.jpg")!.bytes).toEqual(jpeg(1));
+    // No video to sweep, and keeping a photo landmark works like a walk one.
+    expect(t.store.walks[0]).toMatchObject({ contentType: "image/jpeg", track: [], videoDeletedAt: T0 });
+    const saved = await t.call("PUT", "/me/home", { handoffPoint: GATE, cues: [{ landmark: "Blue gate", text: "Neela gate pe rukiye.", location: GATE, proposalId: "prp_4" }] }, TOKEN);
+    expect((saved.body.home as { cues: Record<string, unknown>[] }).cues[0]).toMatchObject({ source: "walkVideo", kind: "gate", color: "#1f5fbf", proposalId: "prp_4" });
+  });
+
+  it("records a failed read on the walk, keeps no frames, and asks for the photos again", async () => {
+    const t = await signedUp();
+    t.vision.error = new Error("model unavailable");
+    await upload(t, gateForm([jpeg(0)]));
+    await t.settle();
+    expect((await t.call("GET", "/me/walks/walk_2", undefined, TOKEN)).body.walk).toMatchObject({
+      status: "failed",
+      error: "Couldn't read the photos: model unavailable. Add them again.",
+    });
+    expect([...t.storage.objects.keys()]).toEqual([]);
+    expect(await t.call("POST", "/me/walks/walk_2/process", undefined, TOKEN)).toEqual({
+      status: 409,
+      body: { error: { code: "PHOTOS_NOT_KEPT", message: "Photos aren't kept after a failed try. Add them again." } },
+    });
+  });
+
+  it("refuses what it can't use, before reading anything", async () => {
+    const t = await signedUp();
+    const cases: [FormData, string][] = [
+      [gateForm([]), "Add at least one photo"],
+      [gateForm(Array.from({ length: 9 }, (_, i) => jpeg(i))), "Up to 8 photos at a time"],
+      [gateForm([Buffer.from("GIF89a")]), '"p0.jpg" isn\'t a JPEG image'],
+      [(() => { const f = gateForm([jpeg(0)]); f.delete("lat"); return f; })(), "lat and lon of your gate are required"],
+      [gateForm([jpeg(0)], { lat: "51.5", lon: "-0.12" }), "Your gate is outside India"],
+    ];
+    for (const [form, message] of cases) {
+      expect(await upload(t, form)).toEqual({ status: 400, body: { error: { code: "INVALID_BODY", message } } });
+    }
+    expect(t.store.walks).toEqual([]);
+    expect(t.vision.seen).toEqual([]);
+    expect((await upload(t, gateForm([jpeg(0)]), "tok:nobody")).status).toBe(404);
+  });
+});
