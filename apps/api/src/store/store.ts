@@ -57,4 +57,6 @@ export interface Store {
   listWalkProposals(walkId: string): Promise<WalkProposal[]>;
   listRecipientProposals(recipientId: string): Promise<WalkProposal[]>;
   updateProposals(proposals: WalkProposal[]): Promise<void>;
+  /** Walks created before `before` whose video is still in storage. */
+  listWalksWithVideo(before: Date): Promise<Walk[]>;
 }

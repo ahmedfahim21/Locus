@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { EXPIRED_WALK_ERROR, sweepWalkVideos } from "../src/enrich/sweep.js";
 import type { VisionLandmark } from "../src/enrich/vision.js";
 import { T0, recipient, setup } from "./fixtures.js";
 
@@ -294,7 +295,15 @@ describe("walks: keeping landmarks", () => {
         photoUrl: `https://storage.test/${frame}?exp=3600`,
         proposalId: "prp_4",
       },
-      { text: "Neela gate.", landmark: "blue gate", location: GATE, aliases: [], source: "typed", photoUrl: null, proposalId: null },
+      {
+        text: "Neela gate.",
+        landmark: "blue gate",
+        location: GATE,
+        aliases: ["blue gate हिं", "blue gate ಕನ್ನ"],
+        source: "typed",
+        photoUrl: null,
+        proposalId: null,
+      },
     ]);
     expect(t.store.homes.find((h) => h.recipientId === "rcp_1")!.cues[0]).toMatchObject({ photoPath: frame, source: "walkVideo" });
 
@@ -335,5 +344,29 @@ describe("walks: keeping landmarks", () => {
     await t.say("ses_1", "Bajrang Bali gudi ke paas hoon");
     expect(t.store.turns.at(-1)).toMatchObject({ matchedCueId: "cue_2", lost: false });
     expect(recipient.id).toBe("rcp_seed");
+  });
+});
+
+describe("walks: video sweep", () => {
+  it("deletes videos older than a day that were never processed, and marks those walks failed", async () => {
+    const t = await signedUp();
+    const created = await t.call("POST", "/me/walks", walkBody, TOKEN);
+    const stale = (created.body.walk as { id: string }).id;
+    t.storage.browserUpload((created.body.upload as { token: string }).token, video, "video/mp4");
+    const { walkId: done } = await processedWalk(t, [bakery]);
+
+    // Not yet a day old: nothing is touched.
+    expect(await sweepWalkVideos({ store: t.store, storage: t.storage, now: () => new Date(T0.getTime() + 23 * 3600_000), log: () => {} })).toBe(0);
+    expect(t.storage.objects.has(`walks/rcp_1/${stale}.mp4`)).toBe(true);
+
+    const later = new Date(T0.getTime() + 25 * 3600_000);
+    const logs: Record<string, unknown>[] = [];
+    expect(await sweepWalkVideos({ store: t.store, storage: t.storage, now: () => later, log: (e) => logs.push(e) })).toBe(1);
+    expect(t.storage.objects.has(`walks/rcp_1/${stale}.mp4`)).toBe(false);
+    expect(t.store.walks.find((w) => w.id === stale)).toMatchObject({ status: "failed", error: EXPIRED_WALK_ERROR, videoDeletedAt: later });
+    // The processed walk and its frame are untouched.
+    expect(t.store.walks.find((w) => w.id === done)).toMatchObject({ status: "ready", videoDeletedAt: T0 });
+    expect(t.storage.objects.has(`frames/rcp_1/${done}/1.jpg`)).toBe(true);
+    expect(logs).toEqual([{ event: "walk.sweep", deleted: 1 }]);
   });
 });

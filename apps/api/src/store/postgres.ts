@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../db/schema.js";
@@ -336,6 +336,14 @@ export class PostgresStore implements Store {
   async listRecipientProposals(recipientId: string) {
     const rows = await this.db.select().from(schema.walkProposals).where(eq(schema.walkProposals.recipientId, recipientId));
     return rows.map(toProposal);
+  }
+
+  async listWalksWithVideo(before: Date) {
+    const rows = await this.db
+      .select()
+      .from(schema.walks)
+      .where(and(isNull(schema.walks.videoDeletedAt), lt(schema.walks.createdAt, before)));
+    return rows.map(toWalk);
   }
 
   async updateProposals(proposals: WalkProposal[]) {

@@ -124,6 +124,9 @@ export class MemoryStore implements Store {
   async listRecipientProposals(recipientId: string) {
     return structuredClone(this.proposals.filter((p) => p.recipientId === recipientId));
   }
+  async listWalksWithVideo(before: Date) {
+    return structuredClone(this.walks.filter((w) => w.videoDeletedAt === null && w.createdAt < before));
+  }
   async updateProposals(proposals: WalkProposal[]) {
     for (const p of proposals) {
       const i = this.proposals.findIndex((x) => x.id === p.id);
