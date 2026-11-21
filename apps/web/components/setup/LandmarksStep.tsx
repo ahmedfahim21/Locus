@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountMenu } from "../AccountMenu";
 import { ArrowDown, ArrowLeft, ArrowUp, MapPin, Plus, Trash } from "@phosphor-icons/react";
 import type * as MapLibre from "maplibre-gl";
 import { useRef, useState, type ReactNode } from "react";
@@ -170,7 +171,10 @@ export function LandmarksStep({
           <button className="btn icon" type="button" onClick={onBack} aria-label="Back to your gate">
             <ArrowLeft size={18} />
           </button>
-          {progress}
+          <div className="row" style={{ gap: 12 }}>
+            {progress}
+            <AccountMenu />
+          </div>
         </div>
         <div className="stack" style={{ gap: 6 }}>
           <h1 className="title">Landmarks on the way</h1>

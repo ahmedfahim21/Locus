@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountMenu } from "../AccountMenu";
 import { ArrowLeft, ArrowRight, Check, DeviceMobile, MapPin, Record, ShieldCheck, Stop, VideoCamera, Warning } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, scriptNames, supabase, type LatLon, type Proposal, type Walk } from "../../lib/api";
@@ -186,7 +187,10 @@ export function WalkStep({
           <button className="btn icon" type="button" onClick={onBack} disabled={recording} aria-label="Back to your gate">
             <ArrowLeft size={18} />
           </button>
-          {progress}
+          <div className="row" style={{ gap: 12 }}>
+            {progress}
+            <AccountMenu />
+          </div>
         </div>
 
         {phase.kind === "intro" && (

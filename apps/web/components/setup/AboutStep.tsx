@@ -3,6 +3,7 @@
 import { ArrowRight } from "@phosphor-icons/react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { api, type Me, type Profile } from "../../lib/api";
+import { AccountMenu } from "../AccountMenu";
 import { TopBar } from "../TopBar";
 
 const COMMON_APPS = ["swiggy", "zomato", "blinkit", "zepto", "instamart", "amazon", "flipkart", "bigbasket"];
@@ -54,7 +55,10 @@ export function AboutStep({ me, progress, onDone }: { me: Me; progress: ReactNod
 
   return (
     <main className="page" style={{ maxWidth: 720 }}>
-      <TopBar back={r ? { href: "/", label: "Home" } : undefined}>{progress}</TopBar>
+      <TopBar back={r ? { href: "/", label: "Home" } : undefined}>
+        {progress}
+        <AccountMenu />
+      </TopBar>
       <form className="stack" style={{ gap: 20 }} onSubmit={submit}>
         <div className="stack" style={{ gap: 6 }}>
           <h1 className="title">Who is the delivery for?</h1>

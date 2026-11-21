@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { LatLon, Me } from "../../lib/api";
 import { useMe } from "../../lib/hooks";
+import { AccountMenu } from "../AccountMenu";
 import { TopBar } from "../TopBar";
 import { AboutStep } from "./AboutStep";
 import { DoorStep } from "./DoorStep";
@@ -37,7 +38,9 @@ export function Setup() {
   if (me.error) {
     return (
       <main className="page">
-        <TopBar back={{ href: "/", label: "Home" }} />
+        <TopBar back={{ href: "/", label: "Home" }}>
+          <AccountMenu />
+        </TopBar>
         <div className="alert err" role="alert">
           <div className="stack" style={{ gap: 8 }}>
             <span>Couldn&rsquo;t load your details: {me.error}</span>

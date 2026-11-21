@@ -1,11 +1,11 @@
 "use client";
 
-import { CaretRight, MapPinLine, PlayCircle, UserCircle, VideoCamera, Warning } from "@phosphor-icons/react";
+import { CaretRight, MapPinLine, UserCircle, VideoCamera, Warning } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useEffect } from "react";
 import { scriptNames, supabase, type Me } from "../lib/api";
 import { useMe, useRoute } from "../lib/hooks";
-import { AppearanceSwitch } from "./AppearanceSwitch";
+import { AccountMenu } from "./AccountMenu";
 import { Calls } from "./Calls";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { RouteMap } from "./RouteMap";
@@ -103,7 +103,9 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
       </div>
 
       <aside className="home-panel">
-        <TopBar />
+        <TopBar>
+          <AccountMenu />
+        </TopBar>
         <div className="home-title">
           <h1 className="title">Hi, {recipient.firstName}</h1>
           <p className="muted">Locus is ready to guide riders to your door.</p>
@@ -151,27 +153,6 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
           </ul>
         </section>
 
-        <ul className="group">
-          <li>
-            <Link className="cell" href="/replay">
-              <span className="cell-icon"><PlayCircle size={17} /></span>
-              <span className="cell-main">Hear a demo call</span>
-              <CaretRight size={16} className="cell-end" />
-            </Link>
-          </li>
-          <li>
-            <div className="cell">
-              <span className="cell-main">Appearance</span>
-              <AppearanceSwitch />
-            </div>
-          </li>
-          <li>
-            <button className="cell" type="button" onClick={() => void supabase.auth.signOut()} style={{ color: "var(--danger)" }}>
-              <span className="cell-main">Sign out</span>
-              <span className="cell-end">{me.identity.email}</span>
-            </button>
-          </li>
-        </ul>
       </aside>
     </main>
   );

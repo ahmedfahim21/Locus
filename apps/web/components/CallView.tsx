@@ -6,6 +6,7 @@ import { LIVE_STATES, scriptNames, STATE_LABEL, type Call } from "../lib/api";
 import { useMe, useRoute } from "../lib/hooks";
 import { useCalls } from "./Calls";
 import { LiveCall, type LiveTurn } from "./LiveCall";
+import { AccountMenu } from "./AccountMenu";
 import { TopBar } from "./TopBar";
 
 const clock = (ms: number) => {
@@ -40,7 +41,9 @@ export function CallView({
   if (loadError && (!me.data || !calls)) {
     return (
       <main className="page">
-        <TopBar back={{ href: "/", label: "Home" }} />
+        <TopBar back={{ href: "/", label: "Home" }}>
+          <AccountMenu />
+        </TopBar>
         <div className="alert err" role="alert">
           <span>Couldn&rsquo;t load this call: {loadError}</span>
         </div>
@@ -50,7 +53,9 @@ export function CallView({
   if (!me.data || calls === null) {
     return (
       <main className="page" aria-busy="true">
-        <TopBar back={{ href: "/", label: "Home" }} />
+        <TopBar back={{ href: "/", label: "Home" }}>
+          <AccountMenu />
+        </TopBar>
         <div className="skeleton" style={{ height: "70vh" }} />
       </main>
     );
@@ -59,7 +64,9 @@ export function CallView({
     const home = me.data.home;
     return (
       <main className="page">
-        <TopBar back={{ href: "/", label: "Home" }} />
+        <TopBar back={{ href: "/", label: "Home" }}>
+          <AccountMenu />
+        </TopBar>
         <LiveCall
           stops={home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl, kind: c.kind, color: c.color }))}
           door={home.handoffPoint}
@@ -79,7 +86,9 @@ export function CallView({
   if (!call || !me.data.home) {
     return (
       <main className="page">
-        <TopBar back={{ href: "/", label: "Home" }} />
+        <TopBar back={{ href: "/", label: "Home" }}>
+          <AccountMenu />
+        </TopBar>
         <div className="alert info">
           <PhoneSlash size={20} />
           <span>This call isn&rsquo;t in your recent calls any more. Locus keeps your last ten.</span>
@@ -100,6 +109,7 @@ export function CallView({
   return (
     <main className="page">
       <TopBar back={{ href: "/", label: "Home" }}>
+        <AccountMenu />
         <span className="label">{new Date(call.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
       </TopBar>
       {error && (

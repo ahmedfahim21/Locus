@@ -255,6 +255,17 @@ a.cell:hover, button.cell:hover { background: color-mix(in srgb, var(--fill) 55%
 .poster .street { font-size: clamp(20px, 2.4vw, 28px); line-height: 1.1; letter-spacing: -0.02em; }
 @media (max-width: 640px) { .poster { max-width: calc(100% - 32px); } }
 
+/* ---------- account menu (top right on signed-in pages) ---------- */
+.account { position: relative; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; border: 0; background: var(--ink); color: var(--on-ink); font: inherit; font-size: 15px; display: grid; place-items: center; cursor: pointer; flex: none; }
+.account-menu { position: absolute; right: 0; top: calc(100% + 8px); z-index: 20; width: 280px; background: var(--card); border-radius: var(--radius); padding: 6px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18), 0 0 0 0.5px var(--separator); display: grid; }
+.account-who { display: flex; gap: 10px; align-items: center; padding: 10px 10px 12px; border-bottom: 0.5px solid var(--separator); margin-bottom: 4px; }
+.account-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 10px; font-size: 15px; }
+.account-row .segmented button { padding: 5px 10px; font-size: 13px; }
+.account-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 10px; border: 0; background: none; font: inherit; font-size: 15px; color: var(--ink); text-decoration: none; cursor: pointer; text-align: left; width: 100%; }
+.account-item:hover { background: var(--fill); }
+.account-item.danger { color: var(--danger); }
+
 /* ---------- call list ---------- */
 .call-row .cell-main { gap: 2px; }
 

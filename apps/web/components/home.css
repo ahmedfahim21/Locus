@@ -1,14 +1,15 @@
 /* Map fills the screen; the panel is a grouped list beside it (desktop) or a sheet below it (phone). */
 .home { display: grid; grid-template-columns: minmax(0, 1fr) 420px; min-height: 100dvh; }
-.home-map { position: relative; min-height: 100dvh; }
+/* The map stays put while the page (and its panel) scrolls normally. */
+.home-map { position: sticky; top: 0; height: 100dvh; }
 .home-map.skeleton { border-radius: 0; }
 .home-map .map.fill { position: absolute; inset: 0; }
-.home-panel { background: var(--bg); padding: 12px 20px 40px; display: grid; gap: 24px; align-content: start; max-height: 100dvh; overflow: auto; }
+.home-panel { background: var(--bg); padding: 12px 20px 40px; display: grid; gap: 24px; align-content: start; }
 .home-title { display: grid; gap: 4px; padding: 0 4px; }
 .map-banner { position: absolute; left: 16px; bottom: 40px; z-index: 2; max-width: 400px; right: 72px; }
 
 @media (max-width: 860px) {
   .home { grid-template-columns: 1fr; }
-  .home-map { min-height: 52dvh; }
+  .home-map { position: relative; height: 52dvh; }
   .home-panel { max-height: none; border-radius: 20px 20px 0 0; margin-top: -20px; position: relative; z-index: 2; padding-top: 16px; }
 }

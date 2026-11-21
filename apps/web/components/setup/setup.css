@@ -1,7 +1,7 @@
 .setup { display: grid; grid-template-columns: minmax(0, 1fr) 440px; min-height: 100dvh; }
-.setup-map { position: relative; min-height: 100dvh; }
+.setup-map { position: sticky; top: 0; height: 100dvh; }
 .setup-map .map.fill { position: absolute; inset: 0; }
-.setup-panel { background: var(--bg); padding: 12px 20px 40px; display: grid; gap: 20px; align-content: start; max-height: 100dvh; overflow: auto; }
+.setup-panel { background: var(--bg); padding: 12px 20px 40px; display: grid; gap: 20px; align-content: start; }
 .landmarks { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
 .landmark { background: var(--card); border-radius: var(--radius); padding: 12px 14px 14px; display: grid; gap: 12px; }
 .landmark .field input, .landmark .field textarea { background: var(--bg); box-shadow: none; }
@@ -12,6 +12,6 @@
 
 @media (max-width: 860px) {
   .setup { grid-template-columns: 1fr; }
-  .setup-map { min-height: 52dvh; position: sticky; top: 0; z-index: 0; }
+  .setup-map { height: 52dvh; position: sticky; top: 0; z-index: 0; }
   .setup-panel { max-height: none; position: relative; z-index: 2; border-radius: 20px 20px 0 0; margin-top: -20px; padding-top: 16px; }
 }
