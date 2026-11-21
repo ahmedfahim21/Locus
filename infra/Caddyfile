@@ -1,0 +1,5 @@
+# HTTPS for the Locus API; the worker connects out to LiveKit and needs no public port.
+{{API_DOMAIN}} {
+	encode gzip
+	reverse_proxy 127.0.0.1:8787
+}

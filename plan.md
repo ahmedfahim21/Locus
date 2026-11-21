@@ -39,6 +39,41 @@ Optional: Sarvam Voice Agents as the "Equal adoption" demo (a Voice Agents agent
 
 Known gaps: OSM names with numbers ("T-hub 2.0") tokenise poorly and can go to the fallback model; stamps overlap when landmarks are close; the 3D route preview (Sadak port) has its own owner.
 
+## How a real call works, and deploying it
+
+End to end:
+1. A rider taps "call customer" in the Swiggy or Zomato app. The platform's number masking places a fresh call to the receiver's number.
+2. That number is the Locus number (set as the receiver's number when ordering, or the recipient forwards unanswered calls to it).
+3. The number belongs to a SIP provider (Vobiz or Plivo India). The provider sends the call to LiveKit's inbound SIP trunk.
+4. LiveKit's dispatch rule puts the call in a new room and dispatches the `locus-guide` worker.
+5. The worker asks the API for a session for that number (`POST /v1/sessions`), gets the greeting and the call's key terms, and starts Sarvam speech: `saaras:v4` listening for those key terms, `bulbul:v4-flash` speaking.
+6. Each rider turn goes to the API (`POST /v1/sessions/:id/utterances`), which runs screening, matching and the route, and returns the exact sentence to say.
+7. If Locus loses the rider twice, the API answers "handoff" with the recipient's phone. The worker dials it through LiveKit's outbound trunk and bridges the rider in, or plays the recipient's note if nobody answers.
+8. The recipient's web app shows the call live (`/me/calls`, polled), on the map, while it happens.
+
+What runs where:
+| Piece | Where | Notes |
+|---|---|---|
+| API (`apps/api`, `pnpm --filter @locus/api start`) | One EC2 instance in ap-south-1, behind Caddy (HTTPS) | Needs ffmpeg for walk videos. Public: the web app and the worker call it. |
+| Call worker (`pnpm --filter @locus/api worker start`) | Same EC2 instance | Connects out to LiveKit; no public port. |
+| Web app (`apps/web`) | Vercel (project root `apps/web`) | Env: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `LOCUS_API_URL`. |
+| Database, sign-in, storage | Supabase | Move the project to Mumbai for latency (~0.8 s per turn). |
+| Calls | LiveKit Cloud, India region | Inbound trunk, dispatch rule, outbound trunk. |
+| Phone number | Vobiz (direct) or Plivo India | Not rented through Sarvam: those only route to Sarvam's own agents. |
+| Speech | Sarvam API | Already set up. |
+| Vision, Street View | OpenAI; Google Maps (`GOOGLE_MAPS_API_KEY`, Street View Static API enabled) | Street View is optional. |
+
+Deploy steps:
+1. EC2: Ubuntu 24.04 in ap-south-1, ports 80 and 443 open, a DNS name (e.g. `api.yourdomain.in`) pointing at it. Clone the repo to `~/Locus`, put the production `.env` at `~/Locus/.env`, run `bash infra/setup-ec2.sh api.yourdomain.in` (Node 22, pnpm, ffmpeg, Caddy, migrations, systemd units in `infra/systemd`).
+2. `.env` on the server: everything in `.env.example`, with `LOCUS_API_URL=https://api.yourdomain.in`, `LOCUS_WEB_ORIGIN=https://<your Vercel domain>`, the LiveKit Cloud URL and keys, and no `LOCUS_DEV_DID`. Create the worker's key with `pnpm --filter @locus/api admin client locus-worker --first-party` and set it as `LOCUS_WORKER_API_KEY`.
+3. Vercel: import the repo, root directory `apps/web`, set the three env vars, deploy. Add the Vercel URL to Supabase Auth's redirect URLs.
+4. LiveKit Cloud: create a project (India region). Install the `lk` CLI. Rent the number from Vobiz or Plivo and point its SIP (origination) at the project's SIP URI. Then:
+   - `lk sip inbound create infra/livekit/inbound-trunk.json` (your number filled in)
+   - `lk sip dispatch create infra/livekit/dispatch-rule.json` (the inbound trunk id filled in)
+   - copy `infra/livekit/outbound-trunk.json` to `outbound-trunk.local.json` (gitignored), fill in the provider's SIP domain and credentials, `lk sip outbound create infra/livekit/outbound-trunk.local.json`, and set its id as `LIVEKIT_SIP_OUTBOUND_TRUNK_ID`.
+5. Tell Locus the number belongs to the recipient: `pnpm --filter @locus/api admin number +91XXXXXXXXXX <recipientId> vobiz`, and `admin outbound +91XXXXXXXXXX` for the loop guard.
+6. Test: turn on "Expecting a delivery", call the number from a friend's phone, then do it for real with a Swiggy order whose receiver number is the Locus number.
+
 ## 0. What changed in this revision
 
 - Here is dropped; Locus (formerly Pata) is the primary and only idea. All effort goes here.

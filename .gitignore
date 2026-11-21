@@ -9,3 +9,4 @@ eval/phrases.jsonl
 *.tsbuildinfo
 .pnpm-store/
 eval/voice-run/
+infra/livekit/*.local.json

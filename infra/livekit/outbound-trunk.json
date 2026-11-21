@@ -1,0 +1,9 @@
+{
+  "trunk": {
+    "name": "Locus outbound (handoff to the recipient)",
+    "address": "<your provider's SIP domain, e.g. from the Vobiz or Plivo console>",
+    "numbers": ["+91XXXXXXXXXX"],
+    "auth_username": "<from the provider; keep the real values out of git>",
+    "auth_password": "<from the provider>"
+  }
+}

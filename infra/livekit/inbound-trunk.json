@@ -1,0 +1,7 @@
+{
+  "trunk": {
+    "name": "Locus inbound",
+    "numbers": ["+91XXXXXXXXXX"],
+    "krisp_enabled": true
+  }
+}

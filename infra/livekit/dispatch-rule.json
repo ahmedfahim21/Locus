@@ -1,0 +1,8 @@
+{
+  "dispatch_rule": {
+    "name": "Locus: every call to the guide worker",
+    "trunk_ids": ["<inbound trunk id from `lk sip inbound list`>"],
+    "rule": { "dispatchRuleIndividual": { "roomPrefix": "call-" } },
+    "room_config": { "agents": [{ "agent_name": "locus-guide" }] }
+  }
+}
