@@ -9,7 +9,7 @@ import { PostgresStore } from "../store/postgres.js";
 
 type OverpassElement =
   | { type: "node"; id: number; lat: number; lon: number; tags?: Record<string, string> }
-  | { type: "way"; id: number; nodes: number[]; tags?: Record<string, string>; center?: { lat: number; lon: number } };
+  | { type: "way"; id: number; nodes?: number[]; tags?: Record<string, string>; center?: { lat: number; lon: number } };
 
 const [latArg, lonArg, radiusArg] = process.argv.slice(2);
 const lat = Number(latArg);
@@ -20,14 +20,14 @@ if (!Number.isFinite(lat) || !Number.isFinite(lon) || !Number.isFinite(radius)) 
 }
 
 const endpoint = optionalEnv("OVERPASS_URL") ?? "https://overpass-api.de/api/interpreter";
-const query = `[out:json][timeout:60];
-(
-  nwr(around:${radius},${lat},${lon})["name"][~"^(amenity|shop|tourism|leisure|building|office|historic|healthcare|craft)$"~"."];
-  way(around:${radius},${lat},${lon})["highway"];
-);
-out center tags;
->;
-out skel;`;
+// Places print with a centre point; roads print with their node ids, then those nodes' coordinates.
+const query = `[out:json][timeout:90];
+nwr(around:${radius},${lat},${lon})["name"][~"^(amenity|shop|tourism|leisure|building|office|historic|healthcare|craft)$"~"."]->.places;
+way(around:${radius},${lat},${lon})["highway"]->.roads;
+.places out center tags;
+.roads out body;
+.roads >;
+out skel qt;`;
 
 const res = await fetch(endpoint, {
   method: "POST",
@@ -45,7 +45,7 @@ const ways: { way: typeof schema.osmWays.$inferInsert; nodes: (typeof schema.osm
 
 for (const e of elements) {
   const tags = e.tags ?? {};
-  if (e.type === "way" && tags.highway) {
+  if (e.type === "way" && tags.highway && e.nodes) {
     const wayId = `way/${e.id}`;
     const wayNodes = e.nodes
       .map((id, seq) => ({ id, seq, loc: nodes.get(id) }))
