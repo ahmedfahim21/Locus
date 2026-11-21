@@ -17,7 +17,7 @@ Done and tested (`pnpm typecheck`, `pnpm test`: 93 API tests):
 - Walk-video pipeline (section 4.6) on Supabase Storage, with a sweep that deletes videos older than a day. Typed landmarks get Hindi and Kannada names from Sarvam translate.
 - `osm:import` works (imported 35 places and 248 roads around the demo home). Overpass mirrors are often overloaded: retry, or set `OVERPASS_URL`.
 - `pnpm eval <recipientId> [phrases.jsonl] --ablation` scores typed only / + OSM / + walk landmarks. A 10-phrase dev run: 60% with 2 wrong landmarks named → 90% with none.
-- Web app on DESIGN.md, clicked through signed in (home, setup incl. walk review, landmarks).
+- Web app on DESIGN.md (Spatial Agents chrome, Sadak map colours): light and dark themes with an appearance switch, map labels, a brand mark (`app/icon.svg`), and a 3D view. In 3D, buildings rise from OSM heights and each landmark stands up as a prop in its colour; the walk-video model reports each landmark's kind and colour (verified on the painted-board video: green, rust and saffron came back within a few shades).
 
 Voice, end to end without a phone number (verified):
 - Sarvam models: speech-to-text `saaras:v4` with per-call key terms (name, apps, landmarks, nearby places; sent through `patches/@livekit__agents-plugin-sarvam@1.10.1.patch`), voice `bulbul:v4-flash` (`simran_hi_conversation`), fallback matcher `sarvam-105b-conversations`, names `sarvam-translate:v1`. On phone audio, key terms turn "बहिन" back into "फहीम" (Fahim) and "Kohinoor" into "Kohenur".

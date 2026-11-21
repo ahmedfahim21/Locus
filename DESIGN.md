@@ -148,15 +148,23 @@ Surfaces:
 - Call view and test call (Experience): map with the route and rider; status, progress and chat bubbles beside it.
 - Landing and demo call (Persuade).
 
+## Brand
+
+- Name: Locus. Line: "Talks your rider to your door."
+- Mark (`apps/web/app/icon.svg`, `components/Logo.tsx`): a route bending into an "L" on a dark map tile. The blue dot is the rider, the gold dot a landmark, the white pin the door: the product in one glyph. It reads at 16px (the gold dot drops out) and on light or dark grounds; a 10% white hairline keeps the tile's edge on black.
+- Wordmark: "Locus" in the system font at weight 400, tracking −0.03em, set to the right of the mark at 0.72× its height.
+- Favicon `app/icon.svg`, Apple touch icon `app/apple-icon.png` (180px, rendered from the same SVG), web manifest `app/manifest.ts`.
+
 ## Colors
 
 Strategy: restrained chrome, committed map.
 - Chrome: grey grouped background, white raised surfaces, black ink. Black is the primary button and the rider's chat bubble. There is no brand hue in the chrome.
 - Status colours are iOS system colours and appear only for status: green for a switch that is on and for reached progress, red for live calls, errors and ending a call, orange for warnings.
-- Map: Sadak's game palette, identical in light and dark mode so the route always reads. Dark ground and building blocks, gold primary roads, pale secondaries, grey lanes, all in dark casings; blue water with a lighter shore; green parks.
+- Map: Sadak's game palette in two themes (`lib/mapStyle.ts`). Dark: charcoal ground and building blocks, gold primary roads, pale secondaries, grey lanes in dark casings, blue water with a lighter shore, green parks. Light: the same structure on a pale ground (white lanes in grey casings, gold primaries in a deeper gold casing, sky-blue water, soft green parks).
+- Labels: street names along roads, area names in muted spaced capitals, points of interest in amber (dark map) or deep amber (light map), water names in blue italic; all with a halo in the ground colour. Latin-script names (OSM `name:en`/`name:latin` first), because the map fonts don't cover Devanagari or Kannada.
 - Map meanings: blue is the route and the rider; green is the stretch already walked and reached landmarks; gold is a landmark; white is the door.
 
-Dark mode follows the system: black background, `#1c1c1e` cards, white ink. The map does not change.
+Appearance: Auto (follows the system), Light or Dark, chosen in Home → Account or the landing page footer, saved per browser and applied before first paint. Dark: black background, `#1c1c1e` cards, white ink, and the dark map. The map repaints in place when the theme changes.
 
 ## Typography
 
@@ -192,6 +200,7 @@ Flat surfaces separated by background tone, not borders: white groups on grey. O
 - Door: a white dot with a dark ring and a small "Door" pill (left off when the last landmark is the door).
 - Rider: a blue dot with a white border and a soft blue halo.
 - Callout: a white rounded bubble on the map showing Locus's latest line, rising in.
+- 3D view: a frosted "3D" pill on every route map. On: the camera flies to the door at street zoom with a 62° tilt, buildings rise from OSM heights, and each landmark stands up as a prop. The prop's shape and height come from its kind (gates and shops square, trees and temples round), its colour from the walk video (a blue gate is blue), with a default per kind when the video gave none. Typed landmarks are gold posts. Props are drawn 3× life size so they read at a glance. Pins lift above their props on a short stem. "2D" returns to where you were.
 - Placement pins (setup): a fixed pin at the map centre, white for the gate and gold for landmarks.
 - Live indicator: a pulsing red dot; a four-bar waveform shows who is speaking (red for you, blue for Locus).
 - Loading: shimmer skeletons in fill colour; never a stock image.
@@ -205,7 +214,7 @@ Flat surfaces separated by background tone, not borders: white groups on grey. O
 - Do credit OpenStreetMap and OpenFreeMap on every map.
 - Don't use bold or semibold; use size and tracking.
 - Don't add a brand colour to buttons or headings.
-- Don't change the map palette with the theme.
+- Don't add base-map labels in Devanagari or Kannada (the fonts can't render them); show those names on Locus's own pins.
 - Don't use heavy borders, hard offset shadows or handwritten fonts (the earlier "wedding card" look is retired).
 
 ## Motion
@@ -222,4 +231,6 @@ Flat surfaces separated by background tone, not borders: white groups on grey. O
 | 2026-11-21 | Initial "wedding-card map" system | First /design-consultation pass. |
 | 2026-11-22 | Replaced with Spatial Agents chrome and Sadak map colours | The user found the wedding-card look too stylised ("looks vibe coded") and asked for clean and modern like Spatial Agents, with maps coloured like Sadak. |
 | 2026-11-22 | Weight 400 throughout, unlike Spatial Agents' bold titles | The user's standing rule: no bold or semibold. |
-| 2026-11-22 | Map identical in light and dark mode | The route, rider and door keep the same meaning and contrast everywhere. |
+| 2026-11-22 | Light and dark map themes, map labels, appearance switch | Asked for: "map doesn't have labels? have a light mode too". |
+| 2026-11-22 | Brand mark: the route "L" | Asked for product branding and a logo; the mark shows rider → landmark → door. |
+| 2026-11-22 | 3D view with coloured landmark props | Asked for a Mapbox-like 3D view using what the walk video sees (colour, kind of thing). |
