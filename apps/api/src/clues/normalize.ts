@@ -140,6 +140,22 @@ export function skeleton(token: string): string {
   return (t[0]! + rest).replace(/(.)\1+/g, "$1");
 }
 
+/**
+ * Common Romanization differences ironed out: "phaheem" (romanized फहीम) and
+ * "fahim" both become "fahim"; "svigee" and "swiggy" become "svigi"/"svigy".
+ */
+export function phonetic(token: string): string {
+  return token
+    .replace(/ph/g, "f")
+    .replace(/w/g, "v")
+    .replace(/z/g, "j")
+    .replace(/q/g, "k")
+    .replace(/ee/g, "i")
+    .replace(/oo/g, "u")
+    .replace(/(.)\1+/g, "$1")
+    .replace(/([bcdfgjklmnprstv])h(?=[aeiou])/g, "$1");
+}
+
 /** Normalized Levenshtein similarity in [0, 1]. */
 export function similarity(a: string, b: string): number {
   if (a === b) return 1;

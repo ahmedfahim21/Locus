@@ -1,4 +1,4 @@
-import { similarity, skeleton, tokens } from "./normalize.js";
+import { phonetic, similarity, skeleton, tokens } from "./normalize.js";
 
 export type Candidate = {
   id: string;
@@ -30,7 +30,12 @@ function sameSkeleton(a: string, b: string): boolean {
 }
 
 function tokenHeard(nameToken: string, heard: string[]): boolean {
-  return heard.some((h) => similarity(nameToken, h) >= TOKEN_THRESHOLD || sameSkeleton(nameToken, h));
+  return heard.some(
+    (h) =>
+      similarity(nameToken, h) >= TOKEN_THRESHOLD ||
+      similarity(phonetic(nameToken), phonetic(h)) >= TOKEN_THRESHOLD ||
+      sameSkeleton(nameToken, h),
+  );
 }
 
 /** Best coverage of any of the candidate's names by the heard tokens. */

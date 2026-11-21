@@ -220,3 +220,17 @@ describe("matching Devanagari speech-to-text output", () => {
     expect(heardAny("medical ke paas", ["model"])).toBe(false);
   });
 });
+
+describe("short names heard in Devanagari", () => {
+  it("matches a short name whose Romanization differs only in spelling", () => {
+    expect(tokens("फहीम के लिए है")).toEqual(["phaheem", "lie"]);
+    expect(heardAny("फहीम के लिए है स्विगी से", ["Fahim"])).toBe(true);
+    expect(heardAny("रवि के लिए", ["Ravi"])).toBe(true);
+  });
+
+  it("still refuses a different name or an unrelated word", () => {
+    expect(heardAny("मोहम्मद के लिए", ["Ahmed"])).toBe(false);
+    expect(heardAny("फिल्म देख रहा हूं", ["Fahim"])).toBe(false);
+    expect(heardAny("रमेश के लिए", ["Fahim"])).toBe(false);
+  });
+});
