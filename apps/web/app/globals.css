@@ -266,6 +266,15 @@ a.cell:hover, button.cell:hover { background: color-mix(in srgb, var(--fill) 55%
 .account-item:hover { background: var(--fill); }
 .account-item.danger { color: var(--danger); }
 
+/* ---------- setup suggestions ---------- */
+.suggestion { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; }
+.suggestion-thumb { width: 48px; height: 48px; border-radius: 12px; background: var(--fill); flex: none; overflow: hidden; display: block; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.08); }
+.suggestion-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.source-chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: var(--fill); font-size: 12px; color: var(--secondary); }
+.check { width: 24px; height: 24px; border-radius: 50%; flex: none; margin-top: 12px; box-shadow: inset 0 0 0 1.5px var(--fill-strong); display: grid; place-items: center; color: var(--on-ink); transition: background 150ms ease-out; }
+.check.on { background: var(--ink); box-shadow: none; }
+.suggestion[aria-pressed="false"] .cell-main > span:first-child { color: var(--secondary); }
+
 /* ---------- call list ---------- */
 .call-row .cell-main { gap: 2px; }
 

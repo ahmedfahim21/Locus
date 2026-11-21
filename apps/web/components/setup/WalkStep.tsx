@@ -47,7 +47,8 @@ export function WalkStep({
   progress: ReactNode;
   onBack: () => void;
   onSkip: () => void;
-  onDone: (kept: KeptProposal[]) => void;
+  /** Kept proposals (with any rename) and the ids the recipient skipped. */
+  onDone: (kept: KeptProposal[], skipped: string[]) => void;
 }) {
   const [phase, setPhase] = useState<Phase>(() => {
     const walkId = walkInUrl();
@@ -321,7 +322,7 @@ function ReviewMap({ door, proposals }: { door: LatLon; proposals: Proposal[] })
   );
 }
 
-function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; onDone: (kept: KeptProposal[]) => void; onRecordAgain: () => void }) {
+function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; onDone: (kept: KeptProposal[], skipped: string[]) => void; onRecordAgain: () => void }) {
   const [keep, setKeep] = useState(() => new Set(proposals.map((p) => p.id)));
   const [names, setNames] = useState(() => Object.fromEntries(proposals.map((p) => [p.id, p.name])));
 
@@ -336,7 +337,7 @@ function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; o
           <VideoCamera size={18} />
           Record again
         </button>
-        <button className="btn ghost block" type="button" onClick={() => onDone([])}>
+        <button className="btn ghost block" type="button" onClick={() => onDone([], [])}>
           Add landmarks myself
         </button>
       </>
@@ -384,7 +385,7 @@ function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; o
           );
         })}
       </ol>
-      <button className="btn primary block" type="button" onClick={() => onDone(kept.map((p) => ({ ...p, keptName: names[p.id]!.trim() })))} disabled={kept.length === 0}>
+      <button className="btn primary block" type="button" onClick={() => onDone(kept.map((p) => ({ ...p, keptName: names[p.id]!.trim() })), proposals.filter((p) => !kept.includes(p)).map((p) => p.id))} disabled={kept.length === 0}>
         Use {kept.length} landmark{kept.length === 1 ? "" : "s"}
         <ArrowRight size={18} />
       </button>

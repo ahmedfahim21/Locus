@@ -2,18 +2,19 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { LatLon, Me } from "../../lib/api";
+import type { LatLon, Me, Suggestion } from "../../lib/api";
 import { useMe } from "../../lib/hooks";
 import { AccountMenu } from "../AccountMenu";
 import { TopBar } from "../TopBar";
 import { AboutStep } from "./AboutStep";
 import { DoorStep } from "./DoorStep";
 import { LandmarksStep } from "./LandmarksStep";
+import { SuggestStep } from "./SuggestStep";
 import { WalkStep, type KeptProposal } from "./WalkStep";
 import "./setup.css";
 
-export type Step = "about" | "door" | "walk" | "landmarks";
-const STEPS: Step[] = ["about", "door", "walk", "landmarks"];
+export type Step = "about" | "door" | "walk" | "suggest" | "landmarks";
+const STEPS: Step[] = ["about", "door", "walk", "suggest", "landmarks"];
 
 function stepFrom(param: string | null): Step {
   return STEPS.includes(param as Step) ? (param as Step) : "about";
@@ -24,7 +25,9 @@ export function Setup() {
   const params = useSearchParams();
   const [step, setStep] = useState<Step>(() => stepFrom(params.get("step")));
   const [door, setDoor] = useState<LatLon | null>(null);
-  const [fromWalk, setFromWalk] = useState<KeptProposal[]>([]);
+  const [walkRenames, setWalkRenames] = useState<Map<string, string>>(new Map());
+  const [skippedProposals, setSkippedProposals] = useState<Set<string>>(new Set());
+  const [fromSuggestions, setFromSuggestions] = useState<Suggestion[]>([]);
 
   // Keep the URL in step with the screen so reload and back work.
   useEffect(() => {
@@ -63,7 +66,7 @@ export function Setup() {
 
   // Steps that need earlier ones send you back to the first one missing.
   const data: Me = me.data;
-  const needsDoor = (step === "walk" || step === "landmarks") && !door && !data.home;
+  const needsDoor = (step === "walk" || step === "suggest" || step === "landmarks") && !door && !data.home;
   const effective: Step = !data.recipient ? "about" : needsDoor ? "door" : step;
   const index = STEPS.indexOf(effective);
   const progress = (
@@ -105,9 +108,30 @@ export function Setup() {
         door={door ?? data.home!.handoffPoint}
         progress={progress}
         onBack={() => setStep("door")}
-        onSkip={() => setStep("landmarks")}
+        onSkip={() => setStep("suggest")}
+        onDone={(kept: KeptProposal[], skipped: string[]) => {
+          setWalkRenames(new Map(kept.filter((p) => p.keptName !== p.name).map((p) => [p.id, p.keptName])));
+          setSkippedProposals(new Set(skipped));
+          setStep("suggest");
+        }}
+      />
+    );
+  }
+  if (effective === "suggest") {
+    return (
+      <SuggestStep
+        door={door ?? data.home!.handoffPoint}
+        skippedProposals={skippedProposals}
+        progress={progress}
+        onBack={() => setStep("suggest")}
         onDone={(kept) => {
-          setFromWalk(kept);
+          // A walk landmark the recipient renamed keeps their name, in the drafted words too.
+          setFromSuggestions(
+            kept.map((s) => {
+              const renamed = s.proposalId ? walkRenames.get(s.proposalId) : undefined;
+              return renamed ? { ...s, name: renamed, text: s.text.split(s.name).join(renamed) } : s;
+            }),
+          );
           setStep("landmarks");
         }}
       />
@@ -117,7 +141,7 @@ export function Setup() {
     <LandmarksStep
       me={data}
       door={door ?? data.home!.handoffPoint}
-      fromWalk={fromWalk}
+      fromSuggestions={fromSuggestions}
       progress={progress}
       onBack={() => setStep("walk")}
       onDone={() => window.location.assign("/")}

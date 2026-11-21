@@ -4,8 +4,8 @@ import { AccountMenu } from "../AccountMenu";
 import { ArrowDown, ArrowLeft, ArrowUp, MapPin, Plus, Trash } from "@phosphor-icons/react";
 import type * as MapLibre from "maplibre-gl";
 import { useRef, useState, type ReactNode } from "react";
-import { api, scriptNames, type CueInput, type LatLon, type Me } from "../../lib/api";
-import type { KeptProposal } from "./WalkStep";
+import { api, scriptNames, type CueInput, type LatLon, type Me, type Suggestion } from "../../lib/api";
+
 import { Map, MapMarker } from "../mapcn/Map";
 import { DoorPin, Stamp } from "../RouteMap";
 import { MapHandle } from "./MapHandle";
@@ -21,6 +21,10 @@ type Draft = {
   proposalId: string | null;
   photoUrl: string | null;
   alt: { text: string; script: "deva" | "knda" }[];
+  /** Kept from a map or Street View suggestion (walk-video ones carry proposalId instead). */
+  source: "map" | "streetView" | null;
+  kind: string | null;
+  color: string | null;
 };
 
 /** Same threshold as the API's route: a landmark this close to the door is the door. */
@@ -32,20 +36,19 @@ function metresBetween(a: LatLon, b: LatLon) {
   return Math.hypot(dLat, dLon);
 }
 
-/** A starting instruction for a walk-video landmark, said once the rider is there; the recipient edits it before saving. */
-const suggestedText = (name: string) => `${name} ke baad seedha aaiye.`;
 
 export function LandmarksStep({
   me,
   door,
-  fromWalk,
+  fromSuggestions,
   progress,
   onBack,
   onDone,
 }: {
   me: Me;
   door: LatLon;
-  fromWalk: KeptProposal[];
+  /** Suggestions kept in the previous step, in route order, with drafted text. */
+  fromSuggestions: Suggestion[];
   progress: ReactNode;
   onBack: () => void;
   onDone: () => void;
@@ -62,18 +65,25 @@ export function LandmarksStep({
       proposalId: c.proposalId,
       photoUrl: c.photoUrl,
       alt: scriptNames(c.aliases),
+      source: c.source === "map" || c.source === "streetView" ? c.source : null,
+      kind: c.kind,
+      color: c.color,
     }));
-    const have = new Set(existing.flatMap((d) => (d.proposalId ? [d.proposalId] : [])));
-    const walked: Draft[] = fromWalk
-      .filter((p) => !have.has(p.id))
-      .map((p) => ({
+    const haveProposal = new Set(existing.flatMap((d) => (d.proposalId ? [d.proposalId] : [])));
+    const haveName = new Set(existing.map((d) => d.landmark.trim().toLowerCase()));
+    const walked: Draft[] = fromSuggestions
+      .filter((s) => !(s.proposalId && haveProposal.has(s.proposalId)) && !haveName.has(s.name.trim().toLowerCase()))
+      .map((s) => ({
         key: nextKey.current++,
-        landmark: p.keptName,
-        text: suggestedText(p.keptName),
-        location: p.location,
-        proposalId: p.id,
-        photoUrl: p.photoUrl,
-        alt: scriptNames([p.nameHi ?? "", p.nameKn ?? ""]),
+        landmark: s.name,
+        text: s.text,
+        location: s.location,
+        proposalId: s.proposalId,
+        photoUrl: s.photoUrl,
+        alt: scriptNames([s.nameHi ?? "", s.nameKn ?? ""]),
+        source: s.proposalId ? null : s.sources.includes("map") ? "map" : "streetView",
+        kind: s.kind,
+        color: s.color,
       }));
     // The door stays last: new walk landmarks go before an existing landmark that is the door itself.
     const last = existing[existing.length - 1];
@@ -93,7 +103,7 @@ export function LandmarksStep({
   function add() {
     const location = crosshair();
     if (!location || drafts.length >= MAX_LANDMARKS) return;
-    setDrafts((d) => [...d, { key: nextKey.current++, landmark: "", text: "", location, proposalId: null, photoUrl: null, alt: [] }]);
+    setDrafts((d) => [...d, { key: nextKey.current++, landmark: "", text: "", location, proposalId: null, photoUrl: null, alt: [], source: null, kind: null, color: null }]);
   }
 
   const update = (key: number, patch: Partial<Draft>) => setDrafts((d) => d.map((x) => (x.key === key ? { ...x, ...patch } : x)));
@@ -124,6 +134,9 @@ export function LandmarksStep({
         text: d.text.trim(),
         location: d.location,
         ...(d.proposalId ? { proposalId: d.proposalId } : {}),
+        ...(!d.proposalId && d.source ? { source: d.source } : {}),
+        ...(!d.proposalId && d.kind ? { kind: d.kind } : {}),
+        ...(!d.proposalId && d.color ? { color: d.color } : {}),
       }));
       const res = await api<{ warnings: string[] }>("/me/home", { method: "PUT", body: { handoffPoint: door, cues } });
       // Saved either way; if some names couldn't be added, say so before leaving.
@@ -200,7 +213,7 @@ export function LandmarksStep({
           {drafts.map((d, i) => (
             <li key={d.key} className="landmark">
               <div className="landmark-head">
-                <span className="label">Stop {i + 1}{d.proposalId ? " · from your walk" : ""}</span>
+                <span className="label">Stop {i + 1}{d.proposalId ? " · from your walk" : d.source === "map" ? " · from the map" : d.source === "streetView" ? " · from Street View" : ""}</span>
                 <div className="row" style={{ gap: 4 }}>
                   <button className="btn ghost icon compact" type="button" onClick={() => moveToCrosshair(d.key)} aria-label={`Move stop ${i + 1} to the pin`} title="Move to the pin" style={{ width: 40 }}>
                     <MapPin size={18} />

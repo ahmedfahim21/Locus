@@ -13,7 +13,7 @@ export type Cue = {
   location: LatLon;
   /** Other names a rider might say, including Hindi and Kannada script. */
   aliases: string[];
-  source: "typed" | "walkVideo";
+  source: "typed" | "walkVideo" | "map" | "streetView";
   /** Short-lived signed URL of the walk-video frame, for walk-video landmarks. */
   photoUrl: string | null;
   /** From the walk video, for the 3D view: what it is and its colour ("#rrggbb"). */
@@ -24,7 +24,46 @@ export type Cue = {
 };
 
 /** What PUT /me/home takes for each landmark. */
-export type CueInput = { text: string; landmark: string; location: LatLon; aliases?: string[]; proposalId?: string };
+export type CueInput = {
+  text: string;
+  landmark: string;
+  location: LatLon;
+  aliases?: string[];
+  proposalId?: string;
+  source?: "map" | "streetView";
+  kind?: string;
+  color?: string;
+};
+
+export type SuggestionSource = "map" | "video" | "street";
+export type Suggestion = {
+  id: string;
+  name: string;
+  nameHi: string | null;
+  nameKn: string | null;
+  aliases: string[];
+  kind: string | null;
+  color: string | null;
+  location: LatLon;
+  alongM: number;
+  sources: SuggestionSource[];
+  osmId: string | null;
+  proposalId: string | null;
+  photoUrl: string | null;
+  text: string;
+  recommended: boolean;
+};
+export type RoutePlan = {
+  entryStreet: string | null;
+  line: LatLon[];
+  lengthM: number;
+  turns: { atM: number; location: LatLon; direction: "left" | "right"; onto: string | null }[];
+};
+export type Suggestions = {
+  route: RoutePlan;
+  suggestions: Suggestion[];
+  streetView: { status: "ok" | "off" | "error"; message?: string; found?: number };
+};
 
 export type WalkStatus = "awaitingUpload" | "processing" | "ready" | "failed";
 export type Walk = { id: string; status: WalkStatus; error: string | null; createdAt: string; processedAt: string | null };
