@@ -31,8 +31,8 @@ function metresBetween(a: LatLon, b: LatLon) {
   return Math.hypot(dLat, dLon);
 }
 
-/** A starting instruction for a walk-video landmark; the recipient edits it before saving. */
-const suggestedText = (name: string) => `Aage ${name} dikhega, wahan tak aaiye.`;
+/** A starting instruction for a walk-video landmark, said once the rider is there; the recipient edits it before saving. */
+const suggestedText = (name: string) => `${name} ke baad seedha aaiye.`;
 
 export function LandmarksStep({
   me,

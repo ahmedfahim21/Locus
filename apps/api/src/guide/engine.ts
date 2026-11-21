@@ -5,6 +5,9 @@ import type { RoadGraph } from "../geo/roadGraph.js";
 import { OBJECTION_PHRASES, PERSON_PHRASES, WRONG_PHRASES, say } from "./phrases.js";
 import type { PositionResolver } from "./resolver.js";
 
+/** An OSM place this close to a landmark is treated as that landmark. */
+const SAME_PLACE_M = 20;
+
 export const SUPPORTED_LANGUAGES: readonly string[] = ["hi", "en"];
 export const MAX_SCREENING_ATTEMPTS = 2;
 export const LOST_TURNS_FOR_HANDOFF = 2;
@@ -128,29 +131,28 @@ async function guidingTurn(session: Session, input: RiderInput, ctx: GuideContex
   const matchedId = fast ? fast.candidate.id : await ctx.resolver.resolve(input.text, candidates);
   if (matchedId === null) return lostTurn(session, input, ctx);
 
-  const cueIndex = cues.findIndex((c) => c.id === matchedId);
+  const feature = ctx.features.find((f) => f.osmId === matchedId);
+  const remaining = cues.slice(session.currentCue + 1);
+  // A mapped place standing where a landmark the rider hasn't reached yet is, is that landmark.
+  const sameAsCue = feature ? remaining.find((c) => distanceM(feature.location, c.location) <= SAME_PLACE_M) : undefined;
+  const cueIndex = cues.findIndex((c) => c.id === (sameAsCue?.id ?? matchedId));
   if (cueIndex >= 0) {
     const cue = cues[cueIndex]!;
-    const nextCue = cues[cueIndex + 1];
-    if (!nextCue) {
+    const extra = { matchedCueId: cue.id, ...(feature ? { matchedOsmId: feature.osmId } : {}) };
+    if (cueIndex === cues.length - 1) {
       const next: Session = { ...session, state: "arrived", currentCue: cueIndex, lostTurns: 0, endedAt: ctx.now };
       const instruction = say.arrived(lang);
-      return { session: next, instruction, turn: makeTurn(next, input, instruction, ctx.now, { matchedCueId: cue.id }) };
+      return { session: next, instruction, turn: makeTurn(next, input, instruction, ctx.now, extra) };
     }
+    // The recipient wrote each landmark's text as what Locus says when the rider is there.
     const next: Session = { ...session, currentCue: cueIndex, lostTurns: 0 };
-    return {
-      session: next,
-      instruction: nextCue.text,
-      turn: makeTurn(next, input, nextCue.text, ctx.now, { matchedCueId: cue.id }),
-    };
+    return { session: next, instruction: cue.text, turn: makeTurn(next, input, cue.text, ctx.now, extra) };
   }
 
-  const feature = ctx.features.find((f) => f.osmId === matchedId);
   if (!feature) return lostTurn(session, input, ctx);
 
   // Rider is off the recorded route: one street-name step towards the nearest
   // cue they haven't reached yet (P5). Never left/right: heading is unknown.
-  const remaining = cues.slice(session.currentCue + 1);
   const pool = remaining.length > 0 ? remaining : cues;
   const target = pool.reduce((best, c) =>
     distanceM(feature.location, c.location) < distanceM(feature.location, best.location) ? c : best,

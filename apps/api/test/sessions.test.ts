@@ -184,13 +184,14 @@ describe("guide loop", () => {
     const t = setup();
     await guiding(t);
 
+    // Each landmark's own text is what Locus says once the rider is there.
     const a = await t.say("ses_1", "main petrol pump ke saamne hoon");
-    expect(a.body).toEqual({ instruction: cue(2).text, state: "guiding", lostTurns: 0 });
+    expect(a.body).toEqual({ instruction: cue(1).text, state: "guiding", lostTurns: 0 });
     expect(t.store.sessions.get("ses_1")!.currentCue).toBe(0);
 
     // Matches both the cue and the OSM temple's alt name: the cue wins.
     const b = await t.say("ses_1", "hanuman mandir ke paas aa gaya");
-    expect(b.body).toEqual({ instruction: cue(3).text, state: "guiding", lostTurns: 0 });
+    expect(b.body).toEqual({ instruction: cue(2).text, state: "guiding", lostTurns: 0 });
 
     const c = await t.say("ses_1", "neele gate ke saamne khada hoon");
     expect(c.body).toEqual({ instruction: say.arrived("hi"), state: "arrived", lostTurns: 0 });
@@ -208,7 +209,17 @@ describe("guide loop", () => {
     const t = setup();
     await guiding(t);
     const res = await t.say("ses_1", "मैं हनुमान मंदिर के पास हूँ");
-    expect(res.body).toEqual({ instruction: cue(3).text, state: "guiding", lostTurns: 0 });
+    expect(res.body).toEqual({ instruction: cue(2).text, state: "guiding", lostTurns: 0 });
+  });
+
+  it("treats a mapped place standing on a landmark the rider hasn't reached as that landmark", async () => {
+    const t = setup();
+    await guiding(t);
+    // "Sri Anjaneya Temple" (node/101) is the OSM place at the Hanuman temple landmark.
+    const res = await t.say("ses_1", "Sri Anjaneya temple ke paas hoon");
+    expect(res.body).toEqual({ instruction: cue(2).text, state: "guiding", lostTurns: 0 });
+    expect(t.store.turns.at(-1)).toMatchObject({ matchedCueId: "cue_2", matchedOsmId: "node/101", lost: false });
+    expect(t.store.sessions.get("ses_1")!.currentCue).toBe(1);
   });
 
   it("gives an off-route rider a street-name step towards the nearest remaining cue (P5)", async () => {
@@ -229,7 +240,7 @@ describe("guide loop", () => {
     await guiding(t);
     t.resolver.answer = "cue_1";
     const res = await t.say("ses_1", "jahan gaadiyon mein tel bharte hain wahan hoon");
-    expect(res.body).toEqual({ instruction: cue(2).text, state: "guiding", lostTurns: 0 });
+    expect(res.body).toEqual({ instruction: cue(1).text, state: "guiding", lostTurns: 0 });
     expect(t.resolver.calls).toEqual([
       {
         utterance: "jahan gaadiyon mein tel bharte hain wahan hoon",
@@ -262,7 +273,7 @@ describe("guide loop", () => {
     await guiding(t);
     await t.say("ses_1", "kuch nahi dikh raha");
     const res = await t.say("ses_1", "petrol pump");
-    expect(res.body).toEqual({ instruction: cue(2).text, state: "guiding", lostTurns: 0 });
+    expect(res.body).toEqual({ instruction: cue(1).text, state: "guiding", lostTurns: 0 });
   });
 
   it("counts unsupported language and 'wrong instruction' as lost turns", async () => {
