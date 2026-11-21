@@ -64,7 +64,9 @@ What runs where:
 | Vision, Street View | OpenAI; Google Maps (`GOOGLE_MAPS_API_KEY`, Street View Static API enabled) | Street View is optional. |
 
 Deploy steps:
-1. EC2: Ubuntu 24.04 in ap-south-1, ports 80 and 443 open, a DNS name (e.g. `api.yourdomain.in`) pointing at it. Clone the repo to `~/Locus`, put the production `.env` at `~/Locus/.env`, run `bash infra/setup-ec2.sh api.yourdomain.in` (Node 22, pnpm, ffmpeg, Caddy, migrations, systemd units in `infra/systemd`).
+1. EC2 with Docker (what runs now: `locus-api.ahmedfahim.dev` on 3.111.53.34): ports 80 and 443 open in the security group, an A record for the API name pointing at the instance. Put the production env at `infra/.env.production` (gitignored; `API_DOMAIN`, `LOCUS_API_URL`, comma-separated `LOCUS_WEB_ORIGIN`), copy the repo to `~/locus` on the server (from zsh, write `"${H}:locus"`, since `$H:l` is a zsh modifier), then on the server:
+   `docker compose -f infra/docker-compose.yml --env-file infra/.env.production up -d --build`
+   This builds `apps/api/Dockerfile` and starts the API plus Caddy, which gets the TLS certificate. Add `--profile calls` once LiveKit keys are in the env to start the call worker too. Without Docker, `bash infra/setup-ec2.sh api.yourdomain.in` sets up the same thing on Ubuntu with systemd.
 2. `.env` on the server: everything in `.env.example`, with `LOCUS_API_URL=https://api.yourdomain.in`, `LOCUS_WEB_ORIGIN=https://<your Vercel domain>`, the LiveKit Cloud URL and keys, and no `LOCUS_DEV_DID`. Create the worker's key with `pnpm --filter @locus/api admin client locus-worker --first-party` and set it as `LOCUS_WORKER_API_KEY`.
 3. Vercel: import the repo, root directory `apps/web`, set the three env vars, deploy. Add the Vercel URL to Supabase Auth's redirect URLs.
 4. LiveKit Cloud: create a project (India region). Install the `lk` CLI. Rent the number from Vobiz or Plivo and point its SIP (origination) at the project's SIP URI. Then:

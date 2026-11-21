@@ -1,0 +1,5 @@
+# HTTPS for the Locus API (certificates from Let's Encrypt, kept in the caddy_data volume).
+{$API_DOMAIN} {
+	encode gzip
+	reverse_proxy api:8787
+}

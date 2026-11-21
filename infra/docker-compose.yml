@@ -1,0 +1,51 @@
+# Locus on one Docker host: API, call worker, and Caddy for HTTPS.
+# Run from the repository root (the env file holds secrets and stays on your machine):
+#   docker -H ssh://my-vps compose -f infra/docker-compose.yml --env-file infra/.env.production up -d --build
+name: locus
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: apps/api/Dockerfile
+  image: locus-api:latest
+  env_file: .env.production
+  restart: unless-stopped
+
+services:
+  api:
+    <<: *app
+    command: ["pnpm", "start"]
+    expose: ["8787"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/me').then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    <<: *app
+    # Needs LiveKit Cloud keys in the env file; start with `--profile calls`.
+    profiles: ["calls"]
+    command: ["pnpm", "worker", "start"]
+    # Talks to the API over the internal network; LiveKit is reached outbound.
+    environment:
+      LOCUS_API_URL: http://api:8787
+    depends_on:
+      api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in the env file}
+    volumes:
+      - ./Caddyfile.docker:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api]
+
+volumes:
+  caddy_data:
+  caddy_config:
