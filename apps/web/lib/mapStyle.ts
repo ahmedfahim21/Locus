@@ -1,92 +1,84 @@
 import type { StyleSpecification } from "maplibre-gl";
-import { useEffect, useState } from "react";
-
-/** Map colours, read from the CSS tokens so the map follows the light/night card. */
-export type MapColors = {
-  card: string;
-  paper: string;
-  ghost: string;
-  ghostDeep: string;
-  ink: string;
-  ballpoint: string;
-  turmeric: string;
-};
-
-export function readMapColors(): MapColors {
-  const css = getComputedStyle(document.documentElement);
-  const v = (name: string) => {
-    const value = css.getPropertyValue(`--${name}`).trim();
-    if (!value) throw new Error(`Design token --${name} is not defined`);
-    return value;
-  };
-  return {
-    card: v("card"),
-    paper: v("paper"),
-    ghost: v("ghost"),
-    ghostDeep: v("ghost-deep"),
-    ink: v("ink"),
-    ballpoint: v("ballpoint"),
-    turmeric: v("turmeric"),
-  };
-}
-
-/** Re-reads the colours when the system switches between light and night. */
-export function useMapColors(): MapColors | null {
-  const [colors, setColors] = useState<MapColors | null>(null);
-  useEffect(() => {
-    const media = matchMedia("(prefers-color-scheme: dark)");
-    const update = () => setColors(readMapColors());
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
-  return colors;
-}
 
 /**
- * The "wedding-card" base map (DESIGN.md): OpenFreeMap vector tiles with every
- * road and park faded into the card. No labels, no buildings: only the route
- * Locus draws on top is inked.
+ * The map (DESIGN.md "Map"): Sadak's game-map palette. Dark ground and blocks,
+ * gold main roads, pale secondaries, grey lanes in dark casings, blue water,
+ * green parks. The same in light and dark mode, so the route always reads.
  */
-export function weddingCardStyle(c: MapColors): StyleSpecification {
+export const MAP = {
+  outside: "#161a20",
+  ground: "#20252c",
+  building: "#363e49",
+  buildingEdge: "#262c34",
+  water: "#1e5a88",
+  shore: "#4a92c6",
+  park: "#2c5836",
+  pitch: "#346a3d",
+  casing: "#0f1216",
+  primary: "#f0c75e",
+  secondary: "#e3e8ee",
+  lane: "#a3adb8",
+  path: "#b9a58a",
+  rail: "#6b7480",
+  route: "#5ab0ff",
+  walked: "#3ddc84",
+} as const;
+
+export type MapColors = typeof MAP;
+
+/** Kept as a hook so map components read colours one way; the palette does not change with the theme. */
+export function useMapColors(): MapColors {
+  return MAP;
+}
+
+const width = (z14: number, z18: number) => ["interpolate", ["exponential", 1.6], ["zoom"], 12, z14 * 0.35, 14, z14, 18, z18] as never;
+
+export function sadakStyle(): StyleSpecification {
+  const roads = (id: string, classes: string[], fill: string, w14: number, w18: number) => [
+    {
+      id: `${id}-casing`,
+      type: "line",
+      source: "omt",
+      "source-layer": "transportation",
+      filter: ["in", ["get", "class"], ["literal", classes]],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": MAP.casing, "line-width": width(w14 + 1.6, w18 + 4) },
+    },
+    {
+      id,
+      type: "line",
+      source: "omt",
+      "source-layer": "transportation",
+      filter: ["in", ["get", "class"], ["literal", classes]],
+      layout: { "line-cap": "round", "line-join": "round" },
+      paint: { "line-color": fill, "line-width": width(w14, w18) },
+    },
+  ];
   return {
     version: 8,
     sources: {
-      omt: {
-        type: "vector",
-        url: "https://tiles.openfreemap.org/planet",
-        attribution: "© OpenStreetMap contributors · OpenFreeMap",
-      },
+      omt: { type: "vector", url: "https://tiles.openfreemap.org/planet", attribution: "© OpenStreetMap contributors · OpenFreeMap" },
     },
     layers: [
-      { id: "bg", type: "background", paint: { "background-color": c.card } },
-      { id: "park", type: "fill", source: "omt", "source-layer": "park", paint: { "fill-color": c.ghost, "fill-opacity": 0.7 } },
-      { id: "landcover", type: "fill", source: "omt", "source-layer": "landcover", paint: { "fill-color": c.ghost, "fill-opacity": 0.35 } },
-      { id: "water", type: "fill", source: "omt", "source-layer": "water", paint: { "fill-color": c.ghostDeep } },
+      { id: "bg", type: "background", paint: { "background-color": MAP.ground } },
+      { id: "landcover", type: "fill", source: "omt", "source-layer": "landcover", filter: ["in", ["get", "class"], ["literal", ["grass", "wood", "farmland"]]], paint: { "fill-color": MAP.park, "fill-opacity": 0.55 } },
+      { id: "park", type: "fill", source: "omt", "source-layer": "park", paint: { "fill-color": MAP.park } },
+      { id: "pitch", type: "fill", source: "omt", "source-layer": "landuse", filter: ["in", ["get", "class"], ["literal", ["pitch", "stadium"]]], paint: { "fill-color": MAP.pitch } },
+      { id: "water-shore", type: "line", source: "omt", "source-layer": "water", paint: { "line-color": MAP.shore, "line-width": 1.5 } },
+      { id: "water", type: "fill", source: "omt", "source-layer": "water", paint: { "fill-color": MAP.water } },
       {
-        id: "roads",
-        type: "line",
+        id: "buildings",
+        type: "fill",
         source: "omt",
-        "source-layer": "transportation",
-        filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor", "service"]]],
-        layout: { "line-cap": "round", "line-join": "round" },
-        paint: {
-          "line-color": c.ghostDeep,
-          "line-width": ["interpolate", ["linear"], ["zoom"], 12, 0.5, 14, 1, 18, 7],
-        },
+        "source-layer": "building",
+        minzoom: 14,
+        paint: { "fill-color": MAP.building, "fill-outline-color": MAP.buildingEdge },
       },
-    ],
+      { id: "rail", type: "line", source: "omt", "source-layer": "transportation", filter: ["==", ["get", "class"], "rail"], paint: { "line-color": MAP.rail, "line-width": 1.2, "line-dasharray": [3, 2] } },
+      ...roads("path", ["path", "track"], MAP.path, 0.6, 2.5),
+      ...roads("lane", ["minor", "service"], MAP.lane, 1.2, 7),
+      ...roads("secondary", ["secondary", "tertiary"], MAP.secondary, 2, 11),
+      ...roads("primary", ["motorway", "trunk", "primary"], MAP.primary, 2.6, 14),
+    ] as StyleSpecification["layers"],
   };
-}
-
-/** Repaints an already-loaded map with new colours (light ↔ night) without reloading tiles. */
-export function recolorBaseMap(map: import("maplibre-gl").Map, c: MapColors) {
-  const set = (id: string, prop: "background-color" | "fill-color" | "line-color", value: string) => {
-    if (map.getLayer(id)) map.setPaintProperty(id, prop, value);
-  };
-  set("bg", "background-color", c.card);
-  set("park", "fill-color", c.ghost);
-  set("landcover", "fill-color", c.ghost);
-  set("water", "fill-color", c.ghostDeep);
-  set("roads", "line-color", c.ghostDeep);
 }

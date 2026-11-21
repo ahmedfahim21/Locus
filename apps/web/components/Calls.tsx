@@ -37,49 +37,58 @@ export function useCalls() {
   return { calls, error };
 }
 
+/** "Calls" group: newest first, live ones marked; each opens the call view. */
 export function Calls() {
   const { calls, error } = useCalls();
 
   return (
-    <section className="stack" style={{ gap: 8 }}>
-      <h2 className="heading">Rider calls</h2>
-      {error && (
-        <p className="small" role="alert" style={{ color: "var(--kumkum)" }}>
-          Couldn&rsquo;t refresh calls: {error}. Retrying every few seconds.
-        </p>
-      )}
-      {calls === null && !error && <div className="skeleton" style={{ height: 120 }} />}
+    <section>
+      <h2 className="section-label">Calls</h2>
+      {calls === null && !error && <div className="skeleton" style={{ height: 104, borderRadius: "var(--radius)" }} />}
       {calls?.length === 0 && (
-        <div className="alert info">
-          <PhoneIncoming size={20} />
-          <div>
-            <div>No calls yet</div>
-            <div className="label">When a rider calls, you can watch them get guided here.</div>
+        <div className="group">
+          <div className="cell">
+            <span className="cell-icon">
+              <PhoneIncoming size={17} />
+            </span>
+            <div className="cell-main">
+              <span>No calls yet</span>
+              <span className="cell-sub">When a rider calls, watch them get guided here.</span>
+            </div>
           </div>
         </div>
       )}
       {calls && calls.length > 0 && (
-        <ul className="sheet" style={{ listStyle: "none", margin: 0, padding: 0, gap: 0 }}>
-          {calls.map((c, i) => {
+        <ul className="group">
+          {calls.map((c) => {
             const live = LIVE_STATES.has(c.state);
             const last = c.turns[c.turns.length - 1];
             return (
-              <li key={c.id} style={{ borderTop: i ? "1px dashed var(--ghost-deep)" : 0 }}>
-                <Link href={`/calls/${c.id}`} className="call-row">
-                  <span className="row" style={{ gap: 8 }}>
-                    {live && <span className="live-dot" aria-label="Live" />}
-                    <span>{STATE_LABEL[c.state] ?? c.state}</span>
+              <li key={c.id}>
+                <Link href={`/calls/${c.id}`} className="cell call-row">
+                  <div className="cell-main">
+                    <span className="row" style={{ gap: 8 }}>
+                      {live && <span className="live-dot" aria-label="Live" />}
+                      {STATE_LABEL[c.state] ?? c.state}
+                    </span>
+                    <span className="cell-sub">
+                      {c.noTranscript ? "Rider asked not to be recorded" : last ? (last.utterance ?? last.instruction) : "No words yet"}
+                    </span>
+                  </div>
+                  <span className="cell-end">
+                    {new Date(c.createdAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                    <CaretRight size={14} />
                   </span>
-                  <span className="mono label">{new Date(c.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
-                  <span className="label preview">
-                    {c.noTranscript ? "Rider asked not to be recorded" : last ? (last.utterance ?? last.instruction) : "No words yet"}
-                  </span>
-                  <CaretRight size={16} className="caret" />
                 </Link>
               </li>
             );
           })}
         </ul>
+      )}
+      {error && (
+        <p className="small" role="alert" style={{ color: "var(--danger)", padding: "8px 16px 0" }}>
+          Couldn&rsquo;t refresh calls: {error}. Retrying every few seconds.
+        </p>
       )}
     </section>
   );

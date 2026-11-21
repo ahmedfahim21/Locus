@@ -6,7 +6,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { api, scriptNames, type CueInput, type LatLon, type Me } from "../../lib/api";
 import type { KeptProposal } from "./WalkStep";
 import { Map, MapMarker } from "../mapcn/Map";
-import { Stamp } from "../RouteMap";
+import { DoorPin, Stamp } from "../RouteMap";
 import { MapHandle } from "./MapHandle";
 
 const MAX_LANDMARKS = 8; // Same cap as the API (MAX_CUES).
@@ -149,27 +149,25 @@ export function LandmarksStep({
               setMapReady(true);
             }}
           />
-          <MapMarker at={door} anchor="bottom" offset={[0, 14]}>
-            <div className="door">
-              <small>door</small>×
-            </div>
+          <MapMarker at={door} anchor="bottom" offset={[0, 9]}>
+            <DoorPin label="Door" />
           </MapMarker>
           {drafts.map((d, i) => (
-            <MapMarker key={d.key} at={d.location} anchor={i % 2 ? "left" : "right"} offset={[i % 2 ? 10 : -10, 0]}>
+            <MapMarker key={d.key} at={d.location} anchor="left" offset={[-14, 0]}>
               <Stamp stop={{ name: d.landmark.trim() || "Unnamed", location: d.location, photoUrl: d.photoUrl, alt: d.alt }} index={i} draft={!d.landmark.trim()} />
             </MapMarker>
           ))}
         </Map>
-        <div className="crosshair crosshair-blue" aria-hidden="true">+</div>
-        <div className="poster">
+        <div className="crosshair crosshair-landmark" aria-hidden="true"><span className="head" /><span className="stem" /><span className="foot" /></div>
+        <div className="poster glass">
           <div className="street">What does a rider pass?</div>
-          <div className="label">Put the blue + on a landmark and add it, in the order a rider meets them.</div>
+          <div className="label">Put the gold pin on a landmark and add it, in the order a rider meets them.</div>
         </div>
       </div>
 
       <aside className="setup-panel">
         <div className="topbar">
-          <button className="btn ghost icon compact" type="button" onClick={onBack} aria-label="Back to your gate" style={{ width: 40 }}>
+          <button className="btn icon" type="button" onClick={onBack} aria-label="Back to your gate">
             <ArrowLeft size={18} />
           </button>
           {progress}
@@ -184,7 +182,7 @@ export function LandmarksStep({
 
         <button className="btn block" type="button" onClick={add} disabled={!mapReady || drafts.length >= MAX_LANDMARKS}>
           <Plus size={18} />
-          {drafts.length >= MAX_LANDMARKS ? `That's the limit of ${MAX_LANDMARKS}` : "Add landmark at the +"}
+          {drafts.length >= MAX_LANDMARKS ? `That's the limit of ${MAX_LANDMARKS}` : "Add landmark at the pin"}
         </button>
 
         {drafts.length === 0 && (
@@ -200,7 +198,7 @@ export function LandmarksStep({
               <div className="landmark-head">
                 <span className="label">Stop {i + 1}{d.proposalId ? " · from your walk" : ""}</span>
                 <div className="row" style={{ gap: 4 }}>
-                  <button className="btn ghost icon compact" type="button" onClick={() => moveToCrosshair(d.key)} aria-label={`Move stop ${i + 1} to the +`} title="Move to the +" style={{ width: 40 }}>
+                  <button className="btn ghost icon compact" type="button" onClick={() => moveToCrosshair(d.key)} aria-label={`Move stop ${i + 1} to the pin`} title="Move to the pin" style={{ width: 40 }}>
                     <MapPin size={18} />
                   </button>
                   {i > 0 && (

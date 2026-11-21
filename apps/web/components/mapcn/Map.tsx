@@ -2,13 +2,13 @@
 
 // Adapted from mapcn's MIT-licensed Map and MapMarker registry components.
 // https://github.com/AnmolSaini16/mapcn · See LICENSE in this directory.
-// Locus additions: the wedding-card style (DESIGN.md), light/night repainting,
-// fit-to-points and the inked route with the rider's trail.
+// Locus additions: the Sadak-coloured style (DESIGN.md "Map"), fit-to-points,
+// and the route with the rider's walked trail.
 import type * as MapLibre from "maplibre-gl";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { LatLon, RouteLeg } from "../../lib/api";
-import { recolorBaseMap, useMapColors, weddingCardStyle, type MapColors } from "../../lib/mapStyle";
+import { MAP, sadakStyle, type MapColors } from "../../lib/mapStyle";
 
 type MapContextValue = { map: MapLibre.Map; lib: typeof MapLibre; colors: MapColors };
 const MapContext = createContext<MapContextValue | null>(null);
@@ -31,17 +31,13 @@ type MapProps = {
 
 export function Map({ center, zoom, interactive = true, className = "", label, children }: MapProps) {
   const container = useRef<HTMLDivElement>(null);
-  const colors = useMapColors();
   const initial = useRef({ center, zoom, interactive });
   const [context, setContext] = useState<MapContextValue | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const ready = colors !== null;
 
   useEffect(() => {
-    if (!ready) return;
     let cancelled = false;
     let map: MapLibre.Map | undefined;
-    const startColors = colors;
 
     import("maplibre-gl")
       .then((lib) => {
@@ -53,7 +49,7 @@ export function Map({ center, zoom, interactive = true, className = "", label, c
         const { center: c, zoom: z, interactive: i } = initial.current;
         map = new lib.Map({
           container: container.current,
-          style: weddingCardStyle(startColors),
+          style: sadakStyle(),
           center: [c.lon, c.lat],
           zoom: z,
           interactive: i,
@@ -65,7 +61,7 @@ export function Map({ center, zoom, interactive = true, className = "", label, c
         map.on("error", (e) => console.error("[map]", e.error));
         const loaded = map;
         loaded.once("load", () => {
-          if (!cancelled) setContext({ map: loaded, lib, colors: startColors });
+          if (!cancelled) setContext({ map: loaded, lib, colors: MAP });
         });
       })
       .catch((err: unknown) => {
@@ -79,15 +75,7 @@ export function Map({ center, zoom, interactive = true, className = "", label, c
       cancelled = true;
       map?.remove();
     };
-    // The map is created once; colour changes repaint it below instead of rebuilding.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready]);
-
-  useEffect(() => {
-    if (!context || !colors || context.colors === colors) return;
-    recolorBaseMap(context.map, colors);
-    setContext({ ...context, colors });
-  }, [colors, context]);
+  }, []);
 
   return (
     <div className={`map ${className}`} role="region" aria-label={label}>
@@ -178,13 +166,13 @@ export function MapRoute({ legs, walkedLegs = 0, drawIn = false }: { legs: Route
     const roads: MapLibre.FilterSpecification = ["==", ["get", "onRoads"], true];
     const gaps: MapLibre.FilterSpecification = ["==", ["get", "onRoads"], false];
     const round = { "line-cap": "round", "line-join": "round" } as const;
-    map.addLayer({ id: `${id}-edge`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.ink, "line-width": 15, "line-opacity": 0.8 } });
-    map.addLayer({ id: `${id}-band`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.paper, "line-width": 12 } });
-    map.addLayer({ id: `${id}-trail`, type: "line", source: `${id}-trail`, layout: round, paint: { "line-color": colors.turmeric, "line-width": 11, "line-opacity": 0.75 } });
-    map.addLayer({ id: `${id}-ink`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.ballpoint, "line-width": 3.5 } });
-    map.addLayer({ id: `${id}-gap`, type: "line", source: id, filter: gaps, layout: round, paint: { "line-color": colors.ballpoint, "line-width": 2.5, "line-dasharray": [1, 2.5] } });
+    map.addLayer({ id: `${id}-glow`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.route, "line-width": 16, "line-opacity": 0.18, "line-blur": 4 } });
+    map.addLayer({ id: `${id}-edge`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.casing, "line-width": 10 } });
+    map.addLayer({ id: `${id}-ink`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.route, "line-width": 6 } });
+    map.addLayer({ id: `${id}-trail`, type: "line", source: `${id}-trail`, layout: round, paint: { "line-color": colors.walked, "line-width": 6 } });
+    map.addLayer({ id: `${id}-gap`, type: "line", source: id, filter: gaps, layout: round, paint: { "line-color": colors.route, "line-width": 3, "line-dasharray": [1, 2] } });
     return () => {
-      for (const layer of ["gap", "ink", "trail", "band", "edge"]) if (map.getLayer(`${id}-${layer}`)) map.removeLayer(`${id}-${layer}`);
+      for (const layer of ["gap", "trail", "ink", "edge", "glow"]) if (map.getLayer(`${id}-${layer}`)) map.removeLayer(`${id}-${layer}`);
       if (map.getSource(`${id}-trail`)) map.removeSource(`${id}-trail`);
       if (map.getSource(id)) map.removeSource(id);
     };
@@ -219,16 +207,6 @@ export function MapRoute({ legs, walkedLegs = 0, drawIn = false }: { legs: Route
     trail?.setData(legsCollection(legs.slice(0, walkedLegs)));
   }, [map, id, legs, walkedLegs]);
 
-  useEffect(() => {
-    const set = (layer: string, prop: "line-color", value: string) => {
-      if (map.getLayer(`${id}-${layer}`)) map.setPaintProperty(`${id}-${layer}`, prop, value);
-    };
-    set("edge", "line-color", colors.ink);
-    set("band", "line-color", colors.paper);
-    set("trail", "line-color", colors.turmeric);
-    set("ink", "line-color", colors.ballpoint);
-    set("gap", "line-color", colors.ballpoint);
-  }, [map, id, colors]);
 
   return null;
 }

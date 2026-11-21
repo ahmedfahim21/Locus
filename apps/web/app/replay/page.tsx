@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function ReplayPage() {
   return (
     <main className="page">
-      <TopBar back={{ href: "/", label: "Back" }} />
+      <TopBar back={{ href: "/", label: "Home" }} />
       <div className="stack" style={{ gap: 8, maxWidth: 680 }}>
         <p className="label">Demo call · Hebbal, Bengaluru</p>
         <h1 className="display">From the wrong gate to the right one.</h1>

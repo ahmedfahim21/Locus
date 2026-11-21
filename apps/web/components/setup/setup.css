@@ -1,13 +1,17 @@
-.setup { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 420px; min-height: 100dvh; }
+.setup { display: grid; grid-template-columns: minmax(0, 1fr) 440px; min-height: 100dvh; }
 .setup-map { position: relative; min-height: 100dvh; }
 .setup-map .map.fill { position: absolute; inset: 0; }
-.setup-panel { border-left: 1.5px solid var(--ink); background: var(--card); padding: 16px 20px 32px; display: grid; gap: 16px; align-content: start; max-height: 100dvh; overflow: auto; }
+.setup-panel { background: var(--bg); padding: 12px 20px 40px; display: grid; gap: 20px; align-content: start; max-height: 100dvh; overflow: auto; }
 .landmarks { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
-.landmark { background: var(--paper); border: 1.5px solid var(--ink); border-radius: 4px; padding: 10px 12px 12px; display: grid; gap: 10px; }
+.landmark { background: var(--card); border-radius: var(--radius); padding: 12px 14px 14px; display: grid; gap: 12px; }
+.landmark .field input, .landmark .field textarea { background: var(--bg); box-shadow: none; }
 .landmark-head { display: flex; justify-content: space-between; align-items: center; }
+.step-dots { display: inline-flex; gap: 5px; align-items: center; }
+.step-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--fill-strong); }
+.step-dots i.on { width: 18px; border-radius: 3px; background: var(--ink); }
 
 @media (max-width: 860px) {
   .setup { grid-template-columns: 1fr; }
-  .setup-map { min-height: 55dvh; position: sticky; top: 0; z-index: 0; }
-  .setup-panel { border-left: 0; border-top: 1.5px solid var(--ink); max-height: none; position: relative; z-index: 2; border-radius: 10px 10px 0 0; margin-top: -10px; }
+  .setup-map { min-height: 52dvh; position: sticky; top: 0; z-index: 0; }
+  .setup-panel { max-height: none; position: relative; z-index: 2; border-radius: 20px 20px 0 0; margin-top: -20px; padding-top: 16px; }
 }

@@ -55,7 +55,7 @@ export function DoorStep({
   return (
     <main className="setup">
       <div className="setup-map">
-        <Map center={initial ?? BENGALURU} zoom={initial ? 18 : 12} className="fill" label="Move the map so the red cross sits on your gate">
+        <Map center={initial ?? BENGALURU} zoom={initial ? 18 : 12} className="fill" label="Move the map so the white pin sits on your gate">
           <MapHandle
             onMap={(m) => {
               map.current = m;
@@ -63,15 +63,15 @@ export function DoorStep({
             }}
           />
         </Map>
-        <div className="crosshair" aria-hidden="true">×</div>
-        <div className="poster">
+        <div className="crosshair" aria-hidden="true"><span className="head" /><span className="stem" /><span className="foot" /></div>
+        <div className="poster glass">
           <div className="street">Where should the rider stop?</div>
-          <div className="label">Move the map until the red × sits on your gate.</div>
+          <div className="label">Move the map until the pin sits on your gate.</div>
         </div>
       </div>
       <aside className="setup-panel">
         <div className="topbar">
-          <button className="btn ghost icon compact" type="button" onClick={onBack} aria-label="Back" style={{ width: 40 }}>
+          <button className="btn icon" type="button" onClick={onBack} aria-label="Back">
             <ArrowLeft size={18} />
           </button>
           {progress}
@@ -79,7 +79,7 @@ export function DoorStep({
         <div className="stack" style={{ gap: 6 }}>
           <h1 className="title">Your gate</h1>
           <p className="muted">
-            Zoom in until you can see your lane. Put the cross where a rider should stop and hand over the parcel: the gate, not
+            Zoom in until you can see your lane. Put the pin where a rider should stop and hand over the parcel: the gate, not
             the middle of the building.
           </p>
         </div>

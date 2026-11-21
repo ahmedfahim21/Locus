@@ -54,7 +54,7 @@ export function AboutStep({ me, progress, onDone }: { me: Me; progress: ReactNod
 
   return (
     <main className="page" style={{ maxWidth: 720 }}>
-      <TopBar back={r ? { href: "/", label: "Back to home" } : undefined}>{progress}</TopBar>
+      <TopBar back={r ? { href: "/", label: "Home" } : undefined}>{progress}</TopBar>
       <form className="stack" style={{ gap: 20 }} onSubmit={submit}>
         <div className="stack" style={{ gap: 6 }}>
           <h1 className="title">Who is the delivery for?</h1>
@@ -115,7 +115,7 @@ export function AboutStep({ me, progress, onDone }: { me: Me; progress: ReactNod
             placeholder="+919800000000"
             aria-invalid={phone.length > 3 && !phoneOk}
           />
-          {phone.length > 3 && !phoneOk && <span style={{ color: "var(--kumkum)" }}>Use the full number with +91, e.g. +919800000000</span>}
+          {phone.length > 3 && !phoneOk && <span style={{ color: "var(--danger)" }}>Use the full number with +91, e.g. +919800000000</span>}
         </label>
 
         <label className="field">

@@ -37,7 +37,7 @@ export function Setup() {
   if (me.error) {
     return (
       <main className="page">
-        <TopBar back={{ href: "/", label: "Back to home" }} />
+        <TopBar back={{ href: "/", label: "Home" }} />
         <div className="alert err" role="alert">
           <div className="stack" style={{ gap: 8 }}>
             <span>Couldn&rsquo;t load your details: {me.error}</span>
@@ -64,8 +64,10 @@ export function Setup() {
   const effective: Step = !data.recipient ? "about" : needsDoor ? "door" : step;
   const index = STEPS.indexOf(effective);
   const progress = (
-    <span className="label" aria-label={`Step ${index + 1} of ${STEPS.length}`}>
-      Step {index + 1} of {STEPS.length}
+    <span className="step-dots" role="img" aria-label={`Step ${index + 1} of ${STEPS.length}`}>
+      {STEPS.map((s, i) => (
+        <i key={s} className={i === index ? "on" : undefined} />
+      ))}
     </span>
   );
 

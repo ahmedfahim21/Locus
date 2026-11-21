@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, MapPin, Record, Stop, VideoCamera, Warning } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, Check, DeviceMobile, MapPin, Record, ShieldCheck, Stop, VideoCamera, Warning } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, scriptNames, supabase, type LatLon, type Proposal, type Walk } from "../../lib/api";
 import { MAX_RECORD_S, useWalkRecorder, type Recording } from "../../lib/useWalkRecorder";
 import { FitTo, Map, MapMarker } from "../mapcn/Map";
-import { Stamp } from "../RouteMap";
+import { DoorPin, Stamp, StampPhoto } from "../RouteMap";
 
 const BUCKET = "locus-walks";
 const POLL_MS = 2000;
@@ -159,13 +159,13 @@ export function WalkStep({
             {rec.phase === "recording" && (
               <>
                 <div className="vf-top">
-                  <span className="row" style={{ gap: 8 }}>
+                  <span className="vf-pill">
                     <span className="live-dot" />
                     <span className="mono">{clock(rec.elapsedS)}</span>
-                    <span className="label" style={{ color: "inherit" }}>/ {clock(MAX_RECORD_S)}</span>
+                    <span style={{ opacity: 0.6 }}>/ {clock(MAX_RECORD_S)}</span>
                   </span>
-                  <span className="label" style={{ color: "inherit" }}>
-                    <MapPin size={14} /> {rec.gpsError ?? (rec.accuracyM === null ? "Finding GPS…" : `GPS ±${Math.round(rec.accuracyM)} m · ${rec.fixes} fixes`)}
+                  <span className="vf-pill">
+                    <MapPin size={14} /> {rec.gpsError ?? (rec.accuracyM === null ? "Finding GPS…" : `±${Math.round(rec.accuracyM)} m`)}
                   </span>
                 </div>
                 <div className="vf-tip">Point the camera at shop boards, temples and gates as you pass them.</div>
@@ -173,7 +173,7 @@ export function WalkStep({
             )}
           </div>
         )}
-        <div className="poster">
+        <div className="poster glass">
           <div className="street">{phase.kind === "review" ? "Is this right?" : "Walk it once."}</div>
           <div className="label">
             {phase.kind === "review" ? "Landmarks found in your video. Keep, rename or skip each one." : "From the main road to your gate, filming as you go."}
@@ -183,7 +183,7 @@ export function WalkStep({
 
       <aside className="setup-panel">
         <div className="topbar">
-          <button className="btn ghost icon compact" type="button" onClick={onBack} disabled={recording} aria-label="Back to your gate" style={{ width: 40 }}>
+          <button className="btn icon" type="button" onClick={onBack} disabled={recording} aria-label="Back to your gate">
             <ArrowLeft size={18} />
           </button>
           {progress}
@@ -198,10 +198,22 @@ export function WalkStep({
                 there. 30 to 90 seconds is plenty.
               </p>
             </div>
-            <ul className="tips">
-              <li>Hold the phone upright and point it ahead, at boards and gates.</li>
-              <li>Keep location on: Locus places each landmark from your GPS.</li>
-              <li>Faces and number plates are skipped, and the video is deleted once the landmarks are found.</li>
+            <ul className="group tips">
+              {[
+                [DeviceMobile, "Hold the phone upright and point it at boards and gates."],
+                [MapPin, "Keep location on: each landmark is placed from your GPS."],
+                [ShieldCheck, "Faces and number plates are skipped. The video is deleted once landmarks are found."],
+              ].map(([Icon, text]) => {
+                const I = Icon as typeof MapPin;
+                return (
+                  <li key={text as string}>
+                    <div className="cell">
+                      <span className="cell-icon"><I size={17} /></span>
+                      <span className="cell-main small">{text as string}</span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
             <button className="btn primary block" type="button" onClick={() => setPhase({ kind: "record" })}>
               <VideoCamera size={18} />
@@ -292,13 +304,11 @@ function ReviewMap({ door, proposals }: { door: LatLon; proposals: Proposal[] })
   return (
     <Map center={center} zoom={17} className="fill" label="Landmarks found in your walk">
       <FitTo points={[door, ...proposals.map((p) => p.location)]} padding={{ top: 140, bottom: 60, left: 150, right: 150 }} />
-      <MapMarker at={door} anchor="bottom" offset={[0, 14]}>
-        <div className="door">
-          <small>door</small>×
-        </div>
+      <MapMarker at={door} anchor="bottom" offset={[0, 9]}>
+        <DoorPin label="Door" />
       </MapMarker>
       {proposals.map((p, i) => (
-        <MapMarker key={p.id} at={p.location} anchor={i % 2 ? "left" : "right"} offset={[i % 2 ? 10 : -10, 0]}>
+        <MapMarker key={p.id} at={p.location} anchor="left" offset={[-14, 0]}>
           {/* Photos are in the list beside the map; the map keeps the stamps small. */}
           <Stamp stop={{ name: p.name, location: p.location, alt: scriptNames([p.nameHi ?? "", p.nameKn ?? ""]) }} index={i} />
         </MapMarker>
@@ -342,7 +352,9 @@ function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; o
           return (
             <li key={p.id} className={`landmark proposal${on ? "" : " skipped"}`}>
               <div className="proposal-row">
-                <Stamp stop={{ name: names[p.id] || p.name, location: p.location, photoUrl: p.photoUrl }} index={p.ordinal - 1} draft={!on} />
+                <span className="proposal-photo">
+                  {p.photoUrl ? <StampPhoto url={p.photoUrl} alt={p.name} /> : null}
+                </span>
                 <div className="stack" style={{ gap: 6 }}>
                   <label className="field">
                     <span>What a rider would call it</span>

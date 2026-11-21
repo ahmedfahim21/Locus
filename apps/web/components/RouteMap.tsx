@@ -14,8 +14,8 @@ export type Stop = {
 };
 
 /**
- * The wedding-card route map: inked route, numbered landmark stamps, the door,
- * and (during a call) the rider and the direction Locus just gave.
+ * The route map: the route in blue over the Sadak-coloured city, numbered
+ * landmark pins, the door, and (during a call) the rider and Locus's last line.
  */
 export function RouteMap({
   stops,
@@ -60,14 +60,12 @@ export function RouteMap({
       <FitTo points={points} padding={padding} />
       {legs && <MapRoute legs={legs} walkedLegs={walkedLegs} drawIn={drawIn} />}
       {stops.map((stop, i) => (
-        <MapMarker key={`${i}-${stop.name}`} at={stop.location} anchor={i % 2 ? "left" : "right"} offset={[i % 2 ? 14 : -14, 0]}>
+        <MapMarker key={`${i}-${stop.name}`} at={stop.location} anchor="left" offset={[stop.photoUrl ? -23 : -14, 0]}>
           <Stamp stop={stop} index={i} reached={arrived || i < reached} />
         </MapMarker>
       ))}
-      <MapMarker at={door} anchor="bottom" offset={[0, 14]}>
-        <div className="door" aria-label="Door">
-          {!doorIsLastStop && <small>door</small>}×
-        </div>
+      <MapMarker at={door} anchor="bottom" offset={[0, 9]}>
+        <DoorPin label={doorIsLastStop ? null : "Door"} />
       </MapMarker>
       {rider && (
         <MapMarker at={rider}>
@@ -76,7 +74,7 @@ export function RouteMap({
       )}
       {note && noteAt && (
         <MapMarker key={note} at={noteAt} anchor="bottom" offset={[0, -16]}>
-          <div className="map-note">
+          <div className="map-callout">
             <span>{note}</span>
           </div>
         </MapMarker>
@@ -85,17 +83,42 @@ export function RouteMap({
   );
 }
 
+/** A landmark pin: number pip, name, other scripts, and the walk photo when there is one. */
 export function Stamp({ stop, index, reached = false, draft = false }: { stop: Stop; index: number; reached?: boolean; draft?: boolean }) {
-  const rotation = index % 2 ? 2.5 : -2.5;
+  const classes = `pin${stop.photoUrl ? " has-photo" : ""}${reached ? " reached" : ""}${draft ? " draft" : ""}`;
+  const pip = <span className="pip">{index + 1}</span>;
   return (
-    <div className={`stamp${reached ? " reached" : ""}${draft ? " draft" : ""}`} style={{ ["--r" as string]: `${rotation}deg` }}>
-      {stop.photoUrl && <StampPhoto url={stop.photoUrl} alt={stop.name} />}
-      <span className="num">{index + 1}</span> <span className="name">{stop.name}</span>
-      {stop.alt?.map((a) => (
-        <span key={a.text} className={`alt ${a.script}`}>
-          {a.text}
+    <div className={classes}>
+      {stop.photoUrl ? (
+        <span className="pin-photo">
+          <StampPhoto url={stop.photoUrl} alt={stop.name} />
+          {pip}
         </span>
-      ))}
+      ) : (
+        pip
+      )}
+      <span className="pin-text">
+        <span className="pin-name">{stop.name}</span>
+        {stop.alt && stop.alt.length > 0 && (
+          <span className="pin-alt">
+            {stop.alt.map((a, i) => (
+              <span key={a.text} className={a.script}>
+                {i > 0 ? " · " : ""}
+                {a.text}
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
+
+export function DoorPin({ label }: { label: string | null }) {
+  return (
+    <div className="door-pin" aria-label="Door">
+      {label && <small>{label}</small>}
+      <span className="door-dot" />
     </div>
   );
 }
@@ -103,23 +126,18 @@ export function Stamp({ stop, index, reached = false, draft = false }: { stop: S
 /** The landmark's real frame, with a shimmer until it loads (never a stand-in photo). */
 export function StampPhoto({ url, alt }: { url: string; alt: string }) {
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  if (state === "failed") return null;
   return (
-    <span className={`stamp-photo ${state === "loading" ? "skeleton" : ""}`}>
-      {state === "failed" ? (
-        <span className="label">Photo unavailable</span>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element -- signed storage URLs, not optimisable
-        <img
-          src={url}
-          alt={`Photo of ${alt} from your walk`}
-          onLoad={() => setState("ready")}
-          onError={() => {
-            console.error("[photo] failed to load", alt);
-            setState("failed");
-          }}
-          style={{ opacity: state === "ready" ? 1 : 0 }}
-        />
-      )}
-    </span>
+    // eslint-disable-next-line @next/next/no-img-element -- signed storage URLs, not optimisable
+    <img
+      src={url}
+      alt={`Photo of ${alt} from your walk`}
+      className={state === "loading" ? "skeleton" : undefined}
+      onLoad={() => setState("ready")}
+      onError={() => {
+        console.error("[photo] failed to load", alt);
+        setState("failed");
+      }}
+    />
   );
 }

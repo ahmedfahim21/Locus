@@ -1,84 +1,85 @@
 ---
 # gstack: design-md-format=spec
 name: Locus
-description: A hand-drawn neighbourhood map on a pista-green wedding card, inked in ballpoint, calm and local.
+description: Clean native-feeling chrome around a dark game-style map; ink is the only accent, colour belongs to the map.
 colors:
-  surface: "#E3ECD0"
-  surface-raised: "#FAFAF2"
-  ghost: "#C9D5B4"
-  ghost-deep: "#B3C49A"
-  text: "#16213B"
-  text-muted: "#4B5672"
-  primary: "#2340B0"
-  primary-pressed: "#1A3190"
-  on-primary: "#FAFAF2"
-  door: "#C8102E"
-  rider: "#F2B705"
-  success: "#2F7D4F"
-  warning: "#9A6A00"
-  error: "#C8102E"
-  night-surface: "#0F1A2E"
-  night-surface-raised: "#16233D"
-  night-ghost: "#22324F"
-  night-ghost-deep: "#2B3D5E"
-  night-text: "#E8EEDC"
-  night-text-muted: "#A7B1C8"
-  night-primary: "#8EA2FF"
-  night-primary-pressed: "#B3C1FF"
-  night-on-primary: "#0F1A2E"
-  night-door: "#FF6B7D"
-  night-rider: "#F6C531"
-  night-success: "#6FCB95"
+  surface: "#f5f5f7"
+  surface-raised: "#ffffff"
+  fill: "#e5e5ea"
+  fill-strong: "#d1d1d6"
+  text: "#000000"
+  text-muted: "#6e6e73"
+  text-tertiary: "#aeaeb2"
+  separator: "#c6c6c8"
+  primary: "#000000"
+  on-primary: "#ffffff"
+  success: "#34c759"
+  warning: "#ff9500"
+  error: "#ff3b30"
+  live: "#ff3b30"
+  dark-surface: "#000000"
+  dark-surface-raised: "#1c1c1e"
+  dark-fill: "#2c2c2e"
+  dark-text: "#ffffff"
+  dark-text-muted: "#98989f"
+  dark-separator: "#38383a"
+  map-ground: "#20252c"
+  map-outside: "#161a20"
+  map-building: "#363e49"
+  map-building-edge: "#262c34"
+  map-water: "#1e5a88"
+  map-shore: "#4a92c6"
+  map-park: "#2c5836"
+  map-casing: "#0f1216"
+  map-road-primary: "#f0c75e"
+  map-road-secondary: "#e3e8ee"
+  map-road-lane: "#a3adb8"
+  map-road-path: "#b9a58a"
+  map-route: "#5ab0ff"
+  map-walked: "#3ddc84"
+  map-landmark: "#f3d27a"
+  map-door: "#ffffff"
 typography:
   display:
-    fontFamily: Anek Latin
+    fontFamily: -apple-system, BlinkMacSystemFont, SF Pro Display, Inter
     fontWeight: 400
-    fontStretch: 125%
-    fontSize: clamp(28px, 4vw, 44px)
-    lineHeight: 1.05
-    letterSpacing: -0.01em
+    fontSize: clamp(36px, 6vw, 60px)
+    lineHeight: 1.02
+    letterSpacing: -0.035em
+  title:
+    fontFamily: -apple-system, BlinkMacSystemFont, SF Pro Display, Inter
+    fontWeight: 400
+    fontSize: 30px
+    letterSpacing: -0.025em
   heading:
-    fontFamily: Anek Latin
+    fontFamily: -apple-system, BlinkMacSystemFont, SF Pro Text, Inter
     fontWeight: 400
-    fontStretch: 125%
-    fontSize: 24px
-    lineHeight: 1.15
+    fontSize: 20px
+    letterSpacing: -0.015em
   body:
-    fontFamily: Anek Latin
+    fontFamily: -apple-system, BlinkMacSystemFont, SF Pro Text, Inter
     fontWeight: 400
-    fontStretch: 100%
     fontSize: 1rem
-    lineHeight: 1.5
-  body-devanagari:
-    fontFamily: Anek Devanagari
-    fontWeight: 400
-    fontStretch: 100%
-  body-kannada:
-    fontFamily: Anek Kannada
-    fontWeight: 400
-    fontStretch: 100%
+    lineHeight: 1.45
   label:
-    fontFamily: Anek Latin
+    fontFamily: -apple-system, BlinkMacSystemFont, SF Pro Text, Inter
     fontWeight: 400
-    fontStretch: 75%
     fontSize: 0.8125rem
-    lineHeight: 1.4
-  annotation:
-    fontFamily: Kalam
+  section-label:
+    fontFamily: -apple-system, BlinkMacSystemFont, SF Pro Text, Inter
     fontWeight: 400
-    fontSize: 17px
-    lineHeight: 1.15
+    fontSize: 0.8125rem
+    letterSpacing: 0.04em
+  scripts:
+    fontFamily: Anek Devanagari, Anek Kannada
+    fontWeight: 400
   mono:
-    fontFamily: JetBrains Mono
-    fontWeight: 400
+    fontFamily: ui-monospace, SF Mono, Menlo
     fontFeature: tnum
-    letterSpacing: 0.02em
 rounded:
-  xs: 2px
-  sm: 3px
-  md: 4px
-  lg: 6px
-  device: 22px
+  sm: 12px
+  md: 16px
+  lg: 20px
   full: 9999px
 spacing:
   xs: 4px
@@ -91,178 +92,134 @@ components:
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
-    borderColor: "{colors.primary}"
-    rounded: "{rounded.sm}"
-    height: 48px
-  button-primary-hover:
-    backgroundColor: "{colors.primary-pressed}"
-    shadow: 3px 3px 0 "{colors.text}"
-  button-secondary:
-    backgroundColor: "{colors.surface-raised}"
-    textColor: "{colors.text}"
-    borderColor: "{colors.text}"
-    rounded: "{rounded.sm}"
-    height: 48px
-  input:
-    backgroundColor: "{colors.surface}"
-    borderColor: "{colors.text}"
-    rounded: "{rounded.sm}"
-    height: 44px
-  card:
-    backgroundColor: "{colors.surface-raised}"
-    borderColor: "{colors.text}"
-    rounded: "{rounded.md}"
-  switch-on:
-    backgroundColor: "{colors.primary}"
-    rounded: "{rounded.sm}"
-  landmark-stamp:
-    backgroundColor: "{colors.surface-raised}"
-    borderColor: "{colors.text}"
-    rounded: "{rounded.xs}"
-    shadow: 4px 4px 0 "{colors.text}"
-  rider-dot:
-    backgroundColor: "{colors.rider}"
-    borderColor: "{colors.text}"
     rounded: "{rounded.full}"
-  focus-ring:
-    outlineColor: "{colors.rider}"
-    outlineWidth: 3px
+    height: 48px
+  button-secondary:
+    backgroundColor: "{colors.fill}"
+    textColor: "{colors.text}"
+    rounded: "{rounded.full}"
+    height: 48px
+  button-danger:
+    backgroundColor: "{colors.error}"
+    textColor: "#ffffff"
+    rounded: "{rounded.full}"
+  group:
+    backgroundColor: "{colors.surface-raised}"
+    rounded: "{rounded.md}"
+    separator: 0.5px "{colors.separator}", inset 16px
+  cell:
+    minHeight: 52px
+    padding: 10px 16px
+  input:
+    backgroundColor: "{colors.surface-raised}"
+    rounded: "{rounded.sm}"
+    height: 48px
+  switch-on:
+    backgroundColor: "{colors.success}"
+    rounded: "{rounded.full}"
+  bubble-locus:
+    backgroundColor: "{colors.fill}"
+    rounded: 18px
+  bubble-rider:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    rounded: 18px
+  map-pin:
+    backgroundColor: rgba(12, 14, 18, 0.82)
+    pip: "{colors.map-landmark}"
+    rounded: "{rounded.full}"
 ---
 
 # Locus
 
 ## Overview
 
-Creative north star: the map your neighbour draws on the back of a wedding card. Only the route is drawn; the rest of the city fades into the card. It fits because Locus's promise is "it knows my street": the screen should feel local and hand-drawn, not like a generic navigation app.
+Creative north star: the calm of a native iOS settings screen, wrapped around a game map you can read at a glance. The chrome stays out of the way (grouped grey, white cards, black ink); the map carries all the colour, and that colour always means something.
 
-Product context: Locus answers a delivery rider's phone call and guides them to a recipient's door, landmark by landmark, in Hinglish. Recipients set up their home once on a phone (door pin, walk video, confirmed landmarks). Peers are Google Maps, Ola Maps and the delivery apps' own tracking screens. All of them look like satellite-era utility maps, which is the look Locus avoids.
+Product context: Locus answers a delivery rider's call and guides them to the recipient's door in Hinglish. Recipients set up once on a phone (details, gate pin, walk video, landmarks), turn on "Expecting a delivery", and can watch calls live or try one from the browser.
 
-Mode per surface:
-- Live call view on a projector or laptop (Experience): one map, one route, one rider, and a transcript column.
-- Recipient setup on a phone (Operate): door placement, walk recording, landmark review, the expecting-delivery switch.
-- Call history (Read): a list of past calls with the outcome.
+References:
+- Spatial Agents (sister project, `web/src/index.css`, `screenshots/`): grouped lists, inset separators, pill buttons, spring presses, ink as the only accent.
+- Sadak (sister project, `game_engine/components/map/mapKit.ts`): the map palette.
 
-Platform: a mobile-first web app. Walk recording happens in a normal browser tab, not as an installed home-screen app, because iOS MediaRecorder is unreliable in installed web apps. A native app (Expo) comes later, only if background GPS or push is needed.
-
-Reference sites: mapcn.dev (MapLibre components, MIT), felt.com (hand-drawn map illustration), Sadak (our sister repo's photo-stamp markers).
-
-Key characteristics:
-- Pista-green card ground with paper-coloured roads; only the active route is inked.
-- One family (Anek) at a single weight; hierarchy comes from width and size.
-- Landmarks are tilted photo stamps with names in English, Hindi and Kannada.
-- Two colours with fixed meanings: kumkum red is the door, turmeric yellow is the rider.
-- Handwritten Kalam notes appear on the map as the guide speaks.
+Surfaces:
+- Home (Operate): map on the left (or top on a phone), grouped panel on the right: Deliveries, Calls, Your route, Account.
+- Setup (Operate): four steps (details, gate pin, walk video, landmarks), map plus a panel, step dots.
+- Call view and test call (Experience): map with the route and rider; status, progress and chat bubbles beside it.
+- Landing and demo call (Persuade).
 
 ## Colors
 
-Strategy: restrained, with a fixed meaning for each colour. The card colour owns the page. Ink and ballpoint blue carry all text and interaction. Two vivid colours each have exactly one job and never appear anywhere else:
-- Kumkum (`door`) marks the recipient's door on maps. It also doubles as the error colour, because both mean "stop here".
-- Turmeric (`rider`) marks the rider's live position, the trail behind them, reached landmarks, and the keyboard focus ring. It is never used as a button fill.
+Strategy: restrained chrome, committed map.
+- Chrome: grey grouped background, white raised surfaces, black ink. Black is the primary button and the rider's chat bubble. There is no brand hue in the chrome.
+- Status colours are iOS system colours and appear only for status: green for a switch that is on and for reached progress, red for live calls, errors and ending a call, orange for warnings.
+- Map: Sadak's game palette, identical in light and dark mode so the route always reads. Dark ground and building blocks, gold primary roads, pale secondaries, grey lanes, all in dark casings; blue water with a lighter shore; green parks.
+- Map meanings: blue is the route and the rider; green is the stretch already walked and reached landmarks; gold is a landmark; white is the door.
 
-Ballpoint blue (`primary`) is the route line and every primary action, so "the thing to follow" and "the thing to press" look the same.
-
-Neutrals come from the card's own green: `ghost` and `ghost-deep` are the faded city (parks, minor roads, water). Text is a deep blue-black ink rather than grey-black, so it sits on the green like pen on paper.
-
-Light or dark: light by default. Recipients set up at home in daylight, and the light card projects well. The night card is a full theme, not an inversion: the surfaces turn deep navy, ink becomes off-white, and the three meaning colours are lifted (`night-primary`, `night-door`, `night-rider`) so they keep their contrast. Every colour keeps its meaning in both themes.
+Dark mode follows the system: black background, `#1c1c1e` cards, white ink. The map does not change.
 
 ## Typography
 
-Anek (Ek Type) is the one family. It was designed in India with Latin, Devanagari and Kannada in one voice, so a landmark's three names sit together without a font change. It is a variable font, and Locus uses only its width axis:
-- Display and headings: width 125%. Wide and poster-like, used for street names and screen titles.
-- Body: width 100%.
-- Labels, captions and metadata: width 75%, smaller and muted.
-
-The weight is 400 everywhere, including headings and "bold" moments. Emphasis comes from width, size or colour, never weight.
-
-Kalam is the ballpoint handwriting: it is used only for annotations written onto the map (stamp names, directions between stops, the door label). It never appears in UI chrome.
-
-JetBrains Mono is used only for strings people read digit by digit: the Locus phone number, DIGIPIN, timers and clock times. It always uses tabular figures.
-
-Load all of them from Google Fonts (Anek Latin, Anek Devanagari and Anek Kannada with the `wdth` axis 75–125 at weight 400; Kalam 400; JetBrains Mono 400) with `display=swap`. All five faces are verified on Google Fonts.
+The system font (SF Pro on Apple devices, Inter or Helvetica elsewhere) carries the UI. Weight stays 400 everywhere, as the user's rules require; hierarchy comes from size and negative tracking on large text (display −0.035em, title −0.025em). Section labels are small uppercase muted text above each group. Anek Devanagari and Anek Kannada render Hindi and Kannada landmark names. Mono (SF Mono) is for phone numbers, DIGIPIN and timers.
 
 ## Layout
 
-Map first and full bleed. The map is the product; chrome sits on top of it or beside it.
-- Phone (under 640px): the street name sits at the top left like a poster, with one bottom sheet for actions. The call badge moves to the bottom left so it never covers the street name.
-- Projector or desktop (860px and up): the map takes the left two thirds; the right third is a column holding the status ("Guiding to …", five-step progress) above the transcript.
-- 640–860px: the map sits above the column.
-
-Spacing uses a 4px base with the scale in the tokens. Tap targets are at least 48px tall; inputs are 44px. Phone screens use 16px side gutters, and marketing sections use `clamp(16px, 4vw, 48px)`. Section headings cap at about 18 characters per line, and paragraph text caps at 60 characters.
-
-Progress is shown as named places ("Guiding to Iyengar bakery"), not percentages or distances.
+- Map-first. On desktop the map fills the left and the panel (420–440px) sits on the right; on a phone the map takes the top half and the panel slides over it as a sheet with 20px top corners.
+- Panels are a stack of groups with 24px between them.
+- Overlays on the map (street name, call timer, notices) are frosted glass cards: `--glass` with backdrop blur.
+- Phone side gutters 16px; tap targets at least 44px (cells 52px, buttons 48px).
 
 ## Elevation & Depth
 
-Depth is flat and printed, never blurred. Raised things (landmark stamps, phone frames, hovered buttons) get a hard ink offset shadow (`3–6px 3–6px 0`) with no blur, like a stamp pressed onto card. Everything else is separated by a 1.5px ink border or a dashed `ghost-deep` rule. A subtle paper-grain noise sits over the page (6% opacity in light, 8% at night). Glows, soft drop shadows and glassmorphism are not used.
-
-The route is drawn in three layers: a thin ink edge, a paper road band on top of it, and a slightly jittered double ballpoint line over the band so it reads as hand-drawn.
+Flat surfaces separated by background tone, not borders: white groups on grey. Only things floating over the map get shadows (pins, callouts, map controls), soft and dark so they read on the dark ground. The call stage card has a very soft lift.
 
 ## Shapes
 
-Corners are nearly square, as on printed card stock:
-- 2px: stamps.
-- 3px: buttons, inputs, switches.
-- 4px: cards, sheets, alerts.
-- 6px: large panels such as the live-call stage.
-- 22px: device frames, in previews only.
-- Full circle: only the rider dot and the record button.
-
-Stamps are rotated ±2–3°, alternating between neighbours; nothing else is rotated except Kalam notes (−3°).
+- 12px: inputs, small cards, alerts.
+- 16px: groups and cards.
+- 20px: the call stage and phone sheets.
+- Full pill: buttons, chips, segmented controls, map pins, the call timer.
+- Circles: the rider dot, the door dot, landmark pips.
 
 ## Components
 
-- Primary button: ballpoint fill, paper text, 48px tall.
-  - Hover: a darker blue, a 3px ink offset shadow, and a 1px lift.
-  - Active: no shadow and a 1px press.
-  - Focus-visible: a 3px turmeric outline with a 2px offset.
-  - Disabled: 45% opacity with no shadow. Hide controls that cannot work in the current state rather than leaving them dead.
-- Secondary button: paper fill with an ink border. The ghost variant is transparent.
-- Input: card fill, ink border, a 75%-width label above it, and the same turmeric focus outline.
-- Switch: a square-cornered track that fills ballpoint blue when on; the thumb slides 27px.
-- Landmark stamp: a paper card, 2px ink border, a 4px hard shadow and a slight rotation. It shows the stop number, the name in Kalam, then the Hindi and Kannada names at 75% width. Reached stamps take a turmeric tint.
-  - Photo-backed stamps show the walk-video frame.
-  - While the frame is loading, show a shimmer skeleton, never a stock photo.
-- Door marker: a Kalam × in kumkum with a short label under it.
-- Rider dot: a turmeric circle with an ink border and a soft turmeric halo, followed by a translucent turmeric trail.
-- Door placement: the map moves under a fixed kumkum × crosshair, and the resolved address sits in a paper chip at the bottom.
-- Alerts: paper card with an ink border and a coloured Phosphor icon (success leaf, warning amber, error kumkum, info ballpoint); the copy names what happened and what to do next.
-- Transcript turn: the speaker label in a 75%-width label with a Phosphor icon (waveform for Locus, moped for the rider), and Locus's lines in ballpoint blue.
-- Icons: Phosphor Regular only.
-- Map: MapLibre through mapcn components, with a custom style on OpenFreeMap (OpenMapTiles schema).
-  - Base layers: background, park, landcover, water, transportation.
-  - Labels and buildings are off; annotations are HTML markers.
+- Buttons: pills. Primary is black with white text, secondary is grey fill, danger is red. Pressing scales to 0.97 with a quick fade (Spatial Agents' `pressable`). Disabled is 40% opacity; controls that can't work are hidden.
+- Group and cell: a white rounded list. Each row has an optional 30px rounded icon tile, a title, a muted subtitle, and an end value or chevron. Separators are 0.5px and inset 16px.
+- Switch: iOS style, green when on.
+- Inputs: white on grey (grey on white inside a card), 12px corners, a 2px ink focus ring.
+- Chat bubbles: Locus's lines are grey on the left, the rider's black on the right; the speaker label shows only when the speaker changes; the active line is ringed in route blue.
+- Map pins: a dark pill with a gold numbered pip, the name, and the Hindi and Kannada names in small grey text. When there is a walk photo, a 40px rounded photo replaces the pip and the number moves onto its corner. Reached pins turn their pip green; draft pins are translucent with a dashed gold outline.
+- Door: a white dot with a dark ring and a small "Door" pill (left off when the last landmark is the door).
+- Rider: a blue dot with a white border and a soft blue halo.
+- Callout: a white rounded bubble on the map showing Locus's latest line, rising in.
+- Placement pins (setup): a fixed pin at the map centre, white for the gate and gold for landmarks.
+- Live indicator: a pulsing red dot; a four-bar waveform shows who is speaking (red for you, blue for Locus).
+- Loading: shimmer skeletons in fill colour; never a stock image.
+- Icons: Phosphor, regular weight.
 
 ## Do's and Don'ts
 
-- Do keep every type style at weight 400 and get hierarchy from `font-stretch` and size.
-- Do use kumkum only for the door and errors, and turmeric only for the rider, reached state and focus.
-- Do show every landmark name in all three scripts on stamps.
-- Do give every async surface a loading state (skeleton or shimmer) instead of letting content pop in.
+- Do keep the chrome monochrome; let the map and status carry colour.
+- Do use grouped lists for settings-like content, not freestanding bordered boxes.
+- Do give every async view a skeleton.
 - Do credit OpenStreetMap and OpenFreeMap on every map.
-- Don't use bold or semibold anywhere, including headings and buttons.
-- Don't show the full city at full contrast or turn on base-map labels; only the route is inked.
-- Don't use the overused "warm editorial" look: cream grounds, Fraunces or other high-contrast serif display faces, or terracotta accents.
-- Don't use blurred shadows, glows, gradients on buttons, or rounded-pill buttons.
-- Don't use stock or placeholder photos of landmarks; show the real frame or a labelled skeleton.
+- Don't use bold or semibold; use size and tracking.
+- Don't add a brand colour to buttons or headings.
+- Don't change the map palette with the theme.
+- Don't use heavy borders, hard offset shadows or handwritten fonts (the earlier "wedding card" look is retired).
 
 ## Motion
 
-- Approach: intentional. Motion explains where the rider is; it never decorates.
-- Easing: enter ease-out, exit ease-out, move ease-in-out.
-- Duration: micro 100ms (button press), short 200ms (switch, fades), medium 350ms (transcript turn enter), long 500–900ms (note write-on).
-- The one authored moment, the live call:
-  1. The route inks itself in from the first point to the door in about 2 seconds.
-  2. The turmeric rider moves along it as the rider names landmarks, leaving a trail.
-  3. Each stamp tints when it is reached.
-  4. A Kalam note writes itself onto the map (a left-to-right clip reveal) as Locus speaks the next direction.
-- Under `prefers-reduced-motion`: animations and transitions are off, the route draws instantly, and the rider jumps between stops.
+- Approach: snappy and functional, on a critically damped spring (`cubic-bezier(0.22, 1, 0.36, 1)`).
+- Presses 100–160ms; switches 200–250ms; content rises 8px over 280ms.
+- The route draws in over about 1.8 seconds on load; the walked stretch turns green as the rider reaches each landmark; the callout rises in with each new line.
+- `prefers-reduced-motion` turns animation off.
 
 ## Decisions Log
 
 | Date | Decision | Rationale |
 |------|----------|-----------|
-| 2026-11-21 | Initial design system created ("wedding-card map") | Created by /design-consultation from the Locus product brief, research on mapcn, Felt and Sadak, and a Codex outside voice; approved through a live HTML preview. |
-| 2026-11-21 | Mobile-first web app, not native | Recipients set up once; walk recording works in a browser tab. Native (Expo) is deferred until background GPS or push is needed. |
-| 2026-11-21 | Anek at one weight, with width as the hierarchy axis | Covers Latin, Devanagari and Kannada in one voice, and matches the no-bold rule. |
-| 2026-11-21 | Rejected cream, Fraunces and terracotta | Codex suggested them; that palette is the overused editorial look and reads as generic. |
-| 2026-11-21 | Adopted from Codex: crosshair door placement, photo-backed stamps, named-place progress, and the projector split | They make the demo legible from the back of a room. |
+| 2026-11-21 | Initial "wedding-card map" system | First /design-consultation pass. |
+| 2026-11-22 | Replaced with Spatial Agents chrome and Sadak map colours | The user found the wedding-card look too stylised ("looks vibe coded") and asked for clean and modern like Spatial Agents, with maps coloured like Sadak. |
+| 2026-11-22 | Weight 400 throughout, unlike Spatial Agents' bold titles | The user's standing rule: no bold or semibold. |
+| 2026-11-22 | Map identical in light and dark mode | The route, rider and door keep the same meaning and contrast everywhere. |

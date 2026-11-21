@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, MapPinLine, PlayCircle, SignOut, UserCircle, VideoCamera } from "@phosphor-icons/react";
+import { CaretRight, MapPinLine, PlayCircle, UserCircle, VideoCamera, Warning } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useEffect } from "react";
 import { scriptNames, supabase, type Me } from "../lib/api";
@@ -62,6 +62,7 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
   const recipient = me.recipient!;
   const route = useRoute(true, home.confirmedAt);
   const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl }));
+  const photos = home.cues.filter((c) => c.photoUrl).length;
 
   return (
     <main className="home">
@@ -72,19 +73,20 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
           legs={route.data?.legs ?? null}
           drawIn
           className="fill"
-          padding={{ top: 130, bottom: 60, left: 150, right: 150 }}
+          padding={{ top: 120, bottom: 60, left: 80, right: 220 }}
           label="Your route from the first landmark to your door"
         />
-        <div className="poster">
+        <div className="poster glass">
           <div className="street">{recipient.firstName}&rsquo;s door</div>
           <div className="label">
-            DIGIPIN <span className="mono">{home.digipin}</span> · {home.cues.length} landmark{home.cues.length === 1 ? "" : "s"}
+            DIGIPIN <span className="mono">{home.digipin}</span>
           </div>
         </div>
         {route.error && (
           <div className="map-banner alert err" role="alert">
-            <div className="stack" style={{ gap: 6 }}>
-              <span>Couldn't draw your route: {route.error}</span>
+            <Warning size={18} />
+            <div className="stack" style={{ gap: 8 }}>
+              <span>Couldn&rsquo;t draw your route: {route.error}</span>
               <button className="btn compact" type="button" onClick={() => void route.reload()}>
                 Try again
               </button>
@@ -92,50 +94,77 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
           </div>
         )}
         {route.data?.legs.some((l) => !l.onRoads) && (
-          <div className="map-banner alert info small">
+          <div className="map-banner alert info glass small">
             <MapPinLine size={18} />
-            <span>Dotted stretches have no road data nearby yet, so they're drawn as straight lines.</span>
+            <span>Dotted stretches have no road data nearby, so they&rsquo;re drawn straight.</span>
           </div>
         )}
       </div>
 
       <aside className="home-panel">
-        <TopBar>
-          <Link className="btn ghost icon compact" href="/replay" aria-label="Hear a demo call" title="Hear a demo call" style={{ width: 40 }}>
-            <PlayCircle size={20} />
-          </Link>
-          <button
-            className="btn ghost icon compact"
-            type="button"
-            onClick={() => void supabase.auth.signOut()}
-            aria-label="Sign out"
-            title={`Sign out ${me.identity.email ?? ""}`}
-            style={{ width: 40 }}
-          >
-            <SignOut size={20} />
-          </button>
-        </TopBar>
+        <TopBar />
+        <div className="home-title">
+          <h1 className="title">Hi, {recipient.firstName}</h1>
+          <p className="muted">Locus is ready to guide riders to your door.</p>
+        </div>
 
         <DeliverySwitch me={me} onChange={reload} />
         <Calls />
 
-        <section className="stack" style={{ gap: 8 }}>
-          <Link className="btn block" href="/setup?step=landmarks">
-            <MapPinLine size={18} />
-            Edit door and landmarks
-            <ArrowRight size={16} style={{ marginLeft: "auto" }} />
-          </Link>
-          <Link className="btn block ghost" href="/setup?step=walk">
-            <VideoCamera size={18} />
-            Film your walk for landmark photos
-            <ArrowRight size={16} style={{ marginLeft: "auto" }} />
-          </Link>
-          <Link className="btn block ghost" href="/setup">
-            <UserCircle size={18} />
-            Edit your details
-            <ArrowRight size={16} style={{ marginLeft: "auto" }} />
-          </Link>
+        <section>
+          <h2 className="section-label">Your route</h2>
+          <ul className="group">
+            <li>
+              <Link className="cell" href="/setup?step=landmarks">
+                <span className="cell-icon"><MapPinLine size={17} /></span>
+                <div className="cell-main">
+                  <span>Door and landmarks</span>
+                  <span className="cell-sub">
+                    {home.cues.length} landmark{home.cues.length === 1 ? "" : "s"}
+                    {photos ? `, ${photos} with photos` : ""}
+                  </span>
+                </div>
+                <CaretRight size={16} className="cell-end" />
+              </Link>
+            </li>
+            <li>
+              <Link className="cell" href="/setup?step=walk">
+                <span className="cell-icon"><VideoCamera size={17} /></span>
+                <div className="cell-main">
+                  <span>Film your walk</span>
+                  <span className="cell-sub">Find landmarks and photos from a short video</span>
+                </div>
+                <CaretRight size={16} className="cell-end" />
+              </Link>
+            </li>
+            <li>
+              <Link className="cell" href="/setup">
+                <span className="cell-icon"><UserCircle size={17} /></span>
+                <div className="cell-main">
+                  <span>Your details</span>
+                  <span className="cell-sub">{recipient.platforms.join(", ")}</span>
+                </div>
+                <CaretRight size={16} className="cell-end" />
+              </Link>
+            </li>
+          </ul>
         </section>
+
+        <ul className="group">
+          <li>
+            <Link className="cell" href="/replay">
+              <span className="cell-icon"><PlayCircle size={17} /></span>
+              <span className="cell-main">Hear a demo call</span>
+              <CaretRight size={16} className="cell-end" />
+            </Link>
+          </li>
+          <li>
+            <button className="cell" type="button" onClick={() => void supabase.auth.signOut()} style={{ color: "var(--danger)" }}>
+              <span className="cell-main">Sign out</span>
+              <span className="cell-end">{me.identity.email}</span>
+            </button>
+          </li>
+        </ul>
       </aside>
     </main>
   );

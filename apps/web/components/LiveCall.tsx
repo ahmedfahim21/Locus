@@ -70,24 +70,31 @@ export function LiveCall({
           note={note}
           drawIn
           className="fill"
-          padding={{ top: 130, bottom: 60, left: 150, right: 150 }}
+          padding={{ top: 120, bottom: 60, left: 80, right: 220 }}
           label="Map of the rider's route to the door"
         />
-        <div className="poster">
+        <div className="poster glass">
           <div className="street">{poster}</div>
           {posterSub && <div className="label">{posterSub}</div>}
         </div>
         {(live || timer) && (
-          <div className="callbar">
+          <div className="callbar glass">
             {live && <span className="live-dot" />}
-            <span className="label" style={{ color: "var(--ink)" }}>{live ? "Rider on call" : "Call"}</span>
-            {timer && <span className="mono">{timer}</span>}
+            <span>{live ? "On call" : "Call"}</span>
+            {timer && <span className="mono muted">{timer}</span>}
           </div>
         )}
       </div>
       <aside className="stage-side">
         <div className="stage-status" role="status">
-          <div className="label">{statusLabel}</div>
+          <div className="label row" style={{ gap: 6 }}>
+            {live && (
+              <span className="wave" style={{ color: "var(--live)" }} aria-hidden="true">
+                <i /><i /><i /><i />
+              </span>
+            )}
+            {statusLabel}
+          </div>
           <div className="heading now">{statusText}</div>
           <div className="progress" aria-label={`${done} of ${steps} stops reached`}>
             {Array.from({ length: steps }, (_, i) => (
@@ -96,15 +103,18 @@ export function LiveCall({
           </div>
         </div>
         <ol className="transcript" ref={transcript} aria-label="Call transcript">
-          {turns.length === 0 && <li className="label empty">Nothing said yet.</li>}
+          {turns.length === 0 && <li className="label empty">The conversation shows up here as it happens.</li>}
           {turns.map((t, i) => {
+            const first = i === 0 || turns[i - 1]!.speaker !== t.speaker;
             const body = (
               <>
-                <span className="who label">
-                  {t.speaker === "locus" ? <Waveform size={14} /> : <Moped size={14} />}
-                  {t.speaker === "locus" ? "Locus" : "Rider"}
-                </span>
-                <span className="text">{t.text}</span>
+                {first && (
+                  <span className="who label">
+                    {t.speaker === "locus" ? <Waveform size={12} /> : <Moped size={12} />}
+                    {t.speaker === "locus" ? "Locus" : "Rider"}
+                  </span>
+                )}
+                <span className="bubble">{t.text}</span>
               </>
             );
             return (

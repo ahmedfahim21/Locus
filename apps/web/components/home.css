@@ -1,13 +1,14 @@
-/* Map-first home: full-bleed map with the street poster, panel beside (desktop) or below (phone). */
-.home { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 100dvh; }
+/* Map fills the screen; the panel is a grouped list beside it (desktop) or a sheet below it (phone). */
+.home { display: grid; grid-template-columns: minmax(0, 1fr) 420px; min-height: 100dvh; }
 .home-map { position: relative; min-height: 100dvh; }
 .home-map.skeleton { border-radius: 0; }
 .home-map .map.fill { position: absolute; inset: 0; }
-.home-panel { background: var(--card); border-left: 1.5px solid var(--ink); padding: 16px 20px 32px; display: grid; gap: 16px; align-content: start; max-height: 100dvh; overflow: auto; }
-.map-banner { position: absolute; left: 16px; right: 64px; bottom: 40px; z-index: 2; max-width: 440px; }
+.home-panel { background: var(--bg); padding: 12px 20px 40px; display: grid; gap: 24px; align-content: start; max-height: 100dvh; overflow: auto; }
+.home-title { display: grid; gap: 4px; padding: 0 4px; }
+.map-banner { position: absolute; left: 16px; bottom: 40px; z-index: 2; max-width: 400px; right: 72px; }
 
 @media (max-width: 860px) {
   .home { grid-template-columns: 1fr; }
-  .home-map { min-height: 58dvh; }
-  .home-panel { border-left: 0; border-top: 1.5px solid var(--ink); max-height: none; border-radius: 10px 10px 0 0; margin-top: -10px; position: relative; z-index: 2; }
+  .home-map { min-height: 52dvh; }
+  .home-panel { max-height: none; border-radius: 20px 20px 0 0; margin-top: -20px; position: relative; z-index: 2; padding-top: 16px; }
 }

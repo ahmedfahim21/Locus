@@ -1,15 +1,12 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
-import { Anek_Devanagari, Anek_Kannada, Anek_Latin, JetBrains_Mono, Kalam } from "next/font/google";
+import { Anek_Devanagari, Anek_Kannada } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
-// DESIGN.md: one family (Anek) at weight 400; hierarchy comes from the width axis.
-const anekLatin = Anek_Latin({ subsets: ["latin"], weight: "variable", axes: ["wdth"], variable: "--font-anek-latin" });
-const anekDevanagari = Anek_Devanagari({ subsets: ["devanagari"], weight: "variable", axes: ["wdth"], variable: "--font-anek-devanagari" });
-const anekKannada = Anek_Kannada({ subsets: ["kannada"], weight: "variable", axes: ["wdth"], variable: "--font-anek-kannada" });
-const kalam = Kalam({ subsets: ["latin"], weight: "400", variable: "--font-kalam" });
-const mono = JetBrains_Mono({ subsets: ["latin"], weight: "400", variable: "--font-mono" });
+// DESIGN.md: the system font carries the UI; Anek covers Hindi and Kannada landmark names.
+const anekDevanagari = Anek_Devanagari({ subsets: ["devanagari"], weight: "400", variable: "--font-anek-devanagari" });
+const anekKannada = Anek_Kannada({ subsets: ["kannada"], weight: "400", variable: "--font-anek-kannada" });
 
 export const metadata: Metadata = {
   title: "Locus",
@@ -20,15 +17,14 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#E3ECD0" },
-    { media: "(prefers-color-scheme: dark)", color: "#0F1A2E" },
+    { media: "(prefers-color-scheme: light)", color: "#f5f5f7" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
   ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const fonts = [anekLatin, anekDevanagari, anekKannada, kalam, mono].map((f) => f.variable).join(" ");
   return (
-    <html lang="en" className={fonts}>
+    <html lang="en" className={`${anekDevanagari.variable} ${anekKannada.variable}`}>
       <body>{children}</body>
     </html>
   );
