@@ -10,22 +10,26 @@
 
 Read DESIGN.md before any UI work. Secrets live only in the root `.env` (never committed); a cloud session needs the same variables (see `.env.example`).
 
-Done and tested (`pnpm typecheck`, `pnpm test`: 71 API tests pass):
-- Guide-session API, screening, matching (cue aliases now feed the matcher), road graph, handoff and loop guards, Supabase store and auth, LiveKit worker with Sarvam speech.
-- `GET /me/route`: road line from the first landmark to the door over the OSM graph; legs with no road connection come back `onRoads: false` (drawn dashed). Calls expose `reachedCue` (landmarks reached, 0 before the first).
-- Web app rebuilt on DESIGN.md: map-first home, setup (details → crosshair door → landmarks placed on the map), live call view at `/calls/[id]`, demo call at `/replay` on a real Hebbal route. Checked in a browser: `/replay` only; signed-in screens are typechecked and built but not clicked through.
+Done and tested (`pnpm typecheck`, `pnpm test`: 84 API tests pass):
+- Guide-session API, screening, matching (cue aliases feed the matcher), road graph, handoff and loop guards, Supabase store and auth, LiveKit worker with Sarvam speech.
+- `GET /me/route` (road line from the first landmark to the door; legs with no road come back `onRoads: false`, drawn dashed). Calls expose `reachedCue`.
+- Walk-video pipeline (section 4.6), storage on Supabase Storage (private bucket `locus-walks`, created on API start):
+  - `POST /me/walks` (GPS track + metadata → one-time upload token), `POST /me/walks/:id/process` (202, background), `GET /me/walks/:id` (status + proposals with signed photo URLs).
+  - Frames every ~10 m along the GPS track (max 24), OpenAI vision (`OPENAI_VISION_MODEL`, else `OPENAI_MODEL`) names landmarks in English, Hindi and Kannada, names snap to OSM places within 40 m, one frame kept per landmark, video deleted.
+  - `PUT /me/home` takes `proposalId` per cue: the cue gets the photo and all names; every unused proposal is rejected and its frame deleted. Names are de-duplicated by matcher tokens (Latin script) or exact text (other scripts).
+  - Migration `0003` applied to Supabase (`walks`, `walkProposals`, cue `aliases`/`source`/`photoPath`).
+  - `pnpm --filter @locus/api smoke:walk <video> [webm|mp4]` runs the pipeline once against real Supabase Storage, ffmpeg and OpenAI, then cleans up. Last run: 3 painted shop boards → 3 proposals with correct Hindi/Kannada names, video deleted, frames readable.
+- Web app on DESIGN.md: map-first home, setup (details → crosshair door → walk video → landmarks), live call view, demo call at `/replay`. The walk step records with the back camera + GPS, uploads to the signed URL, polls processing, and shows a review (keep / rename / skip, real frames). Kept proposals become landmark drafts with photos and Hindi/Kannada names on the stamps.
 
-Written, not yet tested or run (walk-video pipeline, section 4.6; storage is Supabase Storage, bucket `locus-walks`, created on API start):
-- `apps/api/src/storage/` (Supabase Storage adapter), `apps/api/src/enrich/` (track sampling every ~10 m, ffmpeg frames, OpenAI vision with en/hi/kn names, OSM snapping, `processWalk`).
-- Routes in `recipientRoutes.ts`: `POST /me/walks` (GPS track + metadata → one-time upload token), `POST /me/walks/:id/process` (202, runs in background), `GET /me/walks/:id` (status + proposals with signed photo URLs). `PUT /me/home` accepts `proposalId` and `aliases` per cue; kept proposals give the cue its photo and names, every unused proposal is rejected and its frame deleted. `GET /me` cues now include `aliases`, `source`, `photoUrl`, `proposalId`.
-- Schema: `cues` gained `aliases`, `source`, `photoPath`; new `walks` and `walkProposals` tables. Test fixtures already provide `MemoryStorage`, `FakeVision`, real ffmpeg frames and `settle()` for background work.
+Not verified yet:
+- Signed-in screens in a browser (home, setup incl. the walk step, call view): they typecheck and build but haven't been clicked through. `/` and `/replay` were checked.
+- A real walk on a phone: camera and GPS need HTTPS on a phone (localhost only works on the desktop). Serve the web app over HTTPS (or a tunnel) and record outdoors.
+- Real phone calls: needs LiveKit credentials and a number (section 3).
 
-Next, in order:
-1. `apps/api/test/walks.test.ts`: generate a short mp4 with ffmpeg (`testsrc`, `-c:v mpeg4`) and a GPS track through the fixture OSM features; cover create → browser upload → process → proposals (every field), snapping to `node/101`/`node/102`, video deleted, frames stored; keep/reject through `PUT /me/home` (photo, aliases, source; rejected frames deleted; `PROPOSAL_UNAVAILABLE`); failures (GPS barely moved, vision error, video never uploaded) recorded on the walk; validation errors; another recipient gets 404; second process gets 409; a cue alias matches in a guide session. Unit tests for `cleanTrack` / `sampleAlongTrack` in `units.test.ts`.
-2. `pnpm --filter @locus/api db:generate`, review the SQL (add `IF NOT EXISTS` like 0001), then `db:migrate`.
-3. Add `OPENAI_VISION_MODEL` (optional, defaults to `OPENAI_MODEL`) to `.env.example`.
-4. Web: walk recording in setup between door and landmarks. MediaRecorder at ~2.5 Mbps 720p, `watchPosition` track with `t` relative to recording start, `supabase.storage.from("locus-walks").uploadToSignedUrl(path, token, blob)`, then process and poll `GET /me/walks/:id`. Review screen: proposal stamps with the real frame (skeleton while loading, never a stock photo), keep / rename / skip, kept ones become landmark drafts carrying `proposalId`. Update `lib/api.ts` types for the new cue fields and show photos and Hindi/Kannada names on stamps.
-5. Run API + web, sign in, record a real walk on a phone over HTTPS, and click through every screen.
+Next:
+1. Sign in and click through home → setup (all four steps) → save → home with photos; then the call view with a seeded session.
+2. Record a real walk on a phone over HTTPS; check OSM snapping on a home with an `osm:import`.
+3. Day 1 telephony per section 3 once a number and LiveKit project exist.
 
 ## 0. What changed in this revision
 
