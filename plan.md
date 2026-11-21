@@ -6,6 +6,27 @@
 >
 > Updated: 2026-11-21. Design source: office-hours doc `~/.gstack/projects/ahmedfahim21-Locus/ahmedfahim-main-design-20261121-160159.md` (approach B), extended by this revision.
 
+## Status and next steps (2026-11-21)
+
+Read DESIGN.md before any UI work. Secrets live only in the root `.env` (never committed); a cloud session needs the same variables (see `.env.example`).
+
+Done and tested (`pnpm typecheck`, `pnpm test`: 71 API tests pass):
+- Guide-session API, screening, matching (cue aliases now feed the matcher), road graph, handoff and loop guards, Supabase store and auth, LiveKit worker with Sarvam speech.
+- `GET /me/route`: road line from the first landmark to the door over the OSM graph; legs with no road connection come back `onRoads: false` (drawn dashed). Calls expose `reachedCue` (landmarks reached, 0 before the first).
+- Web app rebuilt on DESIGN.md: map-first home, setup (details → crosshair door → landmarks placed on the map), live call view at `/calls/[id]`, demo call at `/replay` on a real Hebbal route. Checked in a browser: `/replay` only; signed-in screens are typechecked and built but not clicked through.
+
+Written, not yet tested or run (walk-video pipeline, section 4.6; storage is Supabase Storage, bucket `locus-walks`, created on API start):
+- `apps/api/src/storage/` (Supabase Storage adapter), `apps/api/src/enrich/` (track sampling every ~10 m, ffmpeg frames, OpenAI vision with en/hi/kn names, OSM snapping, `processWalk`).
+- Routes in `recipientRoutes.ts`: `POST /me/walks` (GPS track + metadata → one-time upload token), `POST /me/walks/:id/process` (202, runs in background), `GET /me/walks/:id` (status + proposals with signed photo URLs). `PUT /me/home` accepts `proposalId` and `aliases` per cue; kept proposals give the cue its photo and names, every unused proposal is rejected and its frame deleted. `GET /me` cues now include `aliases`, `source`, `photoUrl`, `proposalId`.
+- Schema: `cues` gained `aliases`, `source`, `photoPath`; new `walks` and `walkProposals` tables. Test fixtures already provide `MemoryStorage`, `FakeVision`, real ffmpeg frames and `settle()` for background work.
+
+Next, in order:
+1. `apps/api/test/walks.test.ts`: generate a short mp4 with ffmpeg (`testsrc`, `-c:v mpeg4`) and a GPS track through the fixture OSM features; cover create → browser upload → process → proposals (every field), snapping to `node/101`/`node/102`, video deleted, frames stored; keep/reject through `PUT /me/home` (photo, aliases, source; rejected frames deleted; `PROPOSAL_UNAVAILABLE`); failures (GPS barely moved, vision error, video never uploaded) recorded on the walk; validation errors; another recipient gets 404; second process gets 409; a cue alias matches in a guide session. Unit tests for `cleanTrack` / `sampleAlongTrack` in `units.test.ts`.
+2. `pnpm --filter @locus/api db:generate`, review the SQL (add `IF NOT EXISTS` like 0001), then `db:migrate`.
+3. Add `OPENAI_VISION_MODEL` (optional, defaults to `OPENAI_MODEL`) to `.env.example`.
+4. Web: walk recording in setup between door and landmarks. MediaRecorder at ~2.5 Mbps 720p, `watchPosition` track with `t` relative to recording start, `supabase.storage.from("locus-walks").uploadToSignedUrl(path, token, blob)`, then process and poll `GET /me/walks/:id`. Review screen: proposal stamps with the real frame (skeleton while loading, never a stock photo), keep / rename / skip, kept ones become landmark drafts carrying `proposalId`. Update `lib/api.ts` types for the new cue fields and show photos and Hindi/Kannada names on stamps.
+5. Run API + web, sign in, record a real walk on a phone over HTTPS, and click through every screen.
+
 ## 0. What changed in this revision
 
 - Here is dropped; Locus (formerly Pata) is the primary and only idea. All effort goes here.
