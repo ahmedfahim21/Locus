@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { candidatesFor, passesGate, scoreArm } from "../src/eval/ablation.js";
 import { home as fixtureHome } from "./fixtures.js";
 import { cleanTrack, MAX_FRAMES, sampleAlongTrack, WalkError } from "../src/enrich/track.js";
-import { matchUtterance } from "../src/clues/match.js";
+import { heardAny, matchUtterance } from "../src/clues/match.js";
 import { romanize, tokens } from "../src/clues/normalize.js";
 import { decodeDigipin, encodeDigipin } from "../src/digipin/digipin.js";
 import { RoadGraph } from "../src/geo/roadGraph.js";
@@ -189,5 +189,34 @@ describe("matching ablation", () => {
     const wrong = { resolve: async () => "cue_3" };
     const r = await scoreArm("typed", [{ text: "kuch samajh nahi aa raha", expected: "lost" }], candidatesFor("typed", home, features), wrong);
     expect(r).toMatchObject({ accuracy: 0, falseCueMatches: 1, viaLlm: 1 });
+  });
+});
+
+describe("heardAny: names split by speech-to-text", () => {
+  it("matches a name heard as two words, and still rejects a different name", () => {
+    expect(heardAny("Rama krishna ke liye hai", ["Ramakrishna"])).toBe(true);
+    expect(heardAny("fil dos ke liye, Swiggy se", ["FilDOS"])).toBe(true);
+    expect(heardAny("Ramesh ke liye hai", ["Ramakrishna"])).toBe(false);
+    expect(heardAny("frill dose ke liye", ["Priya"])).toBe(false);
+  });
+});
+
+describe("matching Devanagari speech-to-text output", () => {
+  it("hears names and apps that Sarvam wrote in Devanagari", () => {
+    expect(tokens("अहमद के लिए है स्विगी से")).toEqual(["ahamad", "lie", "svigee"]);
+    expect(heardAny("अहमद के लिए है स्विगी से", ["Ahmed"])).toBe(true);
+    expect(heardAny("अहमद के लिए है स्विगी से", ["swiggy"])).toBe(true);
+    expect(heardAny("ज़ोमैटो से", ["zomato"])).toBe(true);
+    expect(heardAny("रमेश के लिए", ["Ahmed"])).toBe(false);
+  });
+
+  it("matches a landmark heard in Devanagari, without matching unrelated short words", () => {
+    const candidates = [
+      { id: "cue_itc", kind: "cue" as const, names: ["ITC Kohenur"] },
+      { id: "cue_kc", kind: "cue" as const, names: ["Knowledge City"] },
+    ];
+    expect(matchUtterance("ITC कोहेनूर के पास हो", candidates)?.candidate.id).toBe("cue_itc");
+    expect(heardAny("room mein hoon", ["Ram"])).toBe(false);
+    expect(heardAny("medical ke paas", ["model"])).toBe(false);
   });
 });

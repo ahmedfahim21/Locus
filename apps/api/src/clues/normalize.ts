@@ -128,6 +128,18 @@ export function distinctNames(names: (string | null | undefined)[], except?: str
   return out;
 }
 
+/**
+ * Consonant skeleton of a romanized token, for spellings that differ only in
+ * vowels, aspiration and doubled letters: Devanagari speech-to-text output
+ * romanizes "Ahmed" as "ahamad" and "Swiggy" as "svigee"; both skeletons agree
+ * ("ahmd", "swg"). The first letter is kept as is.
+ */
+export function skeleton(token: string): string {
+  const t = token.replace(/ph/g, "f").replace(/v/g, "w").replace(/z/g, "j").replace(/q/g, "k");
+  const rest = t.slice(1).replace(/[aeiouyh]/g, "");
+  return (t[0]! + rest).replace(/(.)\1+/g, "$1");
+}
+
 /** Normalized Levenshtein similarity in [0, 1]. */
 export function similarity(a: string, b: string): number {
   if (a === b) return 1;

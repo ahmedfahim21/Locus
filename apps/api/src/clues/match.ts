@@ -1,4 +1,4 @@
-import { similarity, tokens } from "./normalize.js";
+import { similarity, skeleton, tokens } from "./normalize.js";
 
 export type Candidate = {
   id: string;
@@ -19,8 +19,18 @@ const WEAK_TOKENS = new Set([
   "nagar", "stage", "phase", "block", "street", "second", "first", "third", "1st", "2nd", "3rd",
 ]);
 
+/** Skeletons are only trusted for longer words, so short ones ("ram", "room") can't collide. */
+const SKELETON_MIN_TOKEN = 4;
+const SKELETON_MIN = 3;
+
+function sameSkeleton(a: string, b: string): boolean {
+  if (a.length < SKELETON_MIN_TOKEN || b.length < SKELETON_MIN_TOKEN) return false;
+  const sa = skeleton(a);
+  return sa.length >= SKELETON_MIN && sa === skeleton(b);
+}
+
 function tokenHeard(nameToken: string, heard: string[]): boolean {
-  return heard.some((h) => similarity(nameToken, h) >= TOKEN_THRESHOLD);
+  return heard.some((h) => similarity(nameToken, h) >= TOKEN_THRESHOLD || sameSkeleton(nameToken, h));
 }
 
 /** Best coverage of any of the candidate's names by the heard tokens. */
@@ -63,9 +73,17 @@ export function matchUtterance(utterance: string, candidates: Candidate[]): Matc
   return cues.length === 1 ? cues[0]! : null;
 }
 
-/** True if every token of any of the phrases was heard (fuzzy). */
+/**
+ * Heard tokens plus each pair of neighbours joined: speech-to-text often splits
+ * one name into two words ("rama krishna", "fil dos").
+ */
+function withJoinedPairs(heard: string[]): string[] {
+  return [...heard, ...heard.slice(1).map((t, i) => heard[i]! + t)];
+}
+
+/** True if every token of any of the phrases was heard (fuzzy), allowing a word split in two. */
 export function heardAny(utterance: string, phrases: string[]): boolean {
-  const heard = tokens(utterance);
+  const heard = withJoinedPairs(tokens(utterance));
   return phrases.some((p) => {
     const pt = tokens(p);
     return pt.length > 0 && pt.every((t) => tokenHeard(t, heard));
