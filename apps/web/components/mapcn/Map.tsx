@@ -240,15 +240,19 @@ export function MapRoute({ legs, walkedLegs = 0, drawIn = false }: { legs: Route
 }
 
 /**
- * The 3D view: a toggle that tilts the camera, raises buildings from OSM heights,
- * and stands each landmark up as a prop in its colour (DESIGN.md "Map").
+ * The 3D view as a neighbourhood diorama (DESIGN.md "Map"): only the area around
+ * the route is drawn in detail. Buildings rise inside it, everything outside is
+ * masked, base labels other than street names are hidden so only Locus's
+ * landmarks are named, the home building is picked out, and each landmark
+ * stands up as a prop in its colour.
  */
-export function Map3D({ props, focus, initiallyOn = false }: { props: Prop3D[]; focus: LatLon; initiallyOn?: boolean }) {
-  const { map } = useMap();
+export function Map3D({ props, focus, area, initiallyOn = false }: { props: Prop3D[]; focus: LatLon; area: LatLon[]; initiallyOn?: boolean }) {
+  const { map, colors } = useMap();
   const [on, setOn] = useState(initiallyOn);
   const flat = useRef<{ center: MapLibre.LngLat; zoom: number } | null>(null);
   const id = useRef(`props-${Math.random().toString(36).slice(2)}`).current;
   const key = JSON.stringify(props);
+  const areaKey = JSON.stringify([focus, area]);
 
   useEffect(() => {
     map.addSource(id, { type: "geojson", data: propsCollection(JSON.parse(key) as Prop3D[]) as never });
@@ -256,7 +260,7 @@ export function Map3D({ props, focus, initiallyOn = false }: { props: Prop3D[]; 
       id,
       type: "fill-extrusion",
       source: id,
-      layout: { visibility: "none" },
+      layout: { visibility: on ? "visible" : "none" },
       paint: {
         "fill-extrusion-color": ["get", "color"],
         "fill-extrusion-height": ["get", "height"],
@@ -268,31 +272,89 @@ export function Map3D({ props, focus, initiallyOn = false }: { props: Prop3D[]; 
       if (map.getLayer(id)) map.removeLayer(id);
       if (map.getSource(id)) map.removeSource(id);
     };
+    // Visibility is handled by the effect below.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, id, key]);
 
   useEffect(() => {
     const show = (layer: string, visible: boolean) => {
       if (map.getLayer(layer)) map.setLayoutProperty(layer, "visibility", visible ? "visible" : "none");
     };
-    show("buildings-3d", on);
-    show("buildings", !on);
-    show(id, on);
+    const maskId = `${id}-mask`;
+    const homeId = `${id}-home`;
+    const remove = (layer: string) => {
+      if (map.getLayer(layer)) map.removeLayer(layer);
+      if (map.getSource(layer)) map.removeSource(layer);
+    };
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const move = (camera: MapLibre.JumpToOptions) => (reduce ? map.jumpTo(camera) : map.easeTo({ ...camera, duration: 1200 }));
+
+    if (on) {
+      const { center, radiusM } = dioramaArea(focus, [...area, ...(JSON.parse(key) as Prop3D[]).map((p) => p.location)]);
+      const circle = circleRing(center, radiusM);
+      // Pick out the home building while the map is still flat (before tilting).
+      const home = map
+        .queryRenderedFeatures(map.project([focus.lon, focus.lat]), { layers: ["buildings"] })
+        .find((f) => f.geometry.type === "Polygon" || f.geometry.type === "MultiPolygon");
+      flat.current = { center: map.getCenter(), zoom: map.getZoom() };
+
+      // Order, bottom to top: base map, 3D buildings, the mask (its hole shows the
+      // neighbourhood, it fades everything outside), the home building, the route, props.
+      const firstRouteLayer = map.getStyle().layers.find((l) => l.id.endsWith("-glow"))?.id;
+      map.moveLayer("buildings-3d", firstRouteLayer);
+      map.addSource(maskId, {
+        type: "geojson",
+        data: { type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [worldRing(center), [...circle].reverse()] } } as never,
+      });
+      map.addLayer({ id: maskId, type: "fill", source: maskId, paint: { "fill-color": colors.ground, "fill-opacity": 0.92 } }, firstRouteLayer);
+      if (home) {
+        map.addSource(homeId, { type: "geojson", data: { type: "Feature", properties: {}, geometry: home.geometry } as never });
+        map.addLayer(
+          {
+            id: homeId,
+            type: "fill-extrusion",
+            source: homeId,
+            paint: {
+              "fill-extrusion-color": colors.route,
+              "fill-extrusion-height": Number(home.properties?.render_height ?? 9),
+              "fill-extrusion-base": Number(home.properties?.render_min_height ?? 0),
+              "fill-extrusion-opacity": 0.95,
+            },
+          },
+          firstRouteLayer,
+        );
+      }
+      for (const l of ["label-poi", "label-place", "label-water"]) show(l, false);
+      show("buildings-3d", true);
+      show("buildings", false);
+      show(id, true);
+      const bounds = new (map.getBounds().constructor as typeof MapLibre.LngLatBounds)();
+      for (const [lon, lat] of circle) bounds.extend([lon!, lat!]);
+      const camera = map.cameraForBounds(bounds, { padding: 40, bearing: -24 });
+      move({ ...camera, zoom: (camera?.zoom ?? 17) + 0.4, pitch: 58, bearing: -24 });
+    } else {
+      remove(maskId);
+      remove(homeId);
+      for (const l of ["label-poi", "label-place", "label-water"]) show(l, true);
+      show("buildings-3d", false);
+      show("buildings", true);
+      show(id, false);
+      if (flat.current) move({ pitch: 0, bearing: 0, center: flat.current.center, zoom: flat.current.zoom });
+    }
     // Pins float above their props on a stem (globals.css ".is-3d").
     map.getContainer().classList.toggle("is-3d", on);
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    // 3D flies in to street level around the door; 2D goes back to where you were.
-    let camera: MapLibre.JumpToOptions;
-    if (on) {
-      flat.current = { center: map.getCenter(), zoom: map.getZoom() };
-      camera = { pitch: 62, bearing: -24, center: [focus.lon, focus.lat], zoom: Math.max(map.getZoom(), 17.8) };
-    } else {
-      camera = { pitch: 0, bearing: 0, ...(flat.current ? { center: flat.current.center, zoom: flat.current.zoom } : {}) };
-    }
-    if (reduce) map.jumpTo(camera);
-    else map.easeTo({ ...camera, duration: 1100 });
-    // Only the toggle moves the camera; focus changes don't.
+    return () => {
+      remove(maskId);
+      remove(homeId);
+    };
+    // Rebuilt only when switched or when the route area changes; theme colours are repainted below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, id, on]);
+  }, [map, id, on, areaKey]);
+
+  useEffect(() => {
+    if (map.getLayer(`${id}-mask`)) map.setPaintProperty(`${id}-mask`, "fill-color", colors.ground);
+    if (map.getLayer(`${id}-home`)) map.setPaintProperty(`${id}-home`, "fill-extrusion-color", colors.route);
+  }, [map, id, colors]);
 
   return (
     <button
@@ -300,10 +362,40 @@ export function Map3D({ props, focus, initiallyOn = false }: { props: Prop3D[]; 
       className="map-3d-toggle glass"
       aria-pressed={on}
       onClick={() => setOn((v) => !v)}
-      title={on ? "Back to the flat map" : "See the street in 3D"}
+      title={on ? "Back to the flat map" : "See your street in 3D"}
     >
       <Cube size={16} />
       {on ? "2D" : "3D"}
     </button>
   );
+}
+
+/** The diorama's circle: centred on the route's extent, just big enough to hold it (150–450 m). */
+function dioramaArea(focus: LatLon, points: LatLon[]): { center: LatLon; radiusM: number } {
+  const all = [focus, ...points];
+  const lats = all.map((p) => p.lat);
+  const lons = all.map((p) => p.lon);
+  const center = { lat: (Math.min(...lats) + Math.max(...lats)) / 2, lon: (Math.min(...lons) + Math.max(...lons)) / 2 };
+  const far = Math.max(...all.map((p) => metres(center, p)));
+  return { center, radiusM: Math.min(450, Math.max(150, far + 70)) };
+}
+
+function metres(a: LatLon, b: LatLon) {
+  return Math.hypot((a.lat - b.lat) * 111_320, (a.lon - b.lon) * 111_320 * Math.cos((a.lat * Math.PI) / 180));
+}
+
+function circleRing(c: LatLon, radiusM: number, steps = 72): number[][] {
+  const mLon = 111_320 * Math.cos((c.lat * Math.PI) / 180);
+  const ring: number[][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    ring.push([c.lon + (Math.cos(a) * radiusM) / mLon, c.lat + (Math.sin(a) * radiusM) / 111_320]);
+  }
+  return ring;
+}
+
+/** A square far bigger than the view, as the outer edge of the mask. */
+function worldRing(c: LatLon): number[][] {
+  const d = 0.3;
+  return [[c.lon - d, c.lat - d], [c.lon + d, c.lat - d], [c.lon + d, c.lat + d], [c.lon - d, c.lat + d], [c.lon - d, c.lat - d]];
 }

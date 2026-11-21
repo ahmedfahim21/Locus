@@ -68,6 +68,7 @@ export function RouteMap({
       {interactive && (
         <Map3D
           focus={door}
+          area={(legs ?? []).flatMap((l) => l.line)}
           props={[
             ...stops.map((s) => ({ location: s.location, kind: s.kind, color: s.color })),
             ...(doorProp ? [{ location: door, ...doorProp }] : []),
