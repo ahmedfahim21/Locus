@@ -14,7 +14,8 @@
     "db:migrate": "tsx src/db/migrate.ts",
     "seed:home": "tsx src/scripts/seedHome.ts",
     "admin": "tsx src/scripts/admin.ts",
-    "smoke:walk": "tsx src/scripts/smokeWalk.ts"
+    "smoke:walk": "tsx src/scripts/smokeWalk.ts",
+    "voice:rider": "tsx src/scripts/voiceRider.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",
@@ -22,6 +23,8 @@
     "@livekit/agents-plugin-openai": "^1.10.1",
     "@livekit/agents-plugin-sarvam": "^1.10.1",
     "@livekit/agents-plugin-silero": "^1.10.1",
+    "@livekit/protocol": "1.54.1",
+    "@livekit/rtc-node": "1.2.3",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.19",
     "livekit-server-sdk": "^2.20.1",

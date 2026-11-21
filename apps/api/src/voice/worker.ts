@@ -5,6 +5,10 @@
  *
  *   pnpm --filter @locus/api worker dev     (local, connects to LIVEKIT_URL)
  *   pnpm --filter @locus/api worker start   (production)
+ *
+ * Without a phone number: set LOCUS_DEV_DID to a number assigned to a recipient
+ * (`admin number`). A participant with no SIP attributes (the agents playground,
+ * or `pnpm voice:rider`) is then treated as a call to that number.
  */
 import { fileURLToPath } from "node:url";
 import {
@@ -26,6 +30,8 @@ import { createSpeech, speechProvider } from "./speech.js";
 const SILENCE_MS = 8_000;
 /** Handoff call rings for this long before Locus plays the fallback note (plan §4.3). */
 const HANDOFF_RING_SECONDS = 20;
+/** Pause after the last words before hanging up, so the phone network doesn't clip them. */
+const HANG_UP_GRACE_MS = 1_000;
 
 type Language = "hi" | "en";
 
@@ -49,8 +55,6 @@ class GuideAgent extends voice.Agent {
     private readonly guide: GuideClient,
     private readonly sessionId: string,
     private readonly greeting: string,
-    private readonly callTrunkId: string,
-    private readonly fromNumber: string,
   ) {
     super({ instructions: "Speak only the exact text you are given." });
   }
@@ -112,8 +116,9 @@ class GuideAgent extends voice.Agent {
     const sip = new SipClient(env("LIVEKIT_URL"), env("LIVEKIT_API_KEY"), env("LIVEKIT_API_SECRET"));
     let answered = false;
     try {
-      await sip.createSipParticipant(this.callTrunkId, phone, this.ctx.room.name!, {
-        fromNumber: this.fromNumber,
+      // Read here, not at start: dev calls without a SIP trunk work until a handoff is needed.
+      await sip.createSipParticipant(env("LIVEKIT_SIP_OUTBOUND_TRUNK_ID"), phone, this.ctx.room.name!, {
+        fromNumber: env("LOCUS_OUTBOUND_NUMBER"),
         participantIdentity: "recipient",
         ringingTimeout: HANDOFF_RING_SECONDS,
         waitUntilAnswered: true,
@@ -134,6 +139,7 @@ class GuideAgent extends voice.Agent {
   }
 
   private async hangUp() {
+    await new Promise((resolve) => setTimeout(resolve, HANG_UP_GRACE_MS));
     await this.guide.end(this.sessionId);
     await this.ctx.deleteRoom();
   }
@@ -149,9 +155,12 @@ export default defineAgent({
 
     await ctx.connect();
     const caller = await ctx.waitForParticipant();
-    const did = caller.attributes["sip.trunkPhoneNumber"];
-    const callerId = caller.attributes["sip.phoneNumber"];
-    if (!did) throw new Error(`Participant ${caller.identity} has no sip.trunkPhoneNumber attribute`);
+    const devDid = optionalEnv("LOCUS_DEV_DID");
+    const sipDid = caller.attributes["sip.trunkPhoneNumber"];
+    const did = sipDid ?? devDid;
+    const callerId = caller.attributes["sip.phoneNumber"] ?? (sipDid ? undefined : `dev:${caller.identity}`);
+    if (!did) throw new Error(`Participant ${caller.identity} has no sip.trunkPhoneNumber attribute and LOCUS_DEV_DID is unset`);
+    if (!sipDid) log({ event: "worker.devCall", did, participant: caller.identity });
 
     const created = await guide.createSession(did, callerId, language);
     const session = new voice.AgentSession({
@@ -174,14 +183,7 @@ export default defineAgent({
     }
 
     log({ event: "worker.session", sessionId: created.sessionId });
-    const agent = new GuideAgent(
-      ctx,
-      guide,
-      created.sessionId,
-      created.instruction,
-      env("LIVEKIT_SIP_OUTBOUND_TRUNK_ID"),
-      env("LOCUS_OUTBOUND_NUMBER"),
-    );
+    const agent = new GuideAgent(ctx, guide, created.sessionId, created.instruction);
     await session.start({ agent, room: ctx.room });
   },
 });

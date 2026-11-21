@@ -3,6 +3,8 @@
  *   pnpm --filter @locus/api admin client <name> [--first-party]   create an API client; prints its key once
  *   pnpm --filter @locus/api admin expect <recipientId>    switch "expecting a delivery" on for 3 hours
  *   pnpm --filter @locus/api admin outbound <+E164>        register a Locus outbound number (loop guard)
+ *   pnpm --filter @locus/api admin number <+E164> <recipientId> [provider]   assign a Locus number to a recipient
+ *   pnpm --filter @locus/api admin unnumber <+E164>        remove a Locus number
  */
 import { randomBytes, randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
@@ -14,7 +16,7 @@ import { PostgresStore } from "../store/postgres.js";
 
 
 const [command, arg] = process.argv.slice(2);
-if (!command || !arg) throw new Error("Usage: admin <client|expect|outbound> <arg>");
+if (!command || !arg) throw new Error("Usage: admin <client|expect|outbound|number|unnumber> <arg>");
 
 const store = new PostgresStore(env("DATABASE_URL"));
 try {
@@ -37,6 +39,20 @@ try {
     if (!/^\+\d{8,15}$/.test(arg)) throw new Error("Outbound number must be E.164, e.g. +918000000099");
     await store.db.insert(schema.outboundNumbers).values({ e164: arg }).onConflictDoNothing();
     console.log(`Registered outbound number ${arg}`);
+  } else if (command === "number") {
+    const recipientId = process.argv[4];
+    if (!/^\+\d{8,15}$/.test(arg)) throw new Error("Number must be E.164, e.g. +918047182290");
+    if (!recipientId || !(await store.getRecipient(recipientId))) throw new Error(`Recipient ${recipientId ?? "(missing)"} not found`);
+    const provider = process.argv[5] ?? "dev";
+    await store.db
+      .insert(schema.numbers)
+      .values({ did: arg, recipientId, provider })
+      .onConflictDoUpdate({ target: schema.numbers.did, set: { recipientId, provider } });
+    console.log(`${arg} now rings ${recipientId} (${provider})`);
+  } else if (command === "unnumber") {
+    const removed = await store.db.delete(schema.numbers).where(eq(schema.numbers.did, arg)).returning({ did: schema.numbers.did });
+    if (removed.length !== 1) throw new Error(`Number ${arg} not found`);
+    console.log(`Removed ${arg}`);
   } else {
     throw new Error(`Unknown command ${command}`);
   }

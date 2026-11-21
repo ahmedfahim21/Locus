@@ -8,3 +8,4 @@ eval/phrases.jsonl
 .next/
 *.tsbuildinfo
 .pnpm-store/
+eval/voice-run/
