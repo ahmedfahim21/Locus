@@ -13,7 +13,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "seed:home": "tsx src/scripts/seedHome.ts",
-    "admin": "tsx src/scripts/admin.ts"
+    "admin": "tsx src/scripts/admin.ts",
+    "smoke:walk": "tsx src/scripts/smokeWalk.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",
