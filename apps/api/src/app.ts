@@ -1,3 +1,5 @@
+import { keytermsFor } from "./voice/keyterms.js";
+import type { TestCallIssuer } from "./voice/testCall.js";
 import type { NameTranslator } from "./enrich/translate.js";
 import type { LandmarkVision } from "./enrich/vision.js";
 import type { WalkDeps } from "./enrich/processWalk.js";
@@ -30,6 +32,7 @@ export type Deps = {
   storage: ObjectStorage;
   vision: LandmarkVision;
   translator: NameTranslator;
+  testCalls: TestCallIssuer | null;
   frames: WalkDeps["frames"];
   /** Runs work after the response is sent (walk processing). */
   background: (task: () => Promise<void>) => void;
@@ -195,7 +198,9 @@ export function createApp(deps: Deps) {
     };
     await store.createSession(session);
     log({ event: "session.created", sessionId: session.id, clientId: session.clientId });
-    return c.json({ sessionId: session.id, state: session.state, instruction: say.notice(language) }, 201);
+    // Key terms include the recipient's first name, which screening checks, so only Locus's own worker gets them.
+    const keyterms = c.get("client").firstParty ? keytermsFor(recipient, home, (await contextFor(home)).features) : undefined;
+    return c.json({ sessionId: session.id, state: session.state, instruction: say.notice(language), ...(keyterms ? { keyterms } : {}) }, 201);
   });
 
   app.post("/v1/sessions/:id/utterances", async (c) => {
@@ -280,6 +285,7 @@ export function createApp(deps: Deps) {
       graphFor,
       storage: deps.storage,
       translator: deps.translator,
+      testCalls: deps.testCalls,
       log,
       walk: { vision: deps.vision, frames: deps.frames, log },
       background: deps.background,

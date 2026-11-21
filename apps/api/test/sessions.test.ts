@@ -22,12 +22,19 @@ describe("auth", () => {
 });
 
 describe("POST /v1/sessions", () => {
-  it("creates a screening session and returns only the spoken notice", async () => {
+  it("creates a screening session and gives Locus's worker the call's key terms", async () => {
     const t = setup();
     const res = await t.startSession();
     expect(res).toEqual({
       status: 201,
-      body: { sessionId: "ses_1", state: "screening", instruction: say.notice("hi") },
+      body: {
+        sessionId: "ses_1",
+        state: "screening",
+        instruction: say.notice("hi"),
+        // Name and apps, landmarks in route order, then nearby places closest first.
+        // "Hanuman Mandir" is dropped: it's the same name as "Hanuman temple" to the matcher.
+        keyterms: ["Ahmed", "swiggy", "Shell petrol pump", "Hanuman temple", "blue gate", "Sri Anjaneya Temple", "Iyengar Bakery"],
+      },
     });
     expect(t.store.sessions.get("ses_1")).toEqual({
       id: "ses_1",
@@ -51,8 +58,17 @@ describe("POST /v1/sessions", () => {
   it("accepts recipientId instead of did and honours the language", async () => {
     const t = setup();
     const res = await t.call("POST", "/v1/sessions", { recipientId: recipient.id, language: "en" });
-    expect(res).toEqual({ status: 201, body: { sessionId: "ses_1", state: "screening", instruction: say.notice("en") } });
+    expect(res).toEqual({
+      status: 201,
+      body: { sessionId: "ses_1", state: "screening", instruction: say.notice("en"), keyterms: expect.arrayContaining(["Ahmed"]) },
+    });
     expect(t.store.sessions.get("ses_1")!.callerIdHash).toBeNull();
+  });
+
+  it("never gives a third-party client the key terms (they include the screening name)", async () => {
+    const t = setup();
+    const res = await t.call("POST", "/v1/sessions", { did: DID }, OTHER_KEY);
+    expect(res).toEqual({ status: 201, body: { sessionId: "ses_1", state: "screening", instruction: say.notice("hi") } });
   });
 
   it.each([

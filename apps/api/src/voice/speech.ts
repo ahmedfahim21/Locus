@@ -17,21 +17,28 @@ export function speechProvider(): SpeechProvider {
   return p;
 }
 
-export function createSpeech(provider: SpeechProvider, language: CallLanguage): { stt: stt.STT; tts: tts.TTS } {
+/**
+ * `keyterms` are this call's names and places (from the guide API). Saaras v4 listens
+ * for them: on phone audio it otherwise hears "Fahim" as "bahin" and "Kohenur" as "Kohinoor".
+ */
+export function createSpeech(provider: SpeechProvider, language: CallLanguage, keyterms: string[] = []): { stt: stt.STT; tts: tts.TTS } {
   if (provider === "sarvam") {
     const apiKey = env("SARVAM_API_KEY");
     return {
       stt: new sarvam.STT({
         apiKey,
-        model: "saaras:v3",
+        model: (optionalEnv("SARVAM_STT_MODEL") ?? "saaras:v4") as "saaras:v4",
         // Riders mix Hindi, English and local words; let Saaras detect and keep the mix.
         languageCode: "unknown",
         mode: "codemix",
+        // Sent by our pnpm patch of the plugin (patches/@livekit__agents-plugin-sarvam@1.10.1.patch).
+        keyterms,
       }),
       tts: new sarvam.TTS({
         apiKey,
-        model: "bulbul:v3",
-        speaker: optionalEnv("SARVAM_TTS_SPEAKER") ?? "simran",
+        // The plugin types only list v2/v3; v4-flash accepts the same request fields (verified against the API).
+        model: (optionalEnv("SARVAM_TTS_MODEL") ?? "bulbul:v4-flash") as "bulbul:v3",
+        speaker: optionalEnv("SARVAM_TTS_SPEAKER") ?? "simran_hi_conversation",
         targetLanguageCode: language === "hi" ? "hi-IN" : "en-IN",
       }),
     };
