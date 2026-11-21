@@ -1,0 +1,505 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Locus — design system preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anek+Latin:wdth,wght@75..125,400&family=Anek+Devanagari:wdth,wght@75..125,400&family=Anek+Kannada:wdth,wght@75..125,400&family=Kalam:wght@400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css" />
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css" />
+<style>
+  :root, [data-theme="light"] {
+    --card: #E3ECD0;        /* pista card: the page */
+    --paper: #FAFAF2;       /* road paper: sheets, inputs */
+    --ghost: #C9D5B4;       /* faded city */
+    --ghost-deep: #B3C49A;
+    --ink: #16213B;         /* text, outlines */
+    --ink-muted: #4B5672;
+    --ballpoint: #2340B0;   /* route, primary actions */
+    --ballpoint-press: #1A3190;
+    --kumkum: #C8102E;      /* the door, errors */
+    --turmeric: #F2B705;    /* rider's live position */
+    --leaf: #2F7D4F;        /* success */
+    --on-ballpoint: #FAFAF2;
+    --grain-opacity: .06;
+  }
+  [data-theme="dark"] {
+    --card: #0F1A2E;
+    --paper: #16233D;
+    --ghost: #22324F;
+    --ghost-deep: #2B3D5E;
+    --ink: #E8EEDC;
+    --ink-muted: #A7B1C8;
+    --ballpoint: #8EA2FF;
+    --ballpoint-press: #B3C1FF;
+    --kumkum: #FF6B7D;
+    --turmeric: #F6C531;
+    --leaf: #6FCB95;
+    --on-ballpoint: #0F1A2E;
+    --grain-opacity: .08;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--card); color: var(--ink);
+    font-family: "Anek Latin", "Anek Devanagari", "Anek Kannada", sans-serif;
+    font-weight: 400; font-stretch: 100%; font-size: 16px; line-height: 1.5;
+    transition: background .3s ease-out, color .3s ease-out;
+  }
+  body::before { /* paper grain */
+    content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: var(--grain-opacity);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  main, header { position: relative; z-index: 1; }
+  h1, h2, h3, b, strong { font-weight: 400; }
+  .wide { font-stretch: 125%; }
+  .narrow { font-stretch: 75%; }
+  .mono { font-family: "JetBrains Mono", monospace; font-feature-settings: "tnum"; letter-spacing: .02em; }
+  .hand { font-family: "Kalam", cursive; }
+  .muted { color: var(--ink-muted); }
+  .deva { font-family: "Anek Devanagari", sans-serif; }
+  .knda { font-family: "Anek Kannada", sans-serif; }
+
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 20px clamp(16px, 4vw, 48px); }
+  .wordmark { font-size: 28px; font-stretch: 125%; letter-spacing: -.01em; }
+  .wordmark .deva { font-size: 22px; color: var(--ink-muted); margin-left: 10px; }
+  .theme-btn { font: inherit; font-stretch: 75%; background: transparent; color: var(--ink); border: 1.5px solid var(--ink); border-radius: 3px; padding: 6px 12px; cursor: pointer; display: inline-flex; gap: 8px; align-items: center; }
+
+  section { padding: 24px clamp(16px, 4vw, 48px) 48px; }
+  .section-title { font-size: clamp(28px, 4vw, 44px); font-stretch: 125%; line-height: 1.05; margin: 0 0 8px; max-width: 18ch; }
+  .lede { max-width: 60ch; color: var(--ink-muted); margin: 0 0 28px; font-size: 18px; }
+
+  /* ===== Hero: projector layout ===== */
+  .stage { display: grid; grid-template-columns: 2fr 1fr; gap: 0; border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; background: var(--paper); min-height: 560px; }
+  @media (max-width: 860px) { .stage { grid-template-columns: 1fr; } .stage .side { border-left: 0 !important; border-top: 1.5px solid var(--ink); } }
+  .mapwrap { position: relative; min-height: 420px; }
+  #map { position: absolute; inset: 0; }
+  .poster { position: absolute; left: 16px; top: 14px; z-index: 2; pointer-events: none; max-width: 70%; }
+  .poster .street { font-size: clamp(26px, 3.4vw, 40px); font-stretch: 125%; line-height: 1.02; text-shadow: 0 1px 0 var(--card); }
+  .poster .sub { font-stretch: 75%; color: var(--ink-muted); font-size: 15px; }
+  .callbar { position: absolute; right: 12px; top: 12px; z-index: 2; display: flex; gap: 8px; align-items: center; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 3px; padding: 6px 10px; font-stretch: 75%; }
+  .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--kumkum); animation: pulse 1.4s ease-out infinite; }
+  @media (max-width: 640px) { .callbar { top: auto; bottom: 34px; right: auto; left: 12px; } .poster { max-width: 92%; } .stamp { width: 82px; } }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--kumkum) 60%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+  .side { border-left: 1.5px solid var(--ink); display: flex; flex-direction: column; }
+  .status { padding: 16px 18px; border-bottom: 1.5px solid var(--ink); }
+  .status .label { font-stretch: 75%; color: var(--ink-muted); font-size: 14px; }
+  .status .now { font-size: 24px; font-stretch: 125%; line-height: 1.15; min-height: 2.3em; }
+  .progress { display: flex; gap: 6px; margin-top: 10px; }
+  .progress span { flex: 1; height: 6px; border: 1.5px solid var(--ink); border-radius: 2px; background: transparent; transition: background .4s ease-out; }
+  .progress span.done { background: var(--turmeric); }
+  .transcript { flex: 1; overflow: auto; padding: 8px 18px 18px; max-height: 420px; }
+  .turn { padding: 10px 0; border-bottom: 1px dashed var(--ghost-deep); opacity: 0; transform: translateY(6px); transition: opacity .35s ease-out, transform .35s ease-out; }
+  .turn.show { opacity: 1; transform: none; }
+  .turn .who { font-stretch: 75%; font-size: 13px; color: var(--ink-muted); display: flex; gap: 6px; align-items: center; }
+  .turn.locus .text { color: var(--ballpoint); }
+
+  /* map markers */
+  .stamp { width: 92px; background: var(--paper); border: 2px solid var(--ink); border-radius: 2px; box-shadow: 4px 4px 0 var(--ink); padding: 6px 7px 7px; transform: rotate(var(--r, -2deg)); font-size: 12px; line-height: 1.2; }
+  .stamp .en { font-family: "Kalam", cursive; font-size: 15px; color: var(--ink); }
+  .stamp .deva, .stamp .knda { font-stretch: 75%; color: var(--ink-muted); display: block; }
+  .stamp .num { font-stretch: 75%; color: var(--ink-muted); }
+  .stamp.reached { background: color-mix(in srgb, var(--turmeric) 35%, var(--paper)); }
+  .door { font-family: "Kalam", cursive; color: var(--kumkum); font-size: 44px; line-height: 1; text-shadow: 0 1px 0 var(--paper); }
+  .door small { display: block; font-size: 14px; color: var(--kumkum); text-align: center; margin-top: -6px; }
+  .rider-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--turmeric); border: 2.5px solid var(--ink); box-shadow: 0 0 0 6px color-mix(in srgb, var(--turmeric) 35%, transparent); }
+  .note { pointer-events: none; }
+  .note span { display: block; font-family: "Kalam", cursive; color: var(--ballpoint); font-size: 17px; line-height: 1.15; max-width: 190px; transform: rotate(-3deg); opacity: 0; clip-path: inset(0 100% 0 0); transition: opacity .3s ease-out, clip-path .9s ease-out; }
+  .note.show span { opacity: 1; clip-path: inset(0 0 0 0); }
+  .maplibregl-ctrl-attrib { font-family: "Anek Latin", sans-serif; font-stretch: 75%; background: color-mix(in srgb, var(--paper) 80%, transparent) !important; color: var(--ink-muted); }
+  .maplibregl-ctrl-attrib a { color: var(--ink-muted); }
+
+  /* ===== Phones ===== */
+  .phones { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 28px; align-items: start; }
+  .phone { width: 100%; max-width: 360px; border: 1.5px solid var(--ink); border-radius: 22px; background: var(--card); overflow: hidden; box-shadow: 6px 6px 0 var(--ink); }
+  .phone .bar { height: 26px; display: flex; justify-content: space-between; align-items: center; padding: 0 16px; font-stretch: 75%; font-size: 12px; color: var(--ink-muted); }
+  .phone .body { padding: 14px 16px 18px; min-height: 560px; display: flex; flex-direction: column; gap: 14px; }
+  .phone h3 { margin: 0; font-size: 28px; font-stretch: 125%; line-height: 1.05; }
+  .phone .caption { margin: 0; font-stretch: 75%; color: var(--ink-muted); font-size: 14px; }
+  .minimap { position: relative; height: 250px; border: 1.5px solid var(--ink); border-radius: 4px; overflow: hidden; background: var(--card); }
+  .minimap .reticle { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -100%); z-index: 3; text-align: center; color: var(--kumkum); font-family: "Kalam", cursive; font-size: 40px; line-height: .8; pointer-events: none; }
+  .minimap .addr { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 3px; padding: 6px 10px; font-size: 14px; }
+  .btn { font: inherit; font-stretch: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 18px; border-radius: 3px; border: 1.5px solid var(--ink); cursor: pointer; background: var(--paper); color: var(--ink); transition: transform .12s ease-out, box-shadow .12s ease-out, background .2s ease-out; }
+  .btn:hover { box-shadow: 3px 3px 0 var(--ink); transform: translate(-1px, -1px); }
+  .btn:active { box-shadow: none; transform: translate(1px, 1px); }
+  .btn:focus-visible { outline: 3px solid var(--turmeric); outline-offset: 2px; }
+  .btn.primary { background: var(--ballpoint); color: var(--on-ballpoint); border-color: var(--ballpoint); }
+  .btn.primary:hover { background: var(--ballpoint-press); box-shadow: 3px 3px 0 var(--ink); }
+  .btn.ghost { background: transparent; }
+  .btn[disabled] { opacity: .45; cursor: not-allowed; box-shadow: none; transform: none; }
+  .btn.block { width: 100%; }
+  .record { width: 86px; height: 86px; border-radius: 50%; border: 3px solid var(--ink); background: var(--kumkum); margin: 8px auto 0; display: grid; place-items: center; color: var(--paper); font-size: 30px; }
+  .viewfinder { position: relative; height: 300px; border-radius: 6px; background: #1d2433; overflow: hidden; border: 1.5px solid var(--ink); }
+  .viewfinder .rec { position: absolute; left: 12px; top: 10px; color: #FAFAF2; font-stretch: 75%; display: flex; gap: 8px; align-items: center; }
+  .viewfinder .gps { position: absolute; right: 12px; top: 10px; color: #FAFAF2; font-stretch: 75%; font-size: 13px; }
+  .viewfinder .tip { position: absolute; left: 12px; right: 12px; bottom: 12px; color: #FAFAF2; font-size: 15px; }
+  .viewfinder .track { position: absolute; left: 50%; top: 40%; width: 60%; height: 45%; transform: translateX(-50%); border-left: 3px dashed #F2B705; border-bottom: 3px dashed #F2B705; border-radius: 0 0 0 40px; opacity: .8; }
+  .proposal { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: start; padding: 12px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 4px; }
+  .frame { width: 96px; height: 96px; border: 2px solid var(--ink); border-radius: 2px; background: linear-gradient(110deg, var(--ghost) 30%, var(--card) 50%, var(--ghost) 70%); background-size: 250% 100%; animation: shimmer 1.4s linear infinite; box-shadow: 3px 3px 0 var(--ink); transform: rotate(-2deg); display: grid; place-items: center; color: var(--ink-muted); font-size: 12px; font-stretch: 75%; text-align: center; padding: 6px; }
+  @keyframes shimmer { to { background-position: -250% 0; } }
+  .field { display: grid; gap: 4px; }
+  .field label { font-stretch: 75%; font-size: 13px; color: var(--ink-muted); }
+  .field input { font: inherit; color: var(--ink); background: var(--card); border: 1.5px solid var(--ink); border-radius: 3px; min-height: 44px; padding: 0 10px; }
+  .field input:focus-visible { outline: 3px solid var(--turmeric); outline-offset: 1px; }
+  .row { display: flex; gap: 8px; }
+  .switchrow { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 14px; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 4px; }
+  .switch { width: 62px; height: 34px; border-radius: 3px; border: 1.5px solid var(--ink); background: var(--card); position: relative; cursor: pointer; flex: none; }
+  .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 2px; background: var(--ink-muted); transition: transform .2s ease-out, background .2s ease-out; }
+  .switch[aria-checked="true"] { background: var(--ballpoint); border-color: var(--ballpoint); }
+  .switch[aria-checked="true"]::after { transform: translateX(27px); background: var(--on-ballpoint); }
+  .number { font-size: 26px; }
+  .stops { display: grid; gap: 0; border: 1.5px solid var(--ink); border-radius: 4px; background: var(--paper); }
+  .stops div { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px dashed var(--ghost-deep); }
+  .stops div:first-child { border-top: 0; }
+  .stops .n { font-stretch: 75%; color: var(--ink-muted); }
+
+  /* ===== System ===== */
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px 48px; }
+  .spec { border-top: 1.5px solid var(--ink); padding-top: 12px; }
+  .spec .meta { font-stretch: 75%; color: var(--ink-muted); font-size: 13px; margin-bottom: 6px; }
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+  .sw { border: 1.5px solid var(--ink); border-radius: 4px; overflow: hidden; background: var(--paper); }
+  .sw .chip { height: 72px; border-bottom: 1.5px solid var(--ink); }
+  .sw .info { padding: 8px 10px; font-size: 14px; }
+  .sw .info .mono { font-size: 12px; color: var(--ink-muted); }
+  .alert { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1.5px solid var(--ink); border-radius: 4px; background: var(--paper); max-width: 520px; }
+  .alert i { font-size: 20px; margin-top: 1px; }
+  .alert.ok i { color: var(--leaf); } .alert.warn i { color: #9A6A00; } [data-theme="dark"] .alert.warn i { color: var(--turmeric); }
+  .alert.err i { color: var(--kumkum); } .alert.info i { color: var(--ballpoint); }
+  .stack { display: grid; gap: 12px; }
+  footer { padding: 24px clamp(16px, 4vw, 48px) 48px; color: var(--ink-muted); font-stretch: 75%; font-size: 14px; position: relative; z-index: 1; }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wordmark">Locus<span class="deva">लोकस</span></div>
+  <button class="theme-btn" id="themeBtn" type="button"><i class="ph ph-moon"></i><span>Night card</span></button>
+</header>
+
+<main>
+  <section>
+    <h1 class="section-title">It knows my street.</h1>
+    <p class="lede">A rider calls; Locus answers in Hinglish and walks them in, landmark by landmark, on a map that looks like the one your neighbour drew on the back of a wedding card. This is the live-call view as it appears on the projector: the real Hebbal streets, the route drawn in ballpoint, the rider in turmeric.</p>
+
+    <div class="stage">
+      <div class="mapwrap">
+        <div id="map" aria-label="Map of the route from 5th Cross Road to the blue gate"></div>
+        <div class="poster">
+          <div class="street" id="posterStreet">SS Ashram Road</div>
+          <div class="sub">Hebbal, Bengaluru · DIGIPIN <span class="mono">4P3JK852C9</span></div>
+        </div>
+        <div class="callbar"><span class="live-dot"></span><span>Rider on call</span><span class="mono" id="timer">00:00</span></div>
+      </div>
+      <aside class="side">
+        <div class="status">
+          <div class="label" id="statusLabel">Guiding to</div>
+          <div class="now" id="statusNow">Petrol bunk</div>
+          <div class="progress" id="progress"><span></span><span></span><span></span><span></span><span></span></div>
+        </div>
+        <div class="transcript" id="transcript" aria-live="polite"></div>
+      </aside>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Set up once, on your phone.</h2>
+    <p class="lede">Three screens from the recipient's setup. The map is the same drawing at every step, so the route you confirm is the route the rider hears.</p>
+    <div class="phones">
+      <div class="phone">
+        <div class="bar"><span class="mono">9:41</span><span>Step 1 of 3</span></div>
+        <div class="body">
+          <h3>Where should the rider stop?</h3>
+          <p class="caption">Move the map until the red X sits on your gate.</p>
+          <div class="minimap" id="mini"><div class="reticle">×</div><div class="addr">Gate on 2nd lane, off Vishwanatha Nagenhalli Main Road</div></div>
+          <button class="btn primary block" type="button">This is my gate</button>
+          <button class="btn ghost block" type="button"><i class="ph ph-crosshair"></i>Use my location</button>
+        </div>
+      </div>
+
+      <div class="phone">
+        <div class="bar"><span class="mono">9:43</span><span>Step 2 of 3</span></div>
+        <div class="body">
+          <h3>Walk it once.</h3>
+          <p class="caption">Start at the main road and film your way to the door. 30 to 60 seconds is enough.</p>
+          <div class="viewfinder">
+            <div class="rec"><span class="live-dot"></span><span class="mono">00:24</span></div>
+            <div class="gps"><i class="ph ph-navigation-arrow"></i> GPS ±6 m</div>
+            <div class="track"></div>
+            <div class="tip">Point the camera at shop boards and gates as you pass them.</div>
+          </div>
+          <div class="record" role="button" aria-label="Stop recording"><i class="ph ph-stop"></i></div>
+        </div>
+      </div>
+
+      <div class="phone">
+        <div class="bar"><span class="mono">9:45</span><span>Step 3 of 3</span></div>
+        <div class="body">
+          <h3>Is this right?</h3>
+          <p class="caption">Found in your video, near SS Ashram Road. Keep it, rename it, or skip it.</p>
+          <div class="proposal">
+            <div class="frame">Reading frame 14 of 31</div>
+            <div class="stack" style="gap:8px">
+              <div class="field"><label for="n1">What a rider would call it</label><input id="n1" value="Hanuman temple" /></div>
+              <div class="deva muted" style="font-stretch:75%">हनुमान मंदिर · <span class="knda">ಹನುಮಾನ್ ದೇವಸ್ಥಾನ</span></div>
+            </div>
+          </div>
+          <div class="row"><button class="btn primary" type="button" style="flex:1"><i class="ph ph-check"></i>Keep</button><button class="btn" type="button" style="flex:1">Skip</button></div>
+          <div class="stops" aria-label="Confirmed stops">
+            <div><span class="n">1</span><span>Petrol bunk</span><i class="ph ph-dots-six-vertical muted"></i></div>
+            <div><span class="n">2</span><span>Iyengar bakery</span><i class="ph ph-dots-six-vertical muted"></i></div>
+            <div><span class="n">3</span><span class="muted">Waiting for your answer</span><span></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="phone">
+        <div class="bar"><span class="mono">7:12 pm</span><span>Home</span></div>
+        <div class="body">
+          <h3>Expecting a delivery?</h3>
+          <div class="switchrow">
+            <div><div>On for 2 h 48 min</div><div class="caption">Locus guides riders only while this is on.</div></div>
+            <button class="switch" role="switch" aria-checked="true" aria-label="Expecting a delivery" id="sw"></button>
+          </div>
+          <div class="stack" style="gap:4px">
+            <div class="caption">Your Locus number</div>
+            <div class="mono number">+91 80 4718 2290</div>
+            <div class="caption">Forward unanswered calls here, or give it as the receiver's number.</div>
+          </div>
+          <button class="btn block" type="button"><i class="ph ph-copy"></i>Copy number</button>
+          <div class="alert info"><i class="ph ph-phone-incoming"></i><div><div>No calls yet today</div><div class="caption">When a rider calls, you'll watch them get guided here.</div></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Type: one family, three widths, no bold.</h2>
+    <p class="lede">Anek covers Latin, Devanagari and Kannada with the same voice. Every level stays at weight 400; hierarchy comes from width and size. Kalam is the ballpoint on the map. JetBrains Mono is only for numbers you read digit by digit.</p>
+    <div class="grid2">
+      <div class="spec"><div class="meta">Display · Anek Latin, width 125, 44/46</div><div class="wide" style="font-size:44px;line-height:1.05">Left after the Iyengar bakery</div></div>
+      <div class="spec"><div class="meta">Scripts · Anek Devanagari / Kannada, width 100</div><div style="font-size:30px;line-height:1.3"><span class="deva">हनुमान मंदिर के पीछे वाली गली</span><br /><span class="knda">ಹನುಮಾನ್ ದೇವಸ್ಥಾನದ ಹಿಂದಿನ ರಸ್ತೆ</span></div></div>
+      <div class="spec"><div class="meta">Body · Anek Latin, width 100, 16/24</div><p style="margin:0;max-width:52ch">Locus answers the rider's call, checks who the delivery is for, then guides them one landmark at a time. If it loses them twice, it rings you instead of guessing.</p></div>
+      <div class="spec"><div class="meta">Label · Anek Latin, width 75, 13/18</div><div class="narrow muted" style="font-size:13px">GUIDING TO · 2 OF 5 · UPDATED JUST NOW</div><div class="narrow" style="font-size:15px;margin-top:6px">Rider on call · Swiggy · Hebbal</div></div>
+      <div class="spec"><div class="meta">On-map note · Kalam 400, 18</div><div class="hand" style="font-size:24px;color:var(--ballpoint)">bakery ke baad mandir aayega, wahan se left</div></div>
+      <div class="spec"><div class="meta">Numbers · JetBrains Mono 400, tabular</div><div class="mono" style="font-size:26px">+91 80 4718 2290</div><div class="mono muted" style="font-size:16px;margin-top:4px">DIGIPIN 4P3JK852C9 · 01:42</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Colour means something.</h2>
+    <p class="lede">The card owns the page. Ink and ballpoint carry everything else. Kumkum marks only the door, turmeric only the rider. Night card swaps the paper, not the meanings.</p>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:var(--card)"></div><div class="info">Pista card<div class="mono" data-hex="card"></div></div></div>
+      <div class="sw"><div class="chip" style="background:var(--paper)"></div><div class="info">Road paper<div class="mono" data-hex="paper"></div></div></div>
+      <div class="sw"><div class="chip" style="background:var(--ghost)"></div><div class="info">Faded city<div class="mono" data-hex="ghost"></div></div></div>
+      <div class="sw"><div class="chip" style="background:var(--ink)"></div><div class="info">Ink<div class="mono" data-hex="ink"></div></div></div>
+      <div class="sw"><div class="chip" style="background:var(--ballpoint)"></div><div class="info">Ballpoint<div class="mono" data-hex="ballpoint"></div></div></div>
+      <div class="sw"><div class="chip" style="background:var(--kumkum)"></div><div class="info">Kumkum, the door<div class="mono" data-hex="kumkum"></div></div></div>
+      <div class="sw"><div class="chip" style="background:var(--turmeric)"></div><div class="info">Turmeric, the rider<div class="mono" data-hex="turmeric"></div></div></div>
+      <div class="sw"><div class="chip" style="background:var(--leaf)"></div><div class="info">Leaf, success<div class="mono" data-hex="leaf"></div></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="section-title">Components and states.</h2>
+    <div class="grid2">
+      <div class="stack">
+        <div class="spec" style="border:0;padding:0"><div class="meta">Buttons · 48 px tall, 3 px corners, ink offset on hover</div></div>
+        <div class="row" style="flex-wrap:wrap">
+          <button class="btn primary" type="button"><i class="ph ph-check"></i>Save route</button>
+          <button class="btn" type="button">Rename</button>
+          <button class="btn ghost" type="button"><i class="ph ph-trash"></i>Remove</button>
+          <button class="btn primary" type="button" disabled>Save route</button>
+        </div>
+        <div class="field" style="max-width:360px"><label for="f1">Note if you can't pick up</label><input id="f1" value="Leave it with the security guard" /></div>
+        <div class="field" style="max-width:360px"><label for="f2">Your first name</label><input id="f2" value="" placeholder="As riders see it on the order" /></div>
+      </div>
+      <div class="stack">
+        <div class="alert ok"><i class="ph ph-check-circle"></i><div><div>Rider reached the blue gate</div><div class="muted" style="font-size:14px">2 min 51 s from first call. No handoff needed.</div></div></div>
+        <div class="alert warn"><i class="ph ph-warning"></i><div><div>Calling you now</div><div class="muted" style="font-size:14px">Locus couldn't place the rider twice. Pick up to talk to them.</div></div></div>
+        <div class="alert err"><i class="ph ph-x-circle"></i><div><div>Video upload failed</div><div class="muted" style="font-size:14px">The connection dropped at 64%. Your recording is still on this phone. <u>Try again</u></div></div></div>
+        <div class="alert info"><i class="ph ph-info"></i><div><div>Finding landmarks in your video</div><div class="muted" style="font-size:14px">Usually under a minute. You can keep this screen open.</div></div></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>Map data © OpenStreetMap contributors, tiles by OpenFreeMap. Route geometry from OSRM. Landmark names on the route are sample data for this preview.</footer>
+
+<script src="https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js"></script>
+<script>
+const ROUTE = [[77.592565,13.035454],[77.592718,13.036111],[77.592891,13.036853],[77.592959,13.036828],[77.59355,13.036636],[77.593689,13.036606],[77.59382,13.036573],[77.594119,13.036487],[77.59441,13.036391],[77.594701,13.036296],[77.595046,13.036181],[77.595133,13.036167],[77.595484,13.036169],[77.595691,13.036137],[77.595857,13.036112],[77.59593,13.036101],[77.59613,13.036065],[77.596271,13.036039],[77.596327,13.036029],[77.596649,13.035998],[77.596852,13.035904],[77.596982,13.035853],[77.597024,13.035842],[77.597109,13.035941],[77.597281,13.036211],[77.59733,13.036335],[77.597468,13.036724],[77.597454,13.03679],[77.597413,13.03699],[77.597305,13.037062],[77.59718,13.037108],[77.596917,13.037206],[77.596783,13.037566],[77.596737,13.03769],[77.59668,13.037836],[77.596583,13.038096],[77.59656,13.038164],[77.596483,13.038387],[77.596344,13.038735],[77.596235,13.039106],[77.596233,13.039213],[77.596355,13.039191],[77.597034,13.039139],[77.597671,13.039107],[77.597706,13.039106],[77.598343,13.039098],[77.598332,13.03927],[77.598308,13.039388],[77.598297,13.039441],[77.59826,13.039747],[77.598508,13.039793],[77.59855,13.039793],[77.599063,13.039841]];
+const LANDMARKS = [
+  { i: 2,  en: "Petrol bunk",    hi: "पेट्रोल पंप",      kn: "ಪೆಟ್ರೋಲ್ ಬಂಕ್",   r: -3, dx: -110, dy: -40, street: "5th Cross Road" },
+  { i: 12, en: "Iyengar bakery", hi: "अयंगर बेकरी",      kn: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ", r: 2,  dx: -50, dy: 30, street: "SS Ashram Road" },
+  { i: 25, en: "Hanuman temple", hi: "हनुमान मंदिर",     kn: "ಹನುಮಾನ್ ದೇವಸ್ಥಾನ", r: -2, dx: 30, dy: -10, street: "SS Ashram Road" },
+  { i: 40, en: "Chai stall",     hi: "चाय की दुकान",     kn: "ಟೀ ಅಂಗಡಿ",        r: 3,  dx: -130, dy: -20, street: "Vishwanatha Nagenhalli Main Road" },
+];
+const SCRIPT = [
+  { who: "locus", t: "Namaste, yeh call ek AI assistant utha raha hai. Delivery kiske liye hai, aur kaunse app se?" },
+  { who: "rider", t: "Ahmed ke liye, Swiggy." },
+  { who: "locus", t: "Aap abhi kahan hain? Koi dukaan ya landmark bataiye." },
+  { who: "rider", t: "Petrol bunk ke saamne hoon.", reach: 0 },
+  { who: "locus", t: "Bunk ke baad SS Ashram Road pe seedha aaiye, Iyengar bakery dikhegi.", note: 0 },
+  { who: "rider", t: "Bakery dikh rahi hai.", reach: 1 },
+  { who: "locus", t: "Bakery ke baad Hanuman mandir aayega, wahan se left.", note: 1 },
+  { who: "rider", t: "Mandir aa gaya.", reach: 2 },
+  { who: "locus", t: "Mandir se left, chai stall tak seedha.", note: 2 },
+  { who: "rider", t: "Chai stall pe hoon.", reach: 3 },
+  { who: "locus", t: "Neela gate, nariyal ke ped wala ghar. Wahi rukiye.", note: 3 },
+  { who: "rider", t: "Neela gate mil gaya!", reach: 4 },
+];
+const NOTES = ["seedha, bakery tak", "mandir ke paas left", "chai stall tak seedha", "neela gate, nariyal ka ped"];
+
+const css = n => getComputedStyle(document.documentElement).getPropertyValue("--" + n).trim();
+function jitter(coords, amt, seed) { let s = seed; const rnd = () => (s = (s * 9301 + 49297) % 233280) / 233280 - .5; return coords.map(([x, y]) => [x + rnd() * amt, y + rnd() * amt]); }
+const line = c => ({ type: "Feature", geometry: { type: "LineString", coordinates: c } });
+
+function styleFor() {
+  return {
+    version: 8,
+    sources: { omt: { type: "vector", url: "https://tiles.openfreemap.org/planet" } },
+    layers: [
+      { id: "bg", type: "background", paint: { "background-color": css("card") } },
+      { id: "park", type: "fill", source: "omt", "source-layer": "park", paint: { "fill-color": css("ghost"), "fill-opacity": .7 } },
+      { id: "landcover", type: "fill", source: "omt", "source-layer": "landcover", paint: { "fill-color": css("ghost"), "fill-opacity": .35 } },
+      { id: "water", type: "fill", source: "omt", "source-layer": "water", paint: { "fill-color": css("ghost-deep") } },
+      { id: "roads-faded", type: "line", source: "omt", "source-layer": "transportation",
+        filter: ["in", ["get", "class"], ["literal", ["motorway", "trunk", "primary", "secondary", "tertiary", "minor", "service"]]],
+        paint: { "line-color": css("ghost-deep"), "line-width": ["interpolate", ["linear"], ["zoom"], 14, 1, 18, 7] } },
+    ],
+  };
+}
+
+function fillHex() { document.querySelectorAll("[data-hex]").forEach(el => el.textContent = css(el.dataset.hex).toUpperCase()); }
+fillHex();
+document.getElementById("themeBtn").addEventListener("click", () => {
+  const root = document.documentElement, dark = root.dataset.theme !== "dark";
+  root.dataset.theme = dark ? "dark" : "light";
+  document.querySelector("#themeBtn span").textContent = dark ? "Day card" : "Night card";
+  document.querySelector("#themeBtn i").className = "ph " + (dark ? "ph-sun" : "ph-moon");
+  fillHex(); recolor(map); recolor(mini);
+});
+document.getElementById("sw").addEventListener("click", e => { const b = e.currentTarget; b.setAttribute("aria-checked", b.getAttribute("aria-checked") === "true" ? "false" : "true"); });
+
+const map = new maplibregl.Map({ container: "map", style: styleFor(), center: [77.5958, 13.0377], zoom: 16.2, attributionControl: { compact: true, customAttribution: "© OpenStreetMap contributors · OpenFreeMap" }, cooperativeGestures: true });
+const mini = new maplibregl.Map({ container: "mini", style: styleFor(), center: [77.59906, 13.03984], zoom: 17.2, attributionControl: false, interactive: false });
+
+const ink = jitter(ROUTE, 0.000012, 7), ink2 = jitter(ROUTE, 0.000012, 41);
+function addRouteLayers(m) {
+  m.addSource("route-band", { type: "geojson", data: line(ROUTE) });
+  m.addSource("route-ink", { type: "geojson", data: line([ROUTE[0], ROUTE[0]]) });
+  m.addSource("route-ink2", { type: "geojson", data: line([ROUTE[0], ROUTE[0]]) });
+  m.addSource("rider-trail", { type: "geojson", data: line([ROUTE[0], ROUTE[0]]) });
+  m.addLayer({ id: "band-edge", type: "line", source: "route-band", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": css("ink"), "line-width": 15, "line-opacity": .8 } });
+  m.addLayer({ id: "band", type: "line", source: "route-band", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": css("paper"), "line-width": 12 } });
+  m.addLayer({ id: "trail", type: "line", source: "rider-trail", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": css("turmeric"), "line-width": 11, "line-opacity": .75 } });
+  m.addLayer({ id: "ink2", type: "line", source: "route-ink2", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": css("ballpoint"), "line-width": 2, "line-opacity": .55 } });
+  m.addLayer({ id: "ink", type: "line", source: "route-ink", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": css("ballpoint"), "line-width": 3.5 } });
+}
+function recolor(m) {
+  const set = (id, prop, v) => m.getLayer(id) && m.setPaintProperty(id, prop, v);
+  set("bg", "background-color", css("card")); set("park", "fill-color", css("ghost")); set("landcover", "fill-color", css("ghost"));
+  set("water", "fill-color", css("ghost-deep")); set("roads-faded", "line-color", css("ghost-deep"));
+  set("band-edge", "line-color", css("ink")); set("band", "line-color", css("paper")); set("trail", "line-color", css("turmeric"));
+  set("ink", "line-color", css("ballpoint")); set("ink2", "line-color", css("ballpoint"));
+}
+
+const stampEls = [], noteEls = [];
+let rider;
+map.on("load", () => {
+  addRouteLayers(map);
+  LANDMARKS.forEach((l, k) => {
+    const el = document.createElement("div");
+    el.className = "stamp"; el.style.setProperty("--r", l.r + "deg");
+    el.innerHTML = `<span class="num">${k + 1}</span> <span class="en">${l.en}</span><span class="deva">${l.hi}</span><span class="knda">${l.kn}</span>`;
+    new maplibregl.Marker({ element: el, offset: [l.dx, l.dy] }).setLngLat(ROUTE[l.i]).addTo(map);
+    stampEls.push(el);
+    const n = document.createElement("div"); n.className = "note"; const ns = document.createElement("span"); ns.textContent = NOTES[k]; n.appendChild(ns);
+    const nextI = k + 1 < LANDMARKS.length ? LANDMARKS[k + 1].i : ROUTE.length - 1, mid = ROUTE[Math.round((l.i + nextI) / 2)];
+    new maplibregl.Marker({ element: n, offset: [0, -34] }).setLngLat(mid).addTo(map);
+    noteEls.push(n);
+  });
+  const door = document.createElement("div"); door.className = "door"; door.innerHTML = "×<small>blue gate</small>";
+  new maplibregl.Marker({ element: door, offset: [0, -10] }).setLngLat(ROUTE[ROUTE.length - 1]).addTo(map);
+  const rd = document.createElement("div"); rd.className = "rider-dot";
+  rider = new maplibregl.Marker({ element: rd }).setLngLat(ROUTE[0]).addTo(map);
+  map.fitBounds([[77.5921, 13.0350], [77.5995, 13.0403]], { padding: { top: 110, bottom: 40, left: 40, right: 40 }, duration: 0 });
+  run();
+});
+mini.on("load", () => {
+  mini.addSource("r", { type: "geojson", data: line(ROUTE) });
+  mini.addLayer({ id: "band", type: "line", source: "r", paint: { "line-color": css("paper"), "line-width": 12 } });
+  mini.addLayer({ id: "ink", type: "line", source: "r", paint: { "line-color": css("ballpoint"), "line-width": 3 } });
+});
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+async function drawRoute() {
+  const steps = reduce ? 1 : 40;
+  for (let s = 1; s <= steps; s++) {
+    const n = Math.max(2, Math.round((ROUTE.length * s) / steps));
+    map.getSource("route-ink").setData(line(ink.slice(0, n)));
+    map.getSource("route-ink2").setData(line(ink2.slice(0, n)));
+    await sleep(45);
+  }
+}
+async function moveRider(fromI, toI) {
+  const steps = reduce ? 1 : (toI - fromI) * 3;
+  for (let s = 1; s <= steps; s++) {
+    const pos = fromI + ((toI - fromI) * s) / steps;
+    const a = Math.floor(pos), b = Math.min(ROUTE.length - 1, a + 1), f = pos - a;
+    const p = [ROUTE[a][0] + (ROUTE[b][0] - ROUTE[a][0]) * f, ROUTE[a][1] + (ROUTE[b][1] - ROUTE[a][1]) * f];
+    rider.setLngLat(p);
+    map.getSource("rider-trail").setData(line([...ROUTE.slice(0, a + 1), p]));
+    await sleep(55);
+  }
+}
+let t0 = Date.now();
+setInterval(() => { const s = Math.floor((Date.now() - t0) / 1000); document.getElementById("timer").textContent = String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); }, 500);
+
+async function run() {
+  while (true) {
+    t0 = Date.now();
+    const tr = document.getElementById("transcript"); tr.innerHTML = "";
+    noteEls.forEach(n => n.classList.remove("show")); stampEls.forEach(s => s.classList.remove("reached"));
+    [...document.querySelectorAll("#progress span")].forEach(s => s.classList.remove("done"));
+    map.getSource("rider-trail").setData(line([ROUTE[0], ROUTE[0]])); rider.setLngLat(ROUTE[0]);
+    setStatus("Screening", "Who is this delivery for?", "SS Ashram Road");
+    await drawRoute();
+    let at = 0;
+    for (const line_ of SCRIPT) {
+      const div = document.createElement("div"); div.className = "turn " + line_.who;
+      div.innerHTML = `<div class="who"><i class="ph ${line_.who === "locus" ? "ph-waveform" : "ph-moped"}"></i>${line_.who === "locus" ? "Locus" : "Rider"}</div><div class="text">${line_.t}</div>`;
+      tr.appendChild(div); requestAnimationFrame(() => div.classList.add("show")); tr.scrollTop = tr.scrollHeight;
+      if (line_.reach !== undefined) {
+        const target = line_.reach < LANDMARKS.length ? LANDMARKS[line_.reach].i : ROUTE.length - 1;
+        await moveRider(at, target); at = target;
+        if (line_.reach < LANDMARKS.length) stampEls[line_.reach].classList.add("reached");
+        document.querySelectorAll("#progress span")[line_.reach].classList.add("done");
+        if (line_.reach === LANDMARKS.length) setStatus("Arrived", "At the blue gate", "Vishwanatha Nagenhalli Main Road");
+      }
+      if (line_.note !== undefined) {
+        noteEls[line_.note].classList.add("show");
+        const next = LANDMARKS[line_.note + 1];
+        setStatus("Guiding to", next ? next.en : "Blue gate", LANDMARKS[line_.note].street);
+      } else if (line_.who === "locus" && line_.reach === undefined && SCRIPT.indexOf(line_) === 2) {
+        setStatus("Guiding to", LANDMARKS[0].en, "5th Cross Road");
+      }
+      await sleep(reduce ? 400 : 1300);
+    }
+    await sleep(3500);
+  }
+}
+function setStatus(label, now, street) {
+  document.getElementById("statusLabel").textContent = label;
+  document.getElementById("statusNow").textContent = now;
+  document.getElementById("posterStreet").textContent = street;
+}
+
+</script>
+</body>
+</html>
