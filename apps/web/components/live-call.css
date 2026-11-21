@@ -1,0 +1,32 @@
+.stage { display: grid; grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr); border: 1.5px solid var(--ink); border-radius: 6px; overflow: hidden; background: var(--paper); min-height: min(78vh, 720px); }
+.stage-map { position: relative; min-height: 440px; }
+.stage-map .map.fill { position: absolute; inset: 0; }
+.callbar { position: absolute; right: 12px; top: 12px; z-index: 2; display: flex; gap: 8px; align-items: center; background: var(--paper); border: 1.5px solid var(--ink); border-radius: 3px; padding: 6px 10px; }
+.stage-side { border-left: 1.5px solid var(--ink); display: flex; flex-direction: column; min-height: 0; }
+.stage-status { padding: 16px 18px; border-bottom: 1.5px solid var(--ink); }
+.stage-status .now { min-height: 2.3em; }
+.progress { display: flex; gap: 6px; margin-top: 10px; }
+.progress span { flex: 1; height: 6px; border: 1.5px solid var(--ink); border-radius: 2px; transition: background .4s ease-out; }
+.progress span.done { background: var(--turmeric); }
+.transcript { list-style: none; margin: 0; padding: 4px 18px 18px; flex: 1; overflow: auto; max-height: 560px; }
+.transcript .empty { padding: 14px 0; }
+.turn { border-bottom: 1px dashed var(--ghost-deep); animation: turn-in .35s ease-out both; }
+.turn > div, .turn > button { display: grid; gap: 2px; padding: 10px 0; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; }
+.turn > button { cursor: pointer; padding-left: 8px; padding-right: 8px; margin: 0 -8px; width: calc(100% + 16px); border-radius: 3px; }
+.turn > button:hover { background: color-mix(in srgb, var(--ghost) 50%, transparent); }
+.turn[aria-current="step"] > button { background: color-mix(in srgb, var(--turmeric) 22%, transparent); }
+.turn .who { display: flex; gap: 6px; align-items: center; }
+.turn.locus .text { color: var(--ballpoint); }
+@keyframes turn-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.stage-footer { border-top: 1.5px solid var(--ink); padding: 12px 18px; }
+
+@media (max-width: 860px) {
+  .stage { grid-template-columns: 1fr; min-height: 0; }
+  .stage-map { min-height: 62vh; }
+  .stage-side { border-left: 0; border-top: 1.5px solid var(--ink); }
+  .transcript { max-height: none; }
+}
+@media (max-width: 640px) {
+  .callbar { top: auto; bottom: 34px; right: auto; left: 12px; }
+  .stamp { width: 88px; }
+}

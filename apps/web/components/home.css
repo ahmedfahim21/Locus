@@ -1,0 +1,13 @@
+/* Map-first home: full-bleed map with the street poster, panel beside (desktop) or below (phone). */
+.home { position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1fr) 400px; min-height: 100dvh; }
+.home-map { position: relative; min-height: 100dvh; }
+.home-map.skeleton { border-radius: 0; }
+.home-map .map.fill { position: absolute; inset: 0; }
+.home-panel { background: var(--card); border-left: 1.5px solid var(--ink); padding: 16px 20px 32px; display: grid; gap: 16px; align-content: start; max-height: 100dvh; overflow: auto; }
+.map-banner { position: absolute; left: 16px; right: 16px; bottom: 40px; z-index: 2; max-width: 440px; }
+
+@media (max-width: 860px) {
+  .home { grid-template-columns: 1fr; }
+  .home-map { min-height: 58dvh; }
+  .home-panel { border-left: 0; border-top: 1.5px solid var(--ink); max-height: none; border-radius: 10px 10px 0 0; margin-top: -10px; position: relative; z-index: 2; }
+}
