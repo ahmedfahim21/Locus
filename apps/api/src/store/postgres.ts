@@ -109,22 +109,27 @@ export class PostgresStore implements Store {
   }
 
   async getHomeProfile(recipientId: string) {
-    const [home] = await this.db
-      .select({
-        id: schema.homeProfiles.id,
-        lat: schema.homeProfiles.lat,
-        lon: schema.homeProfiles.lon,
-        digipin: schema.homeProfiles.digipin,
-        confirmedAt: schema.homeProfiles.confirmedAt,
-      })
-      .from(schema.homeProfiles)
-      .where(eq(schema.homeProfiles.recipientId, recipientId));
+    // Home row and its cues in parallel (one round trip, not two): cues join on the recipient.
+    const [[home], cueRows] = await Promise.all([
+      this.db
+        .select({
+          id: schema.homeProfiles.id,
+          lat: schema.homeProfiles.lat,
+          lon: schema.homeProfiles.lon,
+          digipin: schema.homeProfiles.digipin,
+          confirmedAt: schema.homeProfiles.confirmedAt,
+        })
+        .from(schema.homeProfiles)
+        .where(eq(schema.homeProfiles.recipientId, recipientId)),
+      this.db
+        .select({ cue: schema.cues })
+        .from(schema.cues)
+        .innerJoin(schema.homeProfiles, eq(schema.cues.homeProfileId, schema.homeProfiles.id))
+        .where(eq(schema.homeProfiles.recipientId, recipientId))
+        .orderBy(asc(schema.cues.ordinal))
+        .then((rows) => rows.map((r) => r.cue)),
+    ]);
     if (!home) return null;
-    const cueRows = await this.db
-      .select()
-      .from(schema.cues)
-      .where(eq(schema.cues.homeProfileId, home.id))
-      .orderBy(asc(schema.cues.ordinal));
     return {
       id: home.id,
       recipientId,

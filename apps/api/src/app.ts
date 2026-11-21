@@ -5,7 +5,7 @@ import type { ObjectStorage } from "./storage/storage.js";
 import { createHash, randomUUID } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import type { ApiClient, HomeProfile, Language, Session } from "./domain/types.js";
+import type { ApiClient, HomeProfile, Language, OsmFeature, Session } from "./domain/types.js";
 import { RoadGraph } from "./geo/roadGraph.js";
 import { applyHandoffResult, handleRiderInput, isOpen } from "./guide/engine.js";
 import { say } from "./guide/phrases.js";
@@ -75,24 +75,50 @@ function fail(c: Context, status: 400 | 401 | 404 | 409 | 500, code: ErrorCode, 
   return c.json({ error: { code, message, ...extra } }, status);
 }
 
+/** How long cached OSM data and API-client lookups are trusted. */
+const GEO_CACHE_MS = 10 * 60_000;
+const CLIENT_CACHE_MS = 60_000;
+
 export function createApp(deps: Deps) {
   const { store, log } = deps;
-  const graphs = new Map<string, RoadGraph>();
+  // OSM data and API clients change rarely; every database round trip adds to a rider's wait (~0.25 s each).
+  const geo = new Map<string, { at: number; graph: Promise<RoadGraph>; features: Promise<OsmFeature[]> }>();
+  const clients = new Map<string, { at: number; client: ApiClient }>();
 
-  /** Road graph around a home, cached per handoff point so moving the door rebuilds it. */
-  async function graphFor(home: HomeProfile) {
+  /** Road graph and named places around a home, cached per handoff point so moving the door rebuilds them. */
+  function geoFor(home: HomeProfile) {
     const key = `${home.id}@${home.handoffPoint.lat},${home.handoffPoint.lon}`;
-    let graph = graphs.get(key);
-    if (!graph) {
-      graph = new RoadGraph(await store.nearbyWays(home.handoffPoint, SEARCH_RADIUS_M));
-      graphs.set(key, graph);
+    const now = Date.now();
+    let entry = geo.get(key);
+    if (!entry || now - entry.at > GEO_CACHE_MS) {
+      entry = {
+        at: now,
+        graph: store.nearbyWays(home.handoffPoint, SEARCH_RADIUS_M).then((ways) => new RoadGraph(ways)),
+        features: store.nearbyFeatures(home.handoffPoint, SEARCH_RADIUS_M),
+      };
+      // A failed load must not stay cached.
+      Promise.all([entry.graph, entry.features]).catch(() => geo.delete(key));
+      geo.set(key, entry);
     }
-    return graph;
+    return entry;
   }
 
+  const graphFor = (home: HomeProfile) => geoFor(home).graph;
+
   async function contextFor(home: HomeProfile) {
-    const [features, graph] = await Promise.all([store.nearbyFeatures(home.handoffPoint, SEARCH_RADIUS_M), graphFor(home)]);
+    const entry = geoFor(home);
+    const [features, graph] = await Promise.all([entry.features, entry.graph]);
     return { features, graph };
+  }
+
+  async function clientFor(key: string): Promise<ApiClient | null> {
+    const hash = sha256(key);
+    const hit = clients.get(hash);
+    if (hit && Date.now() - hit.at < CLIENT_CACHE_MS) return hit.client;
+    const client = await store.getClientByKeyHash(hash);
+    if (client) clients.set(hash, { at: Date.now(), client });
+    else clients.delete(hash);
+    return client;
   }
 
   async function ownedSession(c: Context<Env>): Promise<Session | null> {
@@ -113,7 +139,7 @@ export function createApp(deps: Deps) {
     c.set("requestId", randomUUID());
     const auth = c.req.header("authorization") ?? "";
     const key = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-    const client = key ? await store.getClientByKeyHash(sha256(key)) : null;
+    const client = key ? await clientFor(key) : null;
     if (!client) return fail(c, 401, "UNAUTHORIZED", "Missing or invalid API key");
     c.set("client", client);
     await next();
@@ -179,8 +205,8 @@ export function createApp(deps: Deps) {
     const parsed = utteranceBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
 
-    const recipient = await store.getRecipient(session.recipientId);
-    const home = await store.getHomeProfile(session.recipientId);
+    const requestStarted = Date.now();
+    const [recipient, home] = await Promise.all([store.getRecipient(session.recipientId), store.getHomeProfile(session.recipientId)]);
     if (!recipient || !home) throw new Error(`recipient or home missing for session ${session.id}`);
     const { features, graph } = await contextFor(home);
 
@@ -193,15 +219,18 @@ export function createApp(deps: Deps) {
       resolver: deps.resolver,
       now: deps.now(),
     });
-    await store.updateSession(outcome.session);
     // No-transcript mode (rider objected) writes no turn rows at all.
-    if (outcome.session.mode === "normal") await store.addTurn(outcome.turn);
+    await Promise.all([
+      store.updateSession(outcome.session),
+      outcome.session.mode === "normal" ? store.addTurn(outcome.turn) : Promise.resolve(),
+    ]);
     log({
       event: "turn",
       sessionId: session.id,
       state: outcome.session.state,
       lost: outcome.turn.lost,
       ms: Date.now() - started,
+      requestMs: Date.now() - requestStarted,
     });
     const enteredHandoff = outcome.session.state === "handoff" && session.state !== "handoff";
     return c.json({
