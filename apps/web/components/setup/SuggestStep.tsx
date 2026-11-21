@@ -81,7 +81,7 @@ export function SuggestStep({
           <div className="label">
             {data
               ? `From ${data.route.entryStreet ?? "the main road"} · ${data.route.lengthM} m · ${data.route.turns.length} turn${data.route.turns.length === 1 ? "" : "s"}`
-              : "Reading the map, your video and Street View…"}
+              : "Reading the map and your walk video…"}
           </div>
         </div>
       </div>
@@ -108,7 +108,7 @@ export function SuggestStep({
             {[0, 1, 2].map((i) => (
               <div key={i} className="skeleton" style={{ height: 72, borderRadius: "var(--radius)" }} />
             ))}
-            <span className="label">Looking at the map, your walk video and Street View. This can take a few seconds.</span>
+            <span className="label">Looking at the map and your walk video. This can take a few seconds.</span>
           </div>
         )}
 
@@ -127,14 +127,11 @@ export function SuggestStep({
 
         {data && (
           <>
-            {data.streetView.status !== "ok" && (
+            {/* Street photos are optional; only a configured source that failed is worth mentioning. */}
+            {data.streetView.status === "error" && (
               <div className="alert info small">
                 <Binoculars size={18} />
-                <span>
-                  {data.streetView.status === "off"
-                    ? "Street View isn't set up on this server, so these come from the map and your video."
-                    : `Street View didn't work this time: ${data.streetView.message}`}
-                </span>
+                <span>Street photos didn&rsquo;t load this time ({data.streetView.message}). These come from the map and your video.</span>
               </div>
             )}
             {data.suggestions.length === 0 ? (
