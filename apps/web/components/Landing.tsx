@@ -4,7 +4,9 @@ import { GoogleLogo, PlayCircle } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useState } from "react";
 import { supabase } from "../lib/api";
+import { AppearanceSwitch } from "./AppearanceSwitch";
 import { DemoCall } from "./DemoCall";
+import { LogoMark } from "./Logo";
 import { TopBar } from "./TopBar";
 
 export function Landing() {
@@ -76,6 +78,12 @@ export function Landing() {
           ))}
         </ul>
       </section>
+      <footer className="row" style={{ justifyContent: "space-between", gap: 16 }}>
+        <span className="row label" style={{ gap: 8 }}>
+          <LogoMark size={18} /> Locus · Talks your rider to your door
+        </span>
+        <AppearanceSwitch />
+      </footer>
       <p className="label" style={{ textAlign: "center" }}>Map data © OpenStreetMap contributors, tiles by OpenFreeMap.</p>
     </main>
   );

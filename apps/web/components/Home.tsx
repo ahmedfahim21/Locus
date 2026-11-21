@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { scriptNames, supabase, type Me } from "../lib/api";
 import { useMe, useRoute } from "../lib/hooks";
+import { AppearanceSwitch } from "./AppearanceSwitch";
 import { Calls } from "./Calls";
 import { DeliverySwitch } from "./DeliverySwitch";
 import { RouteMap } from "./RouteMap";
@@ -61,7 +62,7 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
   const home = me.home!;
   const recipient = me.recipient!;
   const route = useRoute(true, home.confirmedAt);
-  const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl }));
+  const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl, kind: c.kind, color: c.color }));
   const photos = home.cues.filter((c) => c.photoUrl).length;
 
   return (
@@ -157,6 +158,12 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
               <span className="cell-main">Hear a demo call</span>
               <CaretRight size={16} className="cell-end" />
             </Link>
+          </li>
+          <li>
+            <div className="cell">
+              <span className="cell-main">Appearance</span>
+              <AppearanceSwitch />
+            </div>
           </li>
           <li>
             <button className="cell" type="button" onClick={() => void supabase.auth.signOut()} style={{ color: "var(--danger)" }}>

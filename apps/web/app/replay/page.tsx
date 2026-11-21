@@ -3,7 +3,7 @@ import { DemoCall } from "../../components/DemoCall";
 import { TopBar } from "../../components/TopBar";
 
 export const metadata: Metadata = {
-  title: "Demo call · Locus",
+  title: "Demo call",
   description: "Listen to a rider get guided from the wrong gate to the right one, on a real Bengaluru street map.",
 };
 

@@ -8,7 +8,10 @@ import type * as MapLibre from "maplibre-gl";
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { LatLon, RouteLeg } from "../../lib/api";
-import { MAP, sadakStyle, type MapColors } from "../../lib/mapStyle";
+import { Cube } from "@phosphor-icons/react";
+import { applyBasePalette, MAP_PALETTES, sadakStyle, type MapColors } from "../../lib/mapStyle";
+import { propsCollection, type Prop3D } from "../../lib/props3d";
+import { useTheme } from "../../lib/theme";
 
 type MapContextValue = { map: MapLibre.Map; lib: typeof MapLibre; colors: MapColors };
 const MapContext = createContext<MapContextValue | null>(null);
@@ -34,10 +37,17 @@ export function Map({ center, zoom, interactive = true, className = "", label, c
   const initial = useRef({ center, zoom, interactive });
   const [context, setContext] = useState<MapContextValue | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { theme } = useTheme();
+  const colors = theme ? MAP_PALETTES[theme] : null;
+  const startColors = useRef<MapColors | null>(null);
+  if (colors && !startColors.current) startColors.current = colors;
+  const ready = colors !== null;
 
   useEffect(() => {
+    if (!ready) return;
     let cancelled = false;
     let map: MapLibre.Map | undefined;
+    const start = startColors.current!;
 
     import("maplibre-gl")
       .then((lib) => {
@@ -49,7 +59,7 @@ export function Map({ center, zoom, interactive = true, className = "", label, c
         const { center: c, zoom: z, interactive: i } = initial.current;
         map = new lib.Map({
           container: container.current,
-          style: sadakStyle(),
+          style: sadakStyle(start),
           center: [c.lon, c.lat],
           zoom: z,
           interactive: i,
@@ -61,7 +71,7 @@ export function Map({ center, zoom, interactive = true, className = "", label, c
         map.on("error", (e) => console.error("[map]", e.error));
         const loaded = map;
         loaded.once("load", () => {
-          if (!cancelled) setContext({ map: loaded, lib, colors: MAP });
+          if (!cancelled) setContext({ map: loaded, lib, colors: start });
         });
       })
       .catch((err: unknown) => {
@@ -75,7 +85,14 @@ export function Map({ center, zoom, interactive = true, className = "", label, c
       cancelled = true;
       map?.remove();
     };
-  }, []);
+  }, [ready]);
+
+  // Light ↔ dark: repaint in place; route layers follow through the context.
+  useEffect(() => {
+    if (!context || !colors || context.colors === colors) return;
+    applyBasePalette(context.map, colors);
+    setContext({ ...context, colors });
+  }, [colors, context]);
 
   return (
     <div className={`map ${className}`} role="region" aria-label={label}>
@@ -167,7 +184,7 @@ export function MapRoute({ legs, walkedLegs = 0, drawIn = false }: { legs: Route
     const gaps: MapLibre.FilterSpecification = ["==", ["get", "onRoads"], false];
     const round = { "line-cap": "round", "line-join": "round" } as const;
     map.addLayer({ id: `${id}-glow`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.route, "line-width": 16, "line-opacity": 0.18, "line-blur": 4 } });
-    map.addLayer({ id: `${id}-edge`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.casing, "line-width": 10 } });
+    map.addLayer({ id: `${id}-edge`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.routeCasing, "line-width": 10 } });
     map.addLayer({ id: `${id}-ink`, type: "line", source: id, filter: roads, layout: round, paint: { "line-color": colors.route, "line-width": 6 } });
     map.addLayer({ id: `${id}-trail`, type: "line", source: `${id}-trail`, layout: round, paint: { "line-color": colors.walked, "line-width": 6 } });
     map.addLayer({ id: `${id}-gap`, type: "line", source: id, filter: gaps, layout: round, paint: { "line-color": colors.route, "line-width": 3, "line-dasharray": [1, 2] } });
@@ -207,6 +224,86 @@ export function MapRoute({ legs, walkedLegs = 0, drawIn = false }: { legs: Route
     trail?.setData(legsCollection(legs.slice(0, walkedLegs)));
   }, [map, id, legs, walkedLegs]);
 
+  useEffect(() => {
+    const set = (layer: string, value: string) => {
+      if (map.getLayer(`${id}-${layer}`)) map.setPaintProperty(`${id}-${layer}`, "line-color", value);
+    };
+    set("glow", colors.route);
+    set("edge", colors.routeCasing);
+    set("ink", colors.route);
+    set("trail", colors.walked);
+    set("gap", colors.route);
+  }, [map, id, colors]);
+
 
   return null;
+}
+
+/**
+ * The 3D view: a toggle that tilts the camera, raises buildings from OSM heights,
+ * and stands each landmark up as a prop in its colour (DESIGN.md "Map").
+ */
+export function Map3D({ props, focus, initiallyOn = false }: { props: Prop3D[]; focus: LatLon; initiallyOn?: boolean }) {
+  const { map } = useMap();
+  const [on, setOn] = useState(initiallyOn);
+  const flat = useRef<{ center: MapLibre.LngLat; zoom: number } | null>(null);
+  const id = useRef(`props-${Math.random().toString(36).slice(2)}`).current;
+  const key = JSON.stringify(props);
+
+  useEffect(() => {
+    map.addSource(id, { type: "geojson", data: propsCollection(JSON.parse(key) as Prop3D[]) as never });
+    map.addLayer({
+      id,
+      type: "fill-extrusion",
+      source: id,
+      layout: { visibility: "none" },
+      paint: {
+        "fill-extrusion-color": ["get", "color"],
+        "fill-extrusion-height": ["get", "height"],
+        "fill-extrusion-base": 0,
+        "fill-extrusion-opacity": 0.96,
+      },
+    });
+    return () => {
+      if (map.getLayer(id)) map.removeLayer(id);
+      if (map.getSource(id)) map.removeSource(id);
+    };
+  }, [map, id, key]);
+
+  useEffect(() => {
+    const show = (layer: string, visible: boolean) => {
+      if (map.getLayer(layer)) map.setLayoutProperty(layer, "visibility", visible ? "visible" : "none");
+    };
+    show("buildings-3d", on);
+    show("buildings", !on);
+    show(id, on);
+    // Pins float above their props on a stem (globals.css ".is-3d").
+    map.getContainer().classList.toggle("is-3d", on);
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // 3D flies in to street level around the door; 2D goes back to where you were.
+    let camera: MapLibre.JumpToOptions;
+    if (on) {
+      flat.current = { center: map.getCenter(), zoom: map.getZoom() };
+      camera = { pitch: 62, bearing: -24, center: [focus.lon, focus.lat], zoom: Math.max(map.getZoom(), 17.8) };
+    } else {
+      camera = { pitch: 0, bearing: 0, ...(flat.current ? { center: flat.current.center, zoom: flat.current.zoom } : {}) };
+    }
+    if (reduce) map.jumpTo(camera);
+    else map.easeTo({ ...camera, duration: 1100 });
+    // Only the toggle moves the camera; focus changes don't.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, id, on]);
+
+  return (
+    <button
+      type="button"
+      className="map-3d-toggle glass"
+      aria-pressed={on}
+      onClick={() => setOn((v) => !v)}
+      title={on ? "Back to the flat map" : "See the street in 3D"}
+    >
+      <Cube size={16} />
+      {on ? "2D" : "3D"}
+    </button>
+  );
 }
