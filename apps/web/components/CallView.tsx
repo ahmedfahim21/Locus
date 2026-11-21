@@ -1,7 +1,7 @@
 "use client";
 
 import { PhoneSlash } from "@phosphor-icons/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { LIVE_STATES, scriptNames, STATE_LABEL, type Call } from "../lib/api";
 import { useMe, useRoute } from "../lib/hooks";
 import { useCalls } from "./Calls";
@@ -13,12 +13,26 @@ const clock = (ms: number) => {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
 
-/** One call on the projector layout, live while the worker is still on the line. */
-export function CallView({ id }: { id: string }) {
+/**
+ * One call on the projector layout, live while the worker is still on the line.
+ * Pass `id` for a known call, or `pick` to follow the call a browser test is about
+ * to start (shown as "connecting" until it appears); `controls` sits under the transcript.
+ */
+export function CallView({
+  id,
+  pick,
+  controls,
+  waiting = "Connecting…",
+}: {
+  id?: string;
+  pick?: (calls: Call[]) => Call | undefined;
+  controls?: ReactNode;
+  waiting?: string;
+}) {
   const me = useMe();
   const route = useRoute(Boolean(me.data?.home), me.data?.home?.confirmedAt ?? "");
   const { calls, error } = useCalls();
-  const call = calls?.find((c) => c.id === id) ?? null;
+  const call = (pick ? calls && pick(calls) : calls?.find((c) => c.id === id)) ?? null;
   const live = call ? LIVE_STATES.has(call.state) : false;
   const now = useNow(live);
 
@@ -26,7 +40,7 @@ export function CallView({ id }: { id: string }) {
   if (loadError && (!me.data || !calls)) {
     return (
       <main className="page">
-        <TopBar back={{ href: "/", label: "Back to home" }} />
+        <TopBar back={{ href: "/", label: "Home" }} />
         <div className="alert err" role="alert">
           <span>Couldn&rsquo;t load this call: {loadError}</span>
         </div>
@@ -36,15 +50,36 @@ export function CallView({ id }: { id: string }) {
   if (!me.data || calls === null) {
     return (
       <main className="page" aria-busy="true">
-        <TopBar back={{ href: "/", label: "Back to home" }} />
+        <TopBar back={{ href: "/", label: "Home" }} />
         <div className="skeleton" style={{ height: "70vh" }} />
+      </main>
+    );
+  }
+  if (!call && pick && me.data.home) {
+    const home = me.data.home;
+    return (
+      <main className="page">
+        <TopBar back={{ href: "/", label: "Home" }} />
+        <LiveCall
+          stops={home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl }))}
+          door={home.handoffPoint}
+          legs={route.data?.legs ?? null}
+          reached={0}
+          arrived={false}
+          live={false}
+          poster="Your door"
+          statusLabel="Test call"
+          statusText={waiting}
+          turns={[]}
+          footer={controls}
+        />
       </main>
     );
   }
   if (!call || !me.data.home) {
     return (
       <main className="page">
-        <TopBar back={{ href: "/", label: "Back to home" }} />
+        <TopBar back={{ href: "/", label: "Home" }} />
         <div className="alert info">
           <PhoneSlash size={20} />
           <span>This call isn&rsquo;t in your recent calls any more. Locus keeps your last ten.</span>
@@ -64,11 +99,11 @@ export function CallView({ id }: { id: string }) {
 
   return (
     <main className="page">
-      <TopBar back={{ href: "/", label: "Back to home" }}>
+      <TopBar back={{ href: "/", label: "Home" }}>
         <span className="label">{new Date(call.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}</span>
       </TopBar>
       {error && (
-        <p className="small" role="alert" style={{ color: "var(--kumkum)" }}>
+        <p className="small" role="alert" style={{ color: "var(--danger)" }}>
           Couldn&rsquo;t refresh: {error}. Retrying.
         </p>
       )}
@@ -90,10 +125,17 @@ export function CallView({ id }: { id: string }) {
         statusText={call.state === "guiding" ? (next?.name ?? "Your door") : (STATE_LABEL[call.state] ?? call.state)}
         turns={toTurns(call)}
         note={call.state === "guiding" && reached > 0 ? lastInstruction : null}
-        footer={<CallFooter call={call} />}
+        footer={
+          controls || CallFooter({ call }) ? (
+            <div className="stack" style={{ gap: 10 }}>
+              <CallFooter call={call} />
+              {controls}
+            </div>
+          ) : undefined
+        }
       />
       {route.error && (
-        <p className="small" role="alert" style={{ color: "var(--kumkum)" }}>
+        <p className="small" role="alert" style={{ color: "var(--danger)" }}>
           Couldn&rsquo;t draw the route: {route.error}
         </p>
       )}

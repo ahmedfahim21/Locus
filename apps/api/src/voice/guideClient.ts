@@ -8,7 +8,7 @@ export type GuideReply = {
 };
 
 export type CreateResult =
-  | { ok: true; sessionId: string; instruction: string }
+  | { ok: true; sessionId: string; instruction: string; keyterms: string[] }
   | { ok: false; code: string; message: string };
 
 export class GuideApiError extends Error {
@@ -43,10 +43,20 @@ export class GuideClient {
   }
 
   /** Expected refusals (unknown number, switch off, loop guard) come back as `ok: false`, not thrown. */
-  async createSession(did: string, callerId: string | undefined, language: "hi" | "en"): Promise<CreateResult> {
-    const res = await this.post("/v1/sessions", { did, ...(callerId ? { callerId } : {}), language });
+  /** A phone call names the dialled number; a browser test call names the recipient. */
+  async createSession(
+    target: { did: string } | { recipientId: string },
+    callerId: string | undefined,
+    language: "hi" | "en",
+  ): Promise<CreateResult> {
+    const res = await this.post("/v1/sessions", { ...target, ...(callerId ? { callerId } : {}), language });
     if (res.status === 201) {
-      return { ok: true, sessionId: String(res.json.sessionId), instruction: String(res.json.instruction) };
+      return {
+        ok: true,
+        sessionId: String(res.json.sessionId),
+        instruction: String(res.json.instruction),
+        keyterms: Array.isArray(res.json.keyterms) ? (res.json.keyterms as string[]) : [],
+      };
     }
     const err = res.json.error as { code?: string; message?: string } | undefined;
     if ((res.status === 404 || res.status === 409) && err?.code) {

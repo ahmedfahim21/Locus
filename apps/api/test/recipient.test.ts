@@ -2,6 +2,7 @@ import { webcrypto } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { createSupabaseVerifier } from "../src/auth/supabaseJwt.js";
 import { EXPECTING_DELIVERY_MS } from "../src/domain/types.js";
+import { LiveKitTestCalls } from "../src/voice/testCall.js";
 import { T0, WEB_ORIGIN, recipient, setup } from "./fixtures.js";
 
 const TOKEN = "tok:google-sub-1";
@@ -338,5 +339,55 @@ describe("createSupabaseVerifier", () => {
     expect(await v.verify(await sign(other.pair.privateKey, valid))).toBeNull();
     expect(await v.verify("not.a.jwt")).toBeNull();
     expect(await v.verify("abc")).toBeNull();
+  });
+});
+
+describe("recipient routes: test call", () => {
+  it("issues a call to the recipient's own Locus, and only theirs", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    const res = await t.call("POST", "/me/test-call", undefined, "tok:owner");
+    expect(res).toEqual({ status: 200, body: { url: "ws://livekit.test", token: "token-for-rcp_seed", room: "test-1" } });
+    expect(t.testCalls.issued).toEqual(["rcp_seed"]);
+  });
+
+  it("explains what's missing before issuing anything", async () => {
+    const t = setup();
+    expect(await t.call("POST", "/me/test-call", undefined, "tok:nobody")).toEqual({
+      status: 404,
+      body: { error: { code: "PROFILE_NOT_SET_UP", message: "Save your profile first" } },
+    });
+    t.store.authSubjects.set("owner", recipient.id);
+    t.store.recipients[0]!.expectingDeliveryUntil = null;
+    expect(await t.call("POST", "/me/test-call", undefined, "tok:owner")).toEqual({
+      status: 409,
+      body: { error: { code: "DELIVERY_NOT_EXPECTED", message: 'Turn on "Expecting a delivery" to try a call' } },
+    });
+    t.store.homes = [];
+    expect((await t.call("POST", "/me/test-call", undefined, "tok:owner")).body).toEqual({
+      error: { code: "HOME_NOT_SET_UP", message: "Save your door and landmarks first" },
+    });
+    expect(t.testCalls.issued).toEqual([]);
+  });
+
+  it("says so when the server has no LiveKit configured", async () => {
+    const t = setup({ testCalls: false });
+    t.store.authSubjects.set("owner", recipient.id);
+    expect(await t.call("POST", "/me/test-call", undefined, "tok:owner")).toEqual({
+      status: 503,
+      body: { error: { code: "TEST_CALL_UNAVAILABLE", message: "Calls aren't set up on this server yet" } },
+    });
+  });
+});
+
+describe("LiveKitTestCalls", () => {
+  it("puts the recipient in a token attribute and dispatches the guide worker", async () => {
+    const ticket = await new LiveKitTestCalls("ws://lk.test", "key", "secret-that-is-long-enough-for-hs256").issue("rcp_7");
+    const claims = JSON.parse(Buffer.from(ticket.token.split(".")[1]!, "base64url").toString());
+    expect(ticket.url).toBe("ws://lk.test");
+    expect(ticket.room).toMatch(/^test-/);
+    expect(claims.attributes).toEqual({ "locus.recipientId": "rcp_7" });
+    expect(claims.video).toMatchObject({ room: ticket.room, roomJoin: true, canPublish: true, canUpdateOwnMetadata: false });
+    expect(claims.roomConfig.agents).toEqual([expect.objectContaining({ agentName: "locus-guide" })]);
   });
 });

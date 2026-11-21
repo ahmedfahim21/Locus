@@ -5,6 +5,7 @@ import type { PositionResolver } from "../src/guide/resolver.js";
 import { extractFrames, probeDurationS } from "../src/enrich/frames.js";
 import type { LandmarkVision, VisionFrame, VisionLandmark } from "../src/enrich/vision.js";
 import type { NameTranslator } from "../src/enrich/translate.js";
+import type { TestCallIssuer } from "../src/voice/testCall.js";
 import type { ObjectStorage } from "../src/storage/storage.js";
 import { MemoryStore } from "../src/store/memory.js";
 
@@ -127,7 +128,16 @@ export class FakeTranslator implements NameTranslator {
   }
 }
 
-export function setup() {
+/** Records which recipients asked for a browser test call. */
+export class FakeTestCalls implements TestCallIssuer {
+  issued: string[] = [];
+  async issue(recipientId: string) {
+    this.issued.push(recipientId);
+    return { url: "ws://livekit.test", token: `token-for-${recipientId}`, room: `test-${this.issued.length}` };
+  }
+}
+
+export function setup(options: { testCalls?: boolean } = {}) {
   const store = new MemoryStore();
   store.clients = [
     { id: "client_worker", name: "locus-worker", keyHash: sha256(API_KEY), firstParty: true },
@@ -171,6 +181,7 @@ export function setup() {
   const storage = new MemoryStorage();
   const vision = new FakeVision();
   const translator = new FakeTranslator();
+  const testCalls = new FakeTestCalls();
   const pending: Promise<void>[] = [];
   const clock = { now: new Date(T0) };
   const logs: Record<string, unknown>[] = [];
@@ -188,6 +199,7 @@ export function setup() {
     storage,
     vision,
     translator,
+    testCalls: options.testCalls === false ? null : testCalls,
     frames: { probeDurationS, extractFrames },
     background: (task) => {
       pending.push(task());
@@ -214,5 +226,5 @@ export function setup() {
   const say = (id: string, text: string, language?: string) =>
     call("POST", `/v1/sessions/${id}/utterances`, language ? { kind: "speech", text, language } : { kind: "speech", text });
 
-  return { store, resolver, storage, vision, translator, clock, logs, app, call, startSession, say, settle };
+  return { store, resolver, storage, vision, translator, testCalls, clock, logs, app, call, startSession, say, settle };
 }

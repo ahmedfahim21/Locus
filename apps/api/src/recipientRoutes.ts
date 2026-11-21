@@ -15,6 +15,7 @@ import {
 } from "./domain/types.js";
 import { processWalk, type WalkDeps } from "./enrich/processWalk.js";
 import type { NameTranslator } from "./enrich/translate.js";
+import type { TestCallIssuer } from "./voice/testCall.js";
 import { distanceM } from "./geo/distance.js";
 import type { RoadGraph } from "./geo/roadGraph.js";
 import { MAX_UPLOAD_BYTES, VIDEO_TYPES, type ObjectStorage } from "./storage/storage.js";
@@ -88,7 +89,7 @@ const walkBody = z
 
 const VIDEO_EXT: Record<(typeof VIDEO_TYPES)[number], string> = { "video/webm": "webm", "video/mp4": "mp4", "video/quicktime": "mov" };
 
-function fail(c: Context, status: 400 | 401 | 404 | 409, code: string, message: string) {
+function fail(c: Context, status: 400 | 401 | 404 | 409 | 503, code: string, message: string) {
   return c.json({ error: { code, message } }, status);
 }
 
@@ -176,6 +177,8 @@ export function recipientRoutes(deps: {
   graphFor: (home: HomeProfile) => Promise<RoadGraph>;
   storage: ObjectStorage;
   translator: NameTranslator;
+  /** Null when LiveKit isn't configured; test calls then answer 503. */
+  testCalls: TestCallIssuer | null;
   log: (event: Record<string, unknown>) => void;
   walk: Omit<WalkDeps, "store" | "storage" | "now" | "newId">;
   /** Runs work after the response is sent (walk processing). */
@@ -423,6 +426,18 @@ export function recipientRoutes(deps: {
       PHOTO_URL_TTL_S,
     );
     return c.json({ walk: publicWalk(walk), proposals: proposals.map((p) => publicProposal(p, photos)) });
+  });
+
+  /** A browser call to the recipient's own Locus, for trying it out. Same screening and guide loop as a phone call. */
+  app.post("/test-call", async (c) => {
+    const recipient = await me(c);
+    if (!recipient) return fail(c, 404, "PROFILE_NOT_SET_UP", "Save your profile first");
+    if (!(await store.getHomeProfile(recipient.id))) return fail(c, 404, "HOME_NOT_SET_UP", "Save your door and landmarks first");
+    if (!recipient.expectingDeliveryUntil || recipient.expectingDeliveryUntil <= deps.now()) {
+      return fail(c, 409, "DELIVERY_NOT_EXPECTED", "Turn on \"Expecting a delivery\" to try a call");
+    }
+    if (!deps.testCalls) return fail(c, 503, "TEST_CALL_UNAVAILABLE", "Calls aren't set up on this server yet");
+    return c.json(await deps.testCalls.issue(recipient.id));
   });
 
   app.get("/calls", async (c) => {

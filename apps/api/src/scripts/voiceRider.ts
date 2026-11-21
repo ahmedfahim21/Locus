@@ -18,6 +18,7 @@ import { RoomAgentDispatch, RoomConfiguration } from "@livekit/protocol";
 import { AudioFrame, AudioSource, AudioStream, LocalAudioTrack, Room, RoomEvent, TrackKind, TrackPublishOptions, TrackSource } from "@livekit/rtc-node";
 import { AccessToken } from "livekit-server-sdk";
 import { env, optionalEnv } from "../config.js";
+import { TEST_CALL_RECIPIENT_ATTR } from "../voice/testCall.js";
 
 const RATE = 16_000;
 const FRAME = RATE / 100; // 10 ms
@@ -31,11 +32,18 @@ const args = process.argv.slice(2);
 const sep = args.indexOf("--");
 const lines = sep >= 0 ? args.slice(sep + 1) : [];
 const flags = sep >= 0 ? args.slice(0, sep) : args;
-const outDir = flags.find((a) => !a.startsWith("--")) ?? "voice-run";
+const recipientFlag = flags.indexOf("--recipient");
+/** Join as a browser test call for this recipient (same token attribute the web app's test call carries). */
+const testRecipient = recipientFlag >= 0 ? flags[recipientFlag + 1] : undefined;
+const outDir = flags.find((a, i) => !a.startsWith("--") && i !== recipientFlag + 1) ?? "voice-run";
 const room = `rider-${Date.now()}`;
 
 async function token(identity: string) {
-  const at = new AccessToken(env("LIVEKIT_API_KEY"), env("LIVEKIT_API_SECRET"), { identity, ttl: "1h" });
+  const at = new AccessToken(env("LIVEKIT_API_KEY"), env("LIVEKIT_API_SECRET"), {
+    identity,
+    ttl: "1h",
+    ...(testRecipient ? { attributes: { [TEST_CALL_RECIPIENT_ATTR]: testRecipient } } : {}),
+  });
   at.addGrant({ room, roomJoin: true, canPublish: true, canSubscribe: true });
   at.roomConfig = new RoomConfiguration({ agents: [new RoomAgentDispatch({ agentName: "locus-guide" })] });
   return at.toJwt();

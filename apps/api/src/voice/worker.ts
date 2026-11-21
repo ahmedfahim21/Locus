@@ -24,6 +24,7 @@ import * as silero from "@livekit/agents-plugin-silero";
 import { SipClient } from "livekit-server-sdk";
 import { env, optionalEnv } from "../config.js";
 import { GuideClient, type GuideReply } from "./guideClient.js";
+import { TEST_CALL_RECIPIENT_ATTR } from "./testCall.js";
 import { createSpeech, speechProvider } from "./speech.js";
 
 /** A rider turn counts as silence after this long with no speech (lost-turn rule, plan §4.2). */
@@ -155,17 +156,23 @@ export default defineAgent({
 
     await ctx.connect();
     const caller = await ctx.waitForParticipant();
-    const devDid = optionalEnv("LOCUS_DEV_DID");
+    // Three ways in: a phone call over SIP, a browser test call from the web app, or a dev call to LOCUS_DEV_DID.
     const sipDid = caller.attributes["sip.trunkPhoneNumber"];
-    const did = sipDid ?? devDid;
-    const callerId = caller.attributes["sip.phoneNumber"] ?? (sipDid ? undefined : `dev:${caller.identity}`);
-    if (!did) throw new Error(`Participant ${caller.identity} has no sip.trunkPhoneNumber attribute and LOCUS_DEV_DID is unset`);
-    if (!sipDid) log({ event: "worker.devCall", did, participant: caller.identity });
+    const testRecipient = caller.attributes[TEST_CALL_RECIPIENT_ATTR];
+    const devDid = optionalEnv("LOCUS_DEV_DID");
+    let target: { did: string } | { recipientId: string };
+    if (sipDid) target = { did: sipDid };
+    else if (testRecipient) target = { recipientId: testRecipient };
+    else if (devDid) target = { did: devDid };
+    else throw new Error(`Participant ${caller.identity} has no SIP number or test-call recipient, and LOCUS_DEV_DID is unset`);
+    const callerId = caller.attributes["sip.phoneNumber"] ?? (sipDid ? undefined : `browser:${caller.identity}`);
+    if (!sipDid) log({ event: "worker.browserCall", ...target, participant: caller.identity });
+    const did = "did" in target ? target.did : `recipient:${target.recipientId}`;
 
-    const created = await guide.createSession(did, callerId, language);
+    const created = await guide.createSession(target, callerId, language);
     const session = new voice.AgentSession({
       vad: ctx.proc.userData.vad as silero.VAD,
-      ...createSpeech(speechProvider(), language),
+      ...createSpeech(speechProvider(), language, created.ok ? created.keyterms : []),
     });
 
     if (!created.ok) {
