@@ -9,6 +9,7 @@ import { sweepWalkVideos } from "./enrich/sweep.js";
 import { SarvamTranslator } from "./enrich/translate.js";
 import { OpenAIVision } from "./enrich/vision.js";
 import { LiveKitTestCalls } from "./voice/testCall.js";
+import { GoogleStreetView } from "./onboarding/streetView.js";
 import { WALK_BUCKET } from "./storage/storage.js";
 import { SupabaseStorage } from "./storage/supabaseStorage.js";
 import { PostgresStore } from "./store/postgres.js";
@@ -36,6 +37,7 @@ const app = createApp({
   storage,
   vision: new OpenAIVision(env("OPENAI_API_KEY"), visionModel, log),
   translator: new SarvamTranslator(env("SARVAM_API_KEY"), log),
+  streetImagery: optionalEnv("GOOGLE_MAPS_API_KEY") ? new GoogleStreetView(env("GOOGLE_MAPS_API_KEY"), log) : null,
   testCalls: optionalEnv("LIVEKIT_URL")
     ? new LiveKitTestCalls(env("LIVEKIT_URL"), env("LIVEKIT_API_KEY"), env("LIVEKIT_API_SECRET"))
     : null,

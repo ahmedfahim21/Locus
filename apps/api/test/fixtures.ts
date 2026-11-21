@@ -6,6 +6,7 @@ import { extractFrames, probeDurationS } from "../src/enrich/frames.js";
 import type { LandmarkVision, VisionFrame, VisionLandmark } from "../src/enrich/vision.js";
 import type { NameTranslator } from "../src/enrich/translate.js";
 import type { TestCallIssuer } from "../src/voice/testCall.js";
+import type { StreetImagery } from "../src/onboarding/streetView.js";
 import type { ObjectStorage } from "../src/storage/storage.js";
 import { MemoryStore } from "../src/store/memory.js";
 
@@ -143,7 +144,7 @@ export class FakeTestCalls implements TestCallIssuer {
   }
 }
 
-export function setup(options: { testCalls?: boolean } = {}) {
+export function setup(options: { testCalls?: boolean; streetImagery?: StreetImagery } = {}) {
   const store = new MemoryStore();
   store.clients = [
     { id: "client_worker", name: "locus-worker", keyHash: sha256(API_KEY), firstParty: true },
@@ -168,6 +169,7 @@ export function setup(options: { testCalls?: boolean } = {}) {
     {
       osmId: "way/1",
       name: "Bellary Road",
+      highway: "primary",
       nodes: [
         { id: "n1", location: { lat: 13.0345, lon: 77.5975 } },
         { id: "n2", location: { lat: 13.035, lon: 77.596 } },
@@ -176,6 +178,7 @@ export function setup(options: { testCalls?: boolean } = {}) {
     {
       osmId: "way/2",
       name: "2nd Cross Road",
+      highway: "residential",
       nodes: [
         { id: "n2", location: { lat: 13.035, lon: 77.596 } },
         { id: "n3", location: { lat: 13.0354, lon: 77.5966 } },
@@ -206,6 +209,7 @@ export function setup(options: { testCalls?: boolean } = {}) {
     vision,
     translator,
     testCalls: options.testCalls === false ? null : testCalls,
+    streetImagery: options.streetImagery ?? null,
     frames: { probeDurationS, extractFrames },
     background: (task) => {
       pending.push(task());

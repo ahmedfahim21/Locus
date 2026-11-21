@@ -7,8 +7,10 @@ import { distinctNames, nameKey } from "./clues/normalize.js";
 import {
   EXPECTING_DELIVERY_MS,
   type Cue,
+  type CueSource,
   type HomeProfile,
   type LatLon,
+  type OsmFeature,
   type Session,
   type Walk,
   type WalkProposal,
@@ -16,6 +18,9 @@ import {
 import { processWalk, type WalkDeps } from "./enrich/processWalk.js";
 import type { NameTranslator } from "./enrich/translate.js";
 import type { TestCallIssuer } from "./voice/testCall.js";
+import { planRoute } from "./onboarding/routePlan.js";
+import type { StreetImagery } from "./onboarding/streetView.js";
+import { suggestLandmarks, type Suggestion } from "./onboarding/suggest.js";
 import { distanceM } from "./geo/distance.js";
 import type { RoadGraph } from "./geo/roadGraph.js";
 import { MAX_UPLOAD_BYTES, VIDEO_TYPES, type ObjectStorage } from "./storage/storage.js";
@@ -28,6 +33,7 @@ const DOOR_SAME_AS_CUE_M = 15;
 /** Signed photo URLs stay valid this long; the app reloads /me well within it. */
 const PHOTO_URL_TTL_S = 3600;
 export const MAX_WALK_S = 180;
+const SUGGESTION_TTL_MS = 60 * 60_000;
 
 type Env = { Variables: { identity: RecipientIdentity } };
 
@@ -56,6 +62,10 @@ const homeBody = z
             aliases: z.array(z.string().trim().min(1).max(60)).max(8).optional(),
             /** A walk-video landmark this cue keeps: its photo and names come from the proposal. */
             proposalId: z.string().min(1).optional(),
+            /** Kept from a map or Street View suggestion (walk-video ones use proposalId). */
+            source: z.enum(["map", "streetView"]).optional(),
+            kind: z.string().trim().min(1).max(30).optional(),
+            color: z.string().regex(/^#[0-9a-f]{6}$/i, "Colour must be #rrggbb").optional(),
           })
           .strict(),
       )
@@ -178,6 +188,8 @@ export function recipientRoutes(deps: {
   now: () => Date;
   newId: () => string;
   graphFor: (home: HomeProfile) => Promise<RoadGraph>;
+  geoAt: (point: LatLon) => Promise<{ graph: RoadGraph; features: OsmFeature[] }>;
+  streetImagery: StreetImagery | null;
   storage: ObjectStorage;
   translator: NameTranslator;
   /** Null when LiveKit isn't configured; test calls then answer 503. */
@@ -189,6 +201,8 @@ export function recipientRoutes(deps: {
 }) {
   const { store, storage } = deps;
   const walkDeps: WalkDeps = { ...deps.walk, store, storage, now: deps.now, newId: deps.newId };
+  /** Street View and vision are slow and paid: suggestions are cached per door and walk-proposal set. */
+  const suggestionCache = new Map<string, { at: number; body: unknown }>();
   const app = new Hono<Env>();
 
   app.use("*", cors({ origin: deps.webOrigin, allowHeaders: ["authorization", "content-type"], allowMethods: ["GET", "PUT", "POST"] }));
@@ -316,10 +330,10 @@ export function recipientRoutes(deps: {
           ],
           input.landmark,
         ),
-        source: proposal ? "walkVideo" : "typed",
+        source: (proposal ? "walkVideo" : (input.source ?? "typed")) satisfies CueSource,
         photoPath: proposal?.framePath ?? null,
-        kind: proposal?.kind ?? null,
-        color: proposal?.color ?? null,
+        kind: proposal?.kind ?? input.kind ?? null,
+        color: proposal?.color ?? input.color?.toLowerCase() ?? null,
       });
     }
     const home: HomeProfile = {
@@ -443,6 +457,62 @@ export function recipientRoutes(deps: {
     }
     if (!deps.testCalls) return fail(c, 503, "TEST_CALL_UNAVAILABLE", "Calls aren't set up on this server yet");
     return c.json(await deps.testCalls.issue(recipient.id));
+  });
+
+  /**
+   * Setup's suggestions: the route from the nearest main road to the door, with
+   * its turns, and landmarks along it from the map, the recipient's walk video
+   * and Street View, each with a drafted instruction. `lat`/`lon` name the door
+   * (setup hasn't saved it yet); without them the saved home is used.
+   */
+  app.get("/suggestions", async (c) => {
+    const recipient = await me(c);
+    if (!recipient) return fail(c, 404, "PROFILE_NOT_SET_UP", "Save your profile first");
+    const lat = Number(c.req.query("lat"));
+    const lon = Number(c.req.query("lon"));
+    let door: LatLon;
+    if (c.req.query("lat") !== undefined || c.req.query("lon") !== undefined) {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+        return fail(c, 400, "INVALID_QUERY", "lat and lon must be numbers");
+      }
+      door = { lat, lon };
+    } else {
+      const home = await store.getHomeProfile(recipient.id);
+      if (!home) return fail(c, 404, "HOME_NOT_SET_UP", "Place your gate first");
+      door = home.handoffPoint;
+    }
+
+    const proposals = (await store.listRecipientProposals(recipient.id)).filter((p) => p.status !== "rejected" && p.framePath);
+    const key = `${recipient.id}@${door.lat.toFixed(6)},${door.lon.toFixed(6)}#${proposals.map((p) => p.id).sort().join(",")}`;
+    const hit = suggestionCache.get(key);
+    if (hit && deps.now().getTime() - hit.at < SUGGESTION_TTL_MS) return c.json(hit.body);
+
+    const { graph, features } = await deps.geoAt(door);
+    const route = planRoute(graph, door);
+    if (!route) {
+      return fail(c, 404, "NO_ROAD_DATA", "No mapped road reaches this gate yet. Add landmarks yourself, or move the pin onto your lane.");
+    }
+    const photos = await storage.signedUrls(proposals.map((p) => p.framePath!), PHOTO_URL_TTL_S);
+    const result = await suggestLandmarks({
+      route,
+      features,
+      proposals: proposals.map((p) => ({ ...p, photoUrl: photos.get(p.framePath!) ?? null })),
+      street: deps.streetImagery ? { imagery: deps.streetImagery, vision: deps.walk.vision } : null,
+      log: deps.log,
+    });
+    const body: { route: unknown; suggestions: Suggestion[]; streetView: typeof result.streetView } = {
+      route: {
+        entryStreet: route.entryStreet,
+        line: route.line,
+        lengthM: Math.round(route.lengthM),
+        turns: route.turns.map((t) => ({ atM: Math.round(t.atM), location: t.location, direction: t.direction, onto: t.onto })),
+      },
+      suggestions: result.suggestions,
+      streetView: result.streetView,
+    };
+    // Don't keep a failed Street View pass: the next request should retry it.
+    if (result.streetView.status !== "error") suggestionCache.set(key, { at: deps.now().getTime(), body });
+    return c.json(body);
   });
 
   app.get("/calls", async (c) => {

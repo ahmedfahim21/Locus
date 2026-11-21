@@ -1,3 +1,4 @@
+import type { StreetImagery } from "./onboarding/streetView.js";
 import { keytermsFor } from "./voice/keyterms.js";
 import type { TestCallIssuer } from "./voice/testCall.js";
 import type { NameTranslator } from "./enrich/translate.js";
@@ -7,7 +8,7 @@ import type { ObjectStorage } from "./storage/storage.js";
 import { createHash, randomUUID } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import type { ApiClient, HomeProfile, Language, OsmFeature, Session } from "./domain/types.js";
+import type { ApiClient, HomeProfile, Language, LatLon, OsmFeature, Session } from "./domain/types.js";
 import { RoadGraph } from "./geo/roadGraph.js";
 import { applyHandoffResult, handleRiderInput, isOpen } from "./guide/engine.js";
 import { say } from "./guide/phrases.js";
@@ -33,6 +34,8 @@ export type Deps = {
   vision: LandmarkVision;
   translator: NameTranslator;
   testCalls: TestCallIssuer | null;
+  /** Street-level imagery for landmark suggestions; null when no key is configured. */
+  streetImagery: StreetImagery | null;
   frames: WalkDeps["frames"];
   /** Runs work after the response is sent (walk processing). */
   background: (task: () => Promise<void>) => void;
@@ -88,16 +91,16 @@ export function createApp(deps: Deps) {
   const geo = new Map<string, { at: number; graph: Promise<RoadGraph>; features: Promise<OsmFeature[]> }>();
   const clients = new Map<string, { at: number; client: ApiClient }>();
 
-  /** Road graph and named places around a home, cached per handoff point so moving the door rebuilds them. */
-  function geoFor(home: HomeProfile) {
-    const key = `${home.id}@${home.handoffPoint.lat},${home.handoffPoint.lon}`;
+  /** Road graph and named places around a point, cached per point so moving the door rebuilds them. */
+  function geoAt(point: LatLon) {
+    const key = `${point.lat.toFixed(6)},${point.lon.toFixed(6)}`;
     const now = Date.now();
     let entry = geo.get(key);
     if (!entry || now - entry.at > GEO_CACHE_MS) {
       entry = {
         at: now,
-        graph: store.nearbyWays(home.handoffPoint, SEARCH_RADIUS_M).then((ways) => new RoadGraph(ways)),
-        features: store.nearbyFeatures(home.handoffPoint, SEARCH_RADIUS_M),
+        graph: store.nearbyWays(point, SEARCH_RADIUS_M).then((ways) => new RoadGraph(ways)),
+        features: store.nearbyFeatures(point, SEARCH_RADIUS_M),
       };
       // A failed load must not stay cached.
       Promise.all([entry.graph, entry.features]).catch(() => geo.delete(key));
@@ -106,6 +109,7 @@ export function createApp(deps: Deps) {
     return entry;
   }
 
+  const geoFor = (home: HomeProfile) => geoAt(home.handoffPoint);
   const graphFor = (home: HomeProfile) => geoFor(home).graph;
 
   async function contextFor(home: HomeProfile) {
@@ -283,6 +287,12 @@ export function createApp(deps: Deps) {
       now: deps.now,
       newId: deps.newId,
       graphFor,
+      geoAt: async (point: LatLon) => {
+        const entry = geoAt(point);
+        const [graph, features] = await Promise.all([entry.graph, entry.features]);
+        return { graph, features };
+      },
+      streetImagery: deps.streetImagery,
       storage: deps.storage,
       translator: deps.translator,
       testCalls: deps.testCalls,

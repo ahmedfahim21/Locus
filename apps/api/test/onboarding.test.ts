@@ -1,0 +1,168 @@
+import { describe, expect, it } from "vitest";
+import type { WalkProposal } from "../src/domain/types.js";
+import type { VisionLandmark } from "../src/enrich/vision.js";
+import { RoadGraph } from "../src/geo/roadGraph.js";
+import { planRoute } from "../src/onboarding/routePlan.js";
+import type { StreetImagery, StreetLook } from "../src/onboarding/streetView.js";
+import { draftText, streetLooks } from "../src/onboarding/suggest.js";
+import { recipient, setup } from "./fixtures.js";
+
+// MG Road runs east; 1st Cross goes north off it; 2nd Lane turns right (east) to the door.
+const ENTRY = { lat: 13.0, lon: 77.002 };
+const CORNER = { lat: 13.001, lon: 77.002 };
+const DOOR = { lat: 13.001, lon: 77.0025 };
+const graph = new RoadGraph([
+  { osmId: "w-mg", name: "MG Road", highway: "primary", nodes: [{ id: "m0", location: { lat: 13.0, lon: 77.0 } }, { id: "e", location: ENTRY }, { id: "m1", location: { lat: 13.0, lon: 77.004 } }] },
+  { osmId: "w-1c", name: "1st Cross", highway: "residential", nodes: [{ id: "e", location: ENTRY }, { id: "c", location: CORNER }] },
+  { osmId: "w-2l", name: "2nd Lane", highway: "residential", nodes: [{ id: "c", location: CORNER }, { id: "d", location: DOOR }] },
+]);
+
+describe("planRoute", () => {
+  it("starts at the nearest main road, ends at the door, and finds the right turn", () => {
+    const route = planRoute(graph, DOOR)!;
+    expect(route.entryStreet).toBe("MG Road");
+    expect(route.line).toEqual([ENTRY, CORNER, DOOR]);
+    expect(route.lengthM).toBeCloseTo(111.2 + 54.2, 0);
+    expect(route.turns).toEqual([{ atM: expect.closeTo(111.2, 0), location: CORNER, direction: "right", onto: "2nd Lane" }]);
+  });
+
+  it("returns null when no main road is reachable", () => {
+    const lanes = new RoadGraph([{ osmId: "w", name: "Lane", highway: "residential", nodes: [{ id: "a", location: CORNER }, { id: "b", location: DOOR }] }]);
+    expect(planRoute(lanes, DOOR)).toBeNull();
+  });
+
+  it("drafts the instruction from the next turn, the door, or straight on", () => {
+    const route = planRoute(graph, DOOR)!;
+    expect(draftText("Petrol bunk", 40, route)).toBe("Petrol bunk ke baad right mudiye, 2nd Lane pe.");
+    expect(draftText("Neem tree", 130, route)).toBe("Neem tree ke paas hi gate hai, wahin rukiye.");
+    const long = { ...route, lengthM: 600, turns: [] };
+    expect(draftText("Bakery", 10, long)).toBe("Bakery se seedha aaiye.");
+  });
+
+  it("looks both ways along the route for Street View", () => {
+    const route = planRoute(graph, DOOR)!;
+    const looks = streetLooks(route);
+    expect(looks).toHaveLength(10); // 5 points × left and right
+    expect(looks[0]!.heading).toBeCloseTo(270, 0); // heading north: left is west
+    expect(looks[1]!.heading).toBeCloseTo(90, 0);
+  });
+});
+
+class FakeStreet implements StreetImagery {
+  calls = 0;
+  async images(looks: StreetLook[]) {
+    this.calls++;
+    return looks.slice(0, 2).map((look) => ({ look, jpeg: Buffer.from([0xff, 0xd8, 0xff]) }));
+  }
+}
+
+describe("GET /me/suggestions", () => {
+  const TOKEN = "tok:owner";
+  const temple: VisionLandmark = { frame: 0, name: "Sri Anjaneya Temple", nameHi: "श्री अंजनेय मंदिर", nameKn: "", aliases: ["Hanuman temple"], kind: "temple", color: "#E08A00" };
+  const gate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: [], kind: "gate", color: "#1F5FBF" };
+
+  function withProposal(t: ReturnType<typeof setup>) {
+    const p: WalkProposal = {
+      id: "prp_v", walkId: "walk_1", recipientId: recipient.id, ordinal: 1, name: "Green pharmacy", nameHi: null, nameKn: null,
+      aliases: [], kind: "pharmacy", color: "#2fa56a", location: { lat: 13.0352, lon: 77.5963 }, osmId: null,
+      framePath: "frames/rcp_seed/walk_1/1.jpg", atS: 2, status: "proposed",
+    };
+    t.store.proposals = [p, { ...p, id: "prp_gone", status: "rejected", framePath: null }];
+  }
+
+  it("merges map, walk video and Street View along the route, with drafted instructions", async () => {
+    const street = new FakeStreet();
+    const t = setup({ streetImagery: street });
+    t.store.authSubjects.set("owner", recipient.id);
+    withProposal(t);
+    t.vision.answer = [temple, gate];
+    const res = await t.call("GET", "/me/suggestions", undefined, TOKEN);
+    expect(res.status).toBe(200);
+    const body = res.body as { route: Record<string, unknown>; suggestions: Record<string, unknown>[]; streetView: unknown };
+    expect(body.route).toEqual({
+      entryStreet: "Bellary Road",
+      line: [{ lat: 13.035, lon: 77.596 }, { lat: 13.0354, lon: 77.5966 }, { lat: 13.0357, lon: 77.5969 }],
+      lengthM: 125,
+      turns: [],
+    });
+    expect(body.streetView).toEqual({ status: "ok", found: 2 });
+    const byName = Object.fromEntries(body.suggestions.map((s) => [s.name, s]));
+    // The OSM temple and the Street View temple are one place, with both sources.
+    expect(byName["Sri Anjaneya Temple"]).toEqual({
+      id: expect.stringMatching(/^sug_/),
+      name: "Sri Anjaneya Temple",
+      nameHi: "श्री अंजनेय मंदिर",
+      nameKn: null,
+      aliases: ["Hanuman Mandir", "Hanuman temple"],
+      kind: "temple",
+      color: "#e08a00",
+      location: { lat: 13.0354, lon: 77.5966 },
+      alongM: 79,
+      sources: ["map", "street"],
+      osmId: "node/101",
+      proposalId: null,
+      photoUrl: null,
+      text: "Sri Anjaneya Temple ke paas hi gate hai, wahin rukiye.",
+      recommended: true,
+    });
+    expect(byName["Green pharmacy"]).toMatchObject({ sources: ["video"], proposalId: "prp_v", photoUrl: "https://storage.test/frames/rcp_seed/walk_1/1.jpg?exp=3600", color: "#2fa56a" });
+    expect(byName["Blue gate"]).toMatchObject({ sources: ["street"], kind: "gate", color: "#1f5fbf", nameKn: "ನೀಲಿ ಗೇಟ್" });
+    // The bakery and the far mall aren't on the way.
+    expect(Object.keys(byName).sort()).toEqual(["Blue gate", "Green pharmacy", "Sri Anjaneya Temple"]);
+    // Route order.
+    const along = body.suggestions.map((s) => s.alongM as number);
+    expect(along).toEqual([...along].sort((a, b) => a - b));
+
+    // Cached: the second request doesn't look at Street View again.
+    await t.call("GET", "/me/suggestions", undefined, TOKEN);
+    expect(street.calls).toBe(1);
+  });
+
+  it("works for a door that isn't saved yet, without Street View when there's no key", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    t.store.homes = [];
+    const res = await t.call("GET", "/me/suggestions?lat=13.0357&lon=77.5969", undefined, TOKEN);
+    expect(res.status).toBe(200);
+    expect((res.body as { streetView: unknown }).streetView).toEqual({ status: "off" });
+    expect((res.body as { suggestions: { name: string; sources: string[] }[] }).suggestions.map((s) => [s.name, s.sources])).toEqual([
+      ["Sri Anjaneya Temple", ["map"]],
+    ]);
+  });
+
+  it("reports a Street View failure and retries it next time instead of caching", async () => {
+    const street = new FakeStreet();
+    street.images = async () => {
+      street.calls++;
+      throw new Error("Street View REQUEST_DENIED: key not enabled");
+    };
+    const t = setup({ streetImagery: street });
+    t.store.authSubjects.set("owner", recipient.id);
+    const res = await t.call("GET", "/me/suggestions", undefined, TOKEN);
+    expect((res.body as { streetView: unknown }).streetView).toEqual({ status: "error", message: "Street View REQUEST_DENIED: key not enabled" });
+    await t.call("GET", "/me/suggestions", undefined, TOKEN);
+    expect(street.calls).toBe(2);
+  });
+
+  it("explains when there's no road data or the query is wrong", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    t.store.ways = [];
+    expect((await t.call("GET", "/me/suggestions", undefined, TOKEN)).body).toEqual({
+      error: { code: "NO_ROAD_DATA", message: "No mapped road reaches this gate yet. Add landmarks yourself, or move the pin onto your lane." },
+    });
+    expect((await t.call("GET", "/me/suggestions?lat=abc&lon=1", undefined, TOKEN)).status).toBe(400);
+    expect((await t.call("GET", "/me/suggestions", undefined, "tok:nobody")).status).toBe(404);
+  });
+
+  it("keeps a map suggestion's source, kind and colour when saved", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    const home = {
+      handoffPoint: { lat: 13.0357, lon: 77.5969 },
+      cues: [{ landmark: "Sri Anjaneya Temple", text: "Mandir ke paas gate hai.", location: { lat: 13.0354, lon: 77.5966 }, source: "map", kind: "temple", color: "#E08A00" }],
+    };
+    expect((await t.call("PUT", "/me/home", home, TOKEN)).status).toBe(200);
+    expect(t.store.homes.find((h) => h.recipientId === recipient.id)!.cues[0]).toMatchObject({ source: "map", kind: "temple", color: "#e08a00", photoPath: null });
+  });
+});
