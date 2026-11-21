@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { sha256 } from "../src/app.js";
 import { say } from "../src/guide/phrases.js";
 import { API_KEY, DID, OTHER_KEY, LOCUS_OUTBOUND, T0, home, recipient, setup } from "./fixtures.js";
@@ -407,5 +407,45 @@ describe("session ownership and end", () => {
       expect(json).not.toContain(cue(3).text);
     }
     expect(API_KEY).not.toBe(OTHER_KEY);
+  });
+});
+
+describe("live calls are kept in memory", () => {
+  it("a rider's turn reads nothing from the database and still saves the session and the turn", async () => {
+    const t = setup();
+    await t.startSession();
+    const reads = [vi.spyOn(t.store, "getSession"), vi.spyOn(t.store, "getRecipient"), vi.spyOn(t.store, "getHomeProfile")];
+    const before = structuredClone(t.store.sessions.get("ses_1")!);
+    const res = await t.say("ses_1", "Ahmed ka Swiggy order");
+    expect(res).toEqual({ status: 200, body: { instruction: say.whereAreYou("hi"), state: "guiding", lostTurns: 0 } });
+    for (const read of reads) expect(read).not.toHaveBeenCalled();
+    // Only state and screening changed in the stored session.
+    expect(t.store.sessions.get("ses_1")).toEqual({
+      ...before,
+      state: "guiding",
+      screening: { nameHeard: true, platformHeard: true, attempts: 1, objected: false },
+    });
+    expect(t.store.turns.map((turn) => [turn.sessionId, turn.utterance, turn.instruction])).toEqual([
+      ["ses_1", "Ahmed ka Swiggy order", say.whereAreYou("hi")],
+    ]);
+  });
+
+  it("an ended call is dropped from memory: later turns read it from the database and are refused", async () => {
+    const t = setup();
+    await t.startSession();
+    await t.call("POST", "/v1/sessions/ses_1/end");
+    const getSession = vi.spyOn(t.store, "getSession");
+    const res = await t.say("ses_1", "hello");
+    expect(res).toEqual({ status: 409, body: { error: { code: "SESSION_CLOSED", message: "Session is ended" } } });
+    expect(getSession).toHaveBeenCalledTimes(1);
+    expect(t.store.turns).toEqual([]);
+  });
+
+  it("another client still can't drive a call that is in memory", async () => {
+    const t = setup();
+    await t.startSession();
+    const res = await t.call("POST", "/v1/sessions/ses_1/end", undefined, OTHER_KEY);
+    expect(res).toEqual({ status: 404, body: { error: { code: "SESSION_NOT_FOUND", message: "Session not found" } } });
+    expect(t.store.sessions.get("ses_1")!.state).toBe("screening");
   });
 });

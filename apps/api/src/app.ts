@@ -8,7 +8,7 @@ import type { ObjectStorage } from "./storage/storage.js";
 import { createHash, randomUUID } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import type { ApiClient, HomeProfile, Language, LatLon, OsmFeature, Session } from "./domain/types.js";
+import type { ApiClient, HomeProfile, Language, LatLon, OsmFeature, Recipient, Session } from "./domain/types.js";
 import { RoadGraph } from "./geo/roadGraph.js";
 import { applyHandoffResult, handleRiderInput, isOpen } from "./guide/engine.js";
 import { say } from "./guide/phrases.js";
@@ -84,12 +84,45 @@ function fail(c: Context, status: 400 | 401 | 404 | 409 | 500, code: ErrorCode, 
 /** How long cached OSM data and API-client lookups are trusted. */
 const GEO_CACHE_MS = 10 * 60_000;
 const CLIENT_CACHE_MS = 60_000;
+/** A call open longer than this is read from the database again. */
+const CALL_CACHE_MS = 30 * 60_000;
 
 export function createApp(deps: Deps) {
   const { store, log } = deps;
   // OSM data and API clients change rarely; every database round trip adds to a rider's wait (~0.25 s each).
   const geo = new Map<string, { at: number; graph: Promise<RoadGraph>; features: Promise<OsmFeature[]> }>();
   const clients = new Map<string, { at: number; client: ApiClient }>();
+  /**
+   * Open calls, so a rider's turn reads nothing from the database. This API runs as
+   * a single instance and is the only writer of sessions, so the copy here is current.
+   * Recipient and home are read once per call: edits made mid-call apply to the next one.
+   */
+  const calls = new Map<string, { at: number; session: Session; recipient: Recipient; home: HomeProfile }>();
+
+  function remember(session: Session, recipient: Recipient, home: HomeProfile) {
+    const now = Date.now();
+    for (const [id, entry] of calls) if (now - entry.at > CALL_CACHE_MS) calls.delete(id);
+    if (isOpen(session)) calls.set(session.id, { at: calls.get(session.id)?.at ?? now, session, recipient, home });
+    else calls.delete(session.id);
+  }
+
+  /** The caller's own open-or-closed session with its recipient and home, from memory when the call is live. */
+  async function ownedCall(c: Context<Env>): Promise<{ session: Session; recipient: Recipient; home: HomeProfile } | null> {
+    const id = c.req.param("id")!;
+    const hit = calls.get(id);
+    const call =
+      hit && Date.now() - hit.at <= CALL_CACHE_MS
+        ? hit
+        : await (async () => {
+            const session = await store.getSession(id);
+            if (!session) return null;
+            const [recipient, home] = await Promise.all([store.getRecipient(session.recipientId), store.getHomeProfile(session.recipientId)]);
+            if (!recipient || !home) throw new Error(`recipient or home missing for session ${session.id}`);
+            return { session, recipient, home };
+          })();
+    if (!call || call.session.clientId !== c.get("client").id) return null;
+    return { session: call.session, recipient: call.recipient, home: call.home };
+  }
 
   /** Road graph and named places around a point, cached per point so moving the door rebuilds them. */
   function geoAt(point: LatLon) {
@@ -126,12 +159,6 @@ export function createApp(deps: Deps) {
     if (client) clients.set(hash, { at: Date.now(), client });
     else clients.delete(hash);
     return client;
-  }
-
-  async function ownedSession(c: Context<Env>): Promise<Session | null> {
-    const session = await store.getSession(c.req.param("id")!);
-    if (!session || session.clientId !== c.get("client").id) return null;
-    return session;
   }
 
   const app = new Hono<Env>();
@@ -201,6 +228,7 @@ export function createApp(deps: Deps) {
       endedAt: null,
     };
     await store.createSession(session);
+    remember(session, recipient, home);
     log({ event: "session.created", sessionId: session.id, clientId: session.clientId });
     // Key terms include the recipient's first name, which screening checks, so only Locus's own worker gets them.
     const keyterms = c.get("client").firstParty ? keytermsFor(recipient, home, (await contextFor(home)).features) : undefined;
@@ -208,15 +236,13 @@ export function createApp(deps: Deps) {
   });
 
   app.post("/v1/sessions/:id/utterances", async (c) => {
-    const session = await ownedSession(c);
-    if (!session) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    const requestStarted = Date.now();
+    const call = await ownedCall(c);
+    if (!call) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    const { session, recipient, home } = call;
     if (!isOpen(session)) return fail(c, 409, "SESSION_CLOSED", `Session is ${session.state}`);
     const parsed = utteranceBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
-
-    const requestStarted = Date.now();
-    const [recipient, home] = await Promise.all([store.getRecipient(session.recipientId), store.getHomeProfile(session.recipientId)]);
-    if (!recipient || !home) throw new Error(`recipient or home missing for session ${session.id}`);
     const { features, graph } = await contextFor(home);
 
     const started = Date.now();
@@ -233,6 +259,7 @@ export function createApp(deps: Deps) {
       store.updateSession(outcome.session),
       outcome.session.mode === "normal" ? store.addTurn(outcome.turn) : Promise.resolve(),
     ]);
+    remember(outcome.session, recipient, home);
     log({
       event: "turn",
       sessionId: session.id,
@@ -252,21 +279,22 @@ export function createApp(deps: Deps) {
   });
 
   app.post("/v1/sessions/:id/handoff-result", async (c) => {
-    const session = await ownedSession(c);
-    if (!session) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    const call = await ownedCall(c);
+    if (!call) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    const { session, recipient, home } = call;
     if (session.state !== "handoff") return fail(c, 409, "NOT_IN_HANDOFF", `Session is ${session.state}`);
     const parsed = handoffBody.safeParse(await c.req.json().catch(() => null));
     if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
-    const recipient = await store.getRecipient(session.recipientId);
-    if (!recipient) throw new Error(`recipient missing for session ${session.id}`);
     const result = applyHandoffResult(session, parsed.data.answered, recipient, deps.now());
     await store.updateSession(result.session);
+    remember(result.session, recipient, home);
     return c.json({ instruction: result.instruction, state: result.session.state });
   });
 
   app.post("/v1/sessions/:id/end", async (c) => {
-    const session = await ownedSession(c);
-    if (!session) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    const call = await ownedCall(c);
+    if (!call) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    const { session, recipient, home } = call;
     const now = deps.now();
     const ended: Session = {
       ...session,
@@ -275,6 +303,7 @@ export function createApp(deps: Deps) {
       handoff: session.handoff && session.handoff.endedAt === null ? { ...session.handoff, endedAt: now } : session.handoff,
     };
     await store.updateSession(ended);
+    remember(ended, recipient, home);
     return c.json({ state: ended.state });
   });
 
