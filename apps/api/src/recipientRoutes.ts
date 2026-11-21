@@ -187,7 +187,7 @@ function publicCall(s: Session, turns: { utterance: string | null; instruction: 
 export function recipientRoutes(deps: {
   store: Store;
   verifyRecipient: VerifyRecipient;
-  webOrigin: string;
+  webOrigin: string | string[];
   now: () => Date;
   newId: () => string;
   graphFor: (home: HomeProfile) => Promise<RoadGraph>;

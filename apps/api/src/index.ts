@@ -33,7 +33,8 @@ const app = createApp({
   newId: () => randomUUID(),
   log,
   verifyRecipient,
-  webOrigin: env("LOCUS_WEB_ORIGIN"),
+  // Comma-separated: the custom domain and the Vercel URL can both use the API.
+  webOrigin: env("LOCUS_WEB_ORIGIN").split(",").map((o) => o.trim()).filter(Boolean),
   storage,
   vision: new OpenAIVision(env("OPENAI_API_KEY"), visionModel, log),
   translator: new SarvamTranslator(env("SARVAM_API_KEY"), log),

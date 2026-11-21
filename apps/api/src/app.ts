@@ -28,7 +28,7 @@ export type Deps = {
   log: (event: Record<string, unknown>) => void;
   verifyRecipient: VerifyRecipient;
   /** Origin of the recipient web app, allowed by CORS on /me. */
-  webOrigin: string;
+  webOrigin: string | string[];
   /** Walk videos and landmark frames. */
   storage: ObjectStorage;
   vision: LandmarkVision;
