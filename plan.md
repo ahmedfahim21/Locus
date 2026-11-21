@@ -6,30 +6,35 @@
 >
 > Updated: 2026-11-21. Design source: office-hours doc `~/.gstack/projects/ahmedfahim21-Locus/ahmedfahim-main-design-20261121-160159.md` (approach B), extended by this revision.
 
-## Status and next steps (2026-11-21)
+## Status and next steps (2026-11-22)
 
-Read DESIGN.md before any UI work. Secrets live only in the root `.env` (never committed); a cloud session needs the same variables (see `.env.example`).
+Read DESIGN.md before any UI work. Secrets live only in the root `.env` (never committed); see `.env.example`.
 
-Done and tested (`pnpm typecheck`, `pnpm test`: 84 API tests pass):
-- Guide-session API, screening, matching (cue aliases feed the matcher), road graph, handoff and loop guards, Supabase store and auth, LiveKit worker with Sarvam speech.
-- `GET /me/route` (road line from the first landmark to the door; legs with no road come back `onRoads: false`, drawn dashed). Calls expose `reachedCue`.
-- Walk-video pipeline (section 4.6), storage on Supabase Storage (private bucket `locus-walks`, created on API start):
-  - `POST /me/walks` (GPS track + metadata → one-time upload token), `POST /me/walks/:id/process` (202, background), `GET /me/walks/:id` (status + proposals with signed photo URLs).
-  - Frames every ~10 m along the GPS track (max 24), OpenAI vision (`OPENAI_VISION_MODEL`, else `OPENAI_MODEL`) names landmarks in English, Hindi and Kannada, names snap to OSM places within 40 m, one frame kept per landmark, video deleted.
-  - `PUT /me/home` takes `proposalId` per cue: the cue gets the photo and all names; every unused proposal is rejected and its frame deleted. Names are de-duplicated by matcher tokens (Latin script) or exact text (other scripts).
-  - Migration `0003` applied to Supabase (`walks`, `walkProposals`, cue `aliases`/`source`/`photoPath`).
-  - `pnpm --filter @locus/api smoke:walk <video> [webm|mp4]` runs the pipeline once against real Supabase Storage, ffmpeg and OpenAI, then cleans up. Last run: 3 painted shop boards → 3 proposals with correct Hindi/Kannada names, video deleted, frames readable.
-- Web app on DESIGN.md: map-first home, setup (details → crosshair door → walk video → landmarks), live call view, demo call at `/replay`. The walk step records with the back camera + GPS, uploads to the signed URL, polls processing, and shows a review (keep / rename / skip, real frames). Kept proposals become landmark drafts with photos and Hindi/Kannada names on the stamps.
+Done and tested (`pnpm typecheck`, `pnpm test`: 93 API tests):
+- Guide-session API, screening, matching, road graph, handoff and loop guards, Supabase store and auth.
+- Matching handles Sarvam's Devanagari output: consonant-skeleton comparison ("अहमद स्विगी" → Ahmed, Swiggy; "कोहिनूर" → Kohenur) and names split in two ("fil dos" → FilDOS).
+- When the rider reaches a landmark, Locus says that landmark's own text ("What Locus says there"); the last landmark means arrived. An OSM place within 20 m of a landmark not yet reached counts as that landmark.
+- Walk-video pipeline (section 4.6) on Supabase Storage, with a sweep that deletes videos older than a day. Typed landmarks get Hindi and Kannada names from Sarvam translate.
+- `osm:import` works (imported 35 places and 248 roads around the demo home). Overpass mirrors are often overloaded: retry, or set `OVERPASS_URL`.
+- `pnpm eval <recipientId> [phrases.jsonl] --ablation` scores typed only / + OSM / + walk landmarks. A 10-phrase dev run: 60% with 2 wrong landmarks named → 90% with none.
+- Web app on DESIGN.md, clicked through signed in (home, setup incl. walk review, landmarks).
 
-Not verified yet:
-- Signed-in screens in a browser (home, setup incl. the walk step, call view): they typecheck and build but haven't been clicked through. `/` and `/replay` were checked.
-- A real walk on a phone: camera and GPS need HTTPS on a phone (localhost only works on the desktop). Serve the web app over HTTPS (or a tunnel) and record outdoors.
-- Real phone calls: needs LiveKit credentials and a number (section 3).
+Voice, end to end without a phone number (verified):
+- `livekit-server --dev`, `pnpm --filter @locus/api start`, `pnpm --filter @locus/api worker dev` (with `LOCUS_DEV_DID` set), then
+  `pnpm --filter @locus/api voice:rider eval/voice-run -- "Ahmed ke liye hai, Swiggy se" "ITC Kohenur ke paas hoon" "Knowledge City aa gaya" "Qualcomm ke saamne hoon"`.
+  The rider speaks in a Sarvam voice, each Locus reply is saved as WAV and transcribed. Dev recipient `rcp_dev_ahmed` (Hyderabad, near the demo home) answers on `+910000000000`.
+- `voice:rider --token` prints a token for the LiveKit agents playground, to talk to the worker with your own microphone.
+- Measured: rider stops → Locus starts talking 2.6–4.2 s (median ~2.6 s on guiding turns). The API part is ~1.0 s, almost all round trips to Supabase in Sydney (ap-southeast-2, ~260 ms each).
 
-Next:
-1. Sign in and click through home → setup (all four steps) → save → home with photos; then the call view with a seeded session.
-2. Record a real walk on a phone over HTTPS; check OSM snapping on a home with an `osm:import`.
-3. Day 1 telephony per section 3 once a number and LiveKit project exist.
+Needs your accounts or hands (in this order):
+1. Move Supabase to Mumbai (ap-south-1). Saves ~0.8 s per rider turn. New project, `db:migrate`, re-run `osm:import`, update `.env` and the Google OAuth redirect.
+2. LiveKit Cloud project (India region) with an inbound SIP trunk and a dispatch rule to agent `locus-guide`, plus an outbound trunk for handoff. Rent a number (Vobiz through Sarvam, or Plivo India) and point it at the trunk. Then in `.env`: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_SIP_OUTBOUND_TRUNK_ID`, `LOCUS_OUTBOUND_NUMBER`; remove `LOCUS_DEV_DID`. Run `pnpm --filter @locus/api admin number <did> <recipientId> plivo` and `admin outbound <number>`.
+3. Demo call through a friend's phone: the friend orders on Swiggy or Zomato with the receiver's number set to the Locus number (or forwards unanswered calls to it); the rider's call reaches the worker.
+4. Deploy: API and worker on one EC2 in ap-south-1 behind Caddy (ffmpeg installed), web on Vercel. Set `LOCUS_WEB_ORIGIN`, `LOCUS_API_URL`, and the Supabase auth redirect.
+5. Record a real walk on a phone over HTTPS (needs step 4, or a tunnel).
+6. Record 40 real rider phrases for the demo home into `eval/phrases.jsonl` and run `pnpm eval <recipientId> --ablation`.
+
+Known gaps: OSM names with numbers ("T-hub 2.0") tokenise poorly and can go to the fallback model; stamps overlap when landmarks are close; the 3D route preview (Sadak port) has its own owner.
 
 ## 0. What changed in this revision
 
