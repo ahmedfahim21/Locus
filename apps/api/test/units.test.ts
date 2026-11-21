@@ -77,6 +77,7 @@ describe("RoadGraph", () => {
     {
       osmId: "w1",
       name: "1st Main",
+      highway: "secondary",
       nodes: [
         { id: "a", location: { lat: 13.0, lon: 77.0 } },
         { id: "b", location: { lat: 13.001, lon: 77.0 } },
@@ -85,12 +86,13 @@ describe("RoadGraph", () => {
     {
       osmId: "w2",
       name: null,
+      highway: "residential",
       nodes: [
         { id: "b", location: { lat: 13.001, lon: 77.0 } },
         { id: "c", location: { lat: 13.001, lon: 77.001 } },
       ],
     },
-    { osmId: "w3", name: "Island Road", nodes: [{ id: "x", location: { lat: 13.01, lon: 77.01 } }, { id: "y", location: { lat: 13.0101, lon: 77.01 } }] },
+    { osmId: "w3", name: "Island Road", highway: "residential", nodes: [{ id: "x", location: { lat: 13.01, lon: 77.01 } }, { id: "y", location: { lat: 13.0101, lon: 77.01 } }] },
   ]);
 
   it("names the first named street on the shortest path", () => {

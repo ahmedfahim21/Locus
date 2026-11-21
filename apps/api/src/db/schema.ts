@@ -152,6 +152,7 @@ export const osmFeatures = locus.table(
 export const osmWays = locus.table("osmWays", {
   osmId: text("osmId").primaryKey(),
   name: text("name"),
+  highway: text("highway"),
 });
 
 export const osmWayNodes = locus.table(

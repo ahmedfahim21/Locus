@@ -175,6 +175,7 @@ export class PostgresStore implements Store {
       .select({
         wayId: schema.osmWayNodes.wayId,
         name: schema.osmWays.name,
+        highway: schema.osmWays.highway,
         nodeId: schema.osmWayNodes.nodeId,
         lat: schema.osmWayNodes.lat,
         lon: schema.osmWayNodes.lon,
@@ -187,7 +188,7 @@ export class PostgresStore implements Store {
     for (const r of rows) {
       let way = ways.get(r.wayId);
       if (!way) {
-        way = { osmId: r.wayId, name: r.name, nodes: [] };
+        way = { osmId: r.wayId, name: r.name, highway: r.highway, nodes: [] };
         ways.set(r.wayId, way);
       }
       way.nodes.push({ id: r.nodeId, location: { lat: r.lat, lon: r.lon } });

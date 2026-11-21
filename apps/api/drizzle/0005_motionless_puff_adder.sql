@@ -1,0 +1,1 @@
+ALTER TABLE "locus"."osmWays" ADD COLUMN "highway" text;

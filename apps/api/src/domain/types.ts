@@ -37,7 +37,8 @@ export type Cue = {
   color: string | null;
 };
 
-export type CueSource = "typed" | "walkVideo";
+/** typed: the recipient wrote it; walkVideo/map/streetView: kept from a suggestion. */
+export type CueSource = "typed" | "walkVideo" | "map" | "streetView";
 
 export type HomeProfile = {
   id: string;
@@ -61,6 +62,8 @@ export type OsmFeature = {
 export type OsmWay = {
   osmId: string;
   name: string | null;
+  /** OSM highway class (primary, residential, service…); null for data imported before it was stored. */
+  highway: string | null;
   nodes: { id: string; location: LatLon }[];
 };
 

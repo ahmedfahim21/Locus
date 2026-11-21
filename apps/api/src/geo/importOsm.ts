@@ -51,7 +51,7 @@ for (const e of elements) {
       .map((id, seq) => ({ id, seq, loc: nodes.get(id) }))
       .filter((n) => n.loc !== undefined)
       .map((n) => ({ wayId, seq: n.seq, nodeId: `node/${n.id}`, lat: n.loc!.lat, lon: n.loc!.lon }));
-    if (wayNodes.length >= 2) ways.push({ way: { osmId: wayId, name: tags.name ?? null }, nodes: wayNodes });
+    if (wayNodes.length >= 2) ways.push({ way: { osmId: wayId, name: tags.name ?? null, highway: tags.highway ?? null }, nodes: wayNodes });
   }
   if (tags.name && !tags.highway) {
     const loc = e.type === "node" ? { lat: e.lat, lon: e.lon } : e.center;
@@ -73,7 +73,7 @@ await store.db.transaction(async (tx) => {
     });
   }
   for (const w of ways) {
-    await tx.insert(schema.osmWays).values(w.way).onConflictDoUpdate({ target: schema.osmWays.osmId, set: { name: w.way.name } });
+    await tx.insert(schema.osmWays).values(w.way).onConflictDoUpdate({ target: schema.osmWays.osmId, set: { name: w.way.name, highway: w.way.highway } });
     await tx.insert(schema.osmWayNodes).values(w.nodes).onConflictDoNothing();
   }
 });
