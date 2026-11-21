@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Locus architecture</title>
+  <style>
+    :root { color-scheme: light; background: #f5f5f7; }
+    body { margin: 0; padding: 24px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { max-width: 1200px; margin: auto; overflow: auto; border-radius: 16px; }
+    main:focus-visible { outline: 2px solid #20252c; outline-offset: 4px; }
+    svg { display: block; width: 100%; min-width: 1020px; height: auto; background: #fff; }
+    text { fill: #20252c; font-weight: 400; }
+    .title { font-size: 42px; letter-spacing: -1.4px; }
+    .subtitle { font-size: 19px; fill: #535a65; }
+    .section, .label { fill: #4d5562; font-size: 14px; }
+    .section { letter-spacing: 1.8px; }
+    .name { font-size: 22px; letter-spacing: -.35px; }
+    .detail { font-size: 14px; fill: #333d4b; }
+    .arrow, .outline { fill: none; stroke: #343d49; stroke-linecap: round; stroke-linejoin: round; }
+    .arrow { stroke-width: 1.5; marker-end: url(#tip); }
+    .both { marker-start: url(#tip); }
+    .outline { stroke-width: 1.45; }
+    .echo { stroke-width: .8; opacity: .29; transform: translate(2px, -1.5px) rotate(.55deg); transform-origin: center; transform-box: fill-box; }
+    @media (max-width: 700px) { body { padding: 8px; } main { border-radius: 12px; } }
+    @media print {
+      body { padding: 0; }
+      main { overflow: visible; }
+      svg { min-width: 0; print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <main aria-label="Locus architecture diagram. Scroll horizontally on narrow screens." tabindex="0">
+    <svg viewBox="0 0 1200 874" role="img" aria-labelledby="diagram-title diagram-description" xmlns="http://www.w3.org/2000/svg">
+      <title id="diagram-title">Locus architecture</title>
+      <desc id="diagram-description">A rider calls through Plivo SIP into a LiveKit room. A LiveKit Agents worker uses Sarvam by default for speech and exchanges utterances and directions with the Hono API. The recipient web app uses Supabase Auth, calls the API for setup and call activity, and joins a LiveKit room for browser test calls. The guide matches landmarks against an OpenStreetMap road graph stored in PostGIS and uses a model when local matching cannot resolve a clue. Supabase Storage holds walk videos and photos. FFmpeg, OpenAI vision and Sarvam translation process onboarding media.</desc>
+      <defs>
+        <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse">
+          <circle cx="2" cy="2" r="1" fill="#dce0e6" opacity=".68"/>
+        </pattern>
+        <marker id="tip" viewBox="0 0 12 12" refX="11" refY="6" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+          <path d="M2 1.7 11 6 2 10.3" fill="none" stroke="#343d49" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+        <path id="box" d="M15 1 Q110 -1 227 1 Q241 1 241 15 L240 112 Q240 125 226 126 Q111 127 15 126 Q1 126 1 112 L0 16 Q0 2 15 1Z"/>
+        <path id="wide-box" d="M15 1 Q280 -1 531 1 Q548 1 548 16 L547 128 Q547 141 532 142 Q265 144 15 142 Q1 142 1 127 L0 16 Q0 2 15 1Z"/>
+      </defs>
+
+      <rect width="1200" height="874" fill="#fff"/>
+      <rect width="1200" height="874" fill="url(#dots)"/>
+      <text x="52" y="69" class="title">Locus architecture</text>
+      <text x="54" y="105" class="subtitle">From a rider’s call to the recipient’s door</text>
+
+      <text x="55" y="168" class="section">VOICE CALL</text>
+      <g transform="translate(53 187)">
+        <use href="#box" fill="#f3f4f6"/>
+        <use href="#box" class="outline"/><use href="#box" class="outline echo"/>
+        <text x="20" y="43" class="name">Rider’s phone</text>
+        <text x="20" y="73" class="detail">Calls a Locus number</text>
+        <text x="20" y="96" class="detail">and describes what’s nearby</text>
+      </g>
+      <g transform="translate(335 187)">
+        <use href="#box" fill="#e8f2fc"/>
+        <use href="#box" class="outline"/><use href="#box" class="outline echo"/>
+        <text x="20" y="43" class="name">LiveKit room</text>
+        <text x="20" y="73" class="detail">Plivo SIP for phone calls</text>
+        <text x="20" y="96" class="detail">WebRTC for browser tests</text>
+      </g>
+      <g transform="translate(617 187)">
+        <use href="#box" fill="#e8f2fc"/>
+        <use href="#box" class="outline"/><use href="#box" class="outline echo"/>
+        <text x="20" y="43" class="name">Voice worker</text>
+        <text x="20" y="73" class="detail">LiveKit Agents · Silero VAD</text>
+        <text x="20" y="96" class="detail">Speaks the API’s instructions</text>
+      </g>
+      <g transform="translate(899 187)">
+        <use href="#box" fill="#e8f2fc"/>
+        <use href="#box" class="outline"/><use href="#box" class="outline echo"/>
+        <text x="20" y="43" class="name">Speech provider</text>
+        <text x="20" y="73" class="detail">Sarvam STT / TTS by default</text>
+        <text x="20" y="96" class="detail">OpenAI configurable</text>
+      </g>
+      <path class="arrow both" d="M300 249 Q313 247 329 249"/>
+      <path class="arrow both" d="M582 249 Q596 247 611 249"/>
+      <path class="arrow both" d="M864 249 Q877 247 893 249"/>
+
+      <text x="55" y="404" class="section">WEB APP AND GUIDE API</text>
+      <g transform="translate(53 424)">
+        <use href="#box" fill="#f3f4f6" transform="scale(1.37 1.125)"/>
+        <use href="#box" class="outline" transform="scale(1.37 1.125)"/>
+        <text x="20" y="42" class="name">Recipient web app</text>
+        <text x="20" y="73" class="detail">Next.js · MapLibre + OpenFreeMap</text>
+        <text x="20" y="96" class="detail">Google sign-in via Supabase Auth</text>
+        <text x="20" y="119" class="detail">Route setup, test calls and call activity</text>
+      </g>
+      <g transform="translate(592 424)">
+        <use href="#wide-box" fill="#fbf2dc"/>
+        <use href="#wide-box" class="outline"/><use href="#wide-box" class="outline echo"/>
+        <text x="22" y="42" class="name">Hono API</text>
+        <text x="22" y="73" class="detail">Screens calls using “Expecting a delivery” and keeps active sessions in memory</text>
+        <text x="22" y="96" class="detail">Matches spoken clues against the route and nearby landmarks</text>
+        <text x="22" y="119" class="detail">Uses Sarvam or OpenAI for ambiguous clues and can request a handoff</text>
+      </g>
+      <path class="arrow both" d="M303 418 Q301 395 318 384 C358 380 418 386 451 379 Q460 372 458 319"/>
+      <text x="329" y="370" class="label">Test call audio</text>
+      <path class="arrow both" d="M737 320 Q733 375 737 418"/>
+      <text x="752" y="373" class="label">Utterances ↔ directions</text>
+      <path class="arrow both" d="M391 491 Q475 487 585 491"/>
+      <text x="488" y="475" class="label" text-anchor="middle">Recipient API</text>
+
+      <text x="55" y="664" class="section">ROUTES AND LANDMARKS</text>
+      <g transform="translate(53 688)">
+        <use href="#box" fill="#edf1eb" transform="scale(1.37 1)"/>
+        <use href="#box" class="outline" transform="scale(1.37 1)"/>
+        <text x="20" y="42" class="name">Postgres + PostGIS</text>
+        <text x="20" y="73" class="detail">Supabase database · imported OSM roads</text>
+        <text x="20" y="96" class="detail">Routes, landmarks, sessions and turns</text>
+      </g>
+      <g transform="translate(434 688)">
+        <use href="#box" fill="#edf1eb" transform="scale(1.37 1)"/>
+        <use href="#box" class="outline" transform="scale(1.37 1)"/>
+        <text x="20" y="42" class="name">Supabase Storage</text>
+        <text x="20" y="73" class="detail">Walk videos and landmark photos</text>
+        <text x="20" y="96" class="detail">Signed URLs for media access</text>
+      </g>
+      <g transform="translate(815 688)">
+        <use href="#box" fill="#fbf2dc" transform="scale(1.35 1)"/>
+        <use href="#box" class="outline" transform="scale(1.35 1)"/>
+        <text x="20" y="42" class="name">Media processing</text>
+        <text x="20" y="73" class="detail">FFmpeg frames → OpenAI vision</text>
+        <text x="20" y="96" class="detail">Sarvam translates landmark names</text>
+      </g>
+      <path class="arrow both" d="M638 573 Q637 599 628 608 C538 612 398 606 342 612 Q325 617 324 681"/>
+      <path class="arrow both" d="M745 573 Q747 597 731 618 Q716 639 613 645 Q600 650 599 681"/>
+      <path class="arrow both" d="M976 573 Q979 629 978 681"/>
+      <text x="992" y="630" class="label">Setup jobs</text>
+    </svg>
+  </main>
+</body>
+</html>
