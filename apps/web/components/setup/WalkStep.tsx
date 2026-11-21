@@ -1,9 +1,10 @@
 "use client";
 
 import { AccountMenu } from "../AccountMenu";
-import { ArrowLeft, ArrowRight, Check, DeviceMobile, MapPin, Record, ShieldCheck, Stop, VideoCamera, Warning } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, Check, DeviceMobile, Images, MapPin, Plus, Record, ShieldCheck, Stop, VideoCamera, Warning, X } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, scriptNames, supabase, type LatLon, type Proposal, type Walk } from "../../lib/api";
+import { api, ApiError, apiForm, scriptNames, supabase, type LatLon, type Proposal, type Walk } from "../../lib/api";
+import { MAX_PHOTOS, toJpeg } from "../../lib/photos";
 import { MAX_RECORD_S, useWalkRecorder, type Recording } from "../../lib/useWalkRecorder";
 import { FitTo, Map, MapMarker } from "../mapcn/Map";
 import { DoorPin, Stamp, StampPhoto } from "../RouteMap";
@@ -18,9 +19,11 @@ type Phase =
   | { kind: "intro" }
   | { kind: "record" }
   | { kind: "upload"; recording: Recording }
-  | { kind: "process"; walkId: string }
-  | { kind: "review"; walkId: string; proposals: Proposal[] }
-  | { kind: "failed"; message: string; retryWalkId: string | null };
+  | { kind: "photos"; files: File[] }
+  | { kind: "sendPhotos"; files: File[] }
+  | { kind: "process"; walkId: string; photos?: boolean }
+  | { kind: "review"; walkId: string; proposals: Proposal[]; photos?: boolean }
+  | { kind: "failed"; message: string; retryWalkId: string | null; photos?: boolean };
 
 const clock = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
@@ -109,9 +112,10 @@ export function WalkStep({
       try {
         const res = await api<{ walk: Walk; proposals: Proposal[] }>(`/me/walks/${phase.walkId}`);
         if (stopped) return;
-        if (res.walk.status === "ready") return setPhase({ kind: "review", walkId: phase.walkId, proposals: res.proposals });
+        if (res.walk.status === "ready") return setPhase({ kind: "review", walkId: phase.walkId, proposals: res.proposals, photos: phase.photos });
         if (res.walk.status === "failed") {
-          return setPhase({ kind: "failed", message: res.walk.error ?? "Processing failed", retryWalkId: phase.walkId });
+          // Photos aren't kept after a failed try, so there's nothing to retry server-side.
+          return setPhase({ kind: "failed", message: res.walk.error ?? "Processing failed", retryWalkId: phase.photos ? null : phase.walkId, photos: phase.photos });
         }
       } catch (err) {
         console.error("[walk] status check failed", err);
@@ -125,6 +129,28 @@ export function WalkStep({
       clearTimeout(timer);
     };
   }, [phase]);
+
+  // Photos: shrink each to JPEG in the browser, send them with the gate's position, then follow processing.
+  useEffect(() => {
+    if (phase.kind !== "sendPhotos") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const form = new FormData();
+        form.set("lat", String(door.lat));
+        form.set("lon", String(door.lon));
+        for (const [i, f] of phase.files.entries()) form.append("photo", await toJpeg(f), `photo-${i + 1}.jpg`);
+        const res = await apiForm<{ walk: Walk }>("/me/photos", form);
+        if (!cancelled) setPhase({ kind: "process", walkId: res.walk.id, photos: true });
+      } catch (err) {
+        console.error("[photos] upload failed", err);
+        if (!cancelled) setPhase({ kind: "failed", message: (err as Error).message, retryWalkId: null, photos: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [phase, door.lat, door.lon]);
 
   async function retry(walkId: string) {
     try {
@@ -149,6 +175,8 @@ export function WalkStep({
       <div className="setup-map">
         {phase.kind === "review" ? (
           <ReviewMap door={door} proposals={phase.proposals} />
+        ) : phase.kind === "photos" || phase.kind === "sendPhotos" ? (
+          <PhotoGrid files={phase.files} />
         ) : (
           <div className="viewfinder">
             <video ref={recorder.preview} muted playsInline aria-label="Camera preview" />
@@ -176,9 +204,15 @@ export function WalkStep({
           </div>
         )}
         <div className="poster glass">
-          <div className="street">{phase.kind === "review" ? "Is this right?" : "Walk it once."}</div>
+          <div className="street">
+            {phase.kind === "review" ? "Is this right?" : phase.kind === "photos" || phase.kind === "sendPhotos" ? "Your photos" : "Walk it once."}
+          </div>
           <div className="label">
-            {phase.kind === "review" ? "Landmarks found in your video. Keep, rename or skip each one." : "From the main road to your gate, filming as you go."}
+            {phase.kind === "review"
+              ? "Landmarks Locus found. Keep, rename or skip each one."
+              : phase.kind === "photos" || phase.kind === "sendPhotos"
+                ? "Shop boards, gates, temples: anything a rider passes on the way in."
+                : "From the main road to your gate, filming as you go."}
           </div>
         </div>
       </div>
@@ -224,10 +258,26 @@ export function WalkStep({
               <VideoCamera size={18} />
               I&rsquo;m at the main road
             </button>
+            <button className="btn block" type="button" onClick={() => setPhase({ kind: "photos", files: [] })}>
+              <Images size={18} />
+              No time to walk? Add photos
+            </button>
             <button className="btn ghost block" type="button" onClick={onSkip}>
               Skip, I&rsquo;ll add landmarks myself
             </button>
           </>
+        )}
+
+        {phase.kind === "photos" && (
+          <PhotoPicker
+            files={phase.files}
+            onChange={(files) => setPhase({ kind: "photos", files })}
+            onSend={() => setPhase({ kind: "sendPhotos", files: phase.files })}
+            onCancel={() => setPhase({ kind: "intro" })}
+          />
+        )}
+        {phase.kind === "sendPhotos" && (
+          <Waiting title="Uploading your photos" body={`${phase.files.length} photo${phase.files.length === 1 ? "" : "s"}, shrunk to save data.`} />
         )}
 
         {phase.kind === "record" && (
@@ -267,7 +317,22 @@ export function WalkStep({
           <Waiting title="Finding landmarks" body="Reading shop boards and gates frame by frame. Usually under a minute; you can keep this screen open." />
         )}
 
-        {phase.kind === "failed" && (
+        {phase.kind === "failed" && phase.photos && (
+          <>
+            <div className="alert err" role="alert">
+              <Warning size={20} />
+              <span>{phase.message}</span>
+            </div>
+            <button className="btn primary block" type="button" onClick={() => setPhase({ kind: "photos", files: [] })}>
+              <Images size={18} />
+              Choose photos again
+            </button>
+            <button className="btn ghost block" type="button" onClick={onSkip}>
+              Skip, I&rsquo;ll add landmarks myself
+            </button>
+          </>
+        )}
+        {phase.kind === "failed" && !phase.photos && (
           <>
             <div className="alert err" role="alert">
               <Warning size={20} />
@@ -288,7 +353,14 @@ export function WalkStep({
           </>
         )}
 
-        {phase.kind === "review" && <Review proposals={phase.proposals} onDone={onDone} onRecordAgain={recordAgain} />}
+        {phase.kind === "review" && (
+          <Review
+            proposals={phase.proposals}
+            fromPhotos={Boolean(phase.photos)}
+            onDone={onDone}
+            onRecordAgain={phase.photos ? () => setPhase({ kind: "photos", files: [] }) : recordAgain}
+          />
+        )}
       </aside>
     </main>
   );
@@ -322,7 +394,17 @@ function ReviewMap({ door, proposals }: { door: LatLon; proposals: Proposal[] })
   );
 }
 
-function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; onDone: (kept: KeptProposal[], skipped: string[]) => void; onRecordAgain: () => void }) {
+function Review({
+  proposals,
+  fromPhotos,
+  onDone,
+  onRecordAgain,
+}: {
+  proposals: Proposal[];
+  fromPhotos: boolean;
+  onDone: (kept: KeptProposal[], skipped: string[]) => void;
+  onRecordAgain: () => void;
+}) {
   const [keep, setKeep] = useState(() => new Set(proposals.map((p) => p.id)));
   const [names, setNames] = useState(() => Object.fromEntries(proposals.map((p) => [p.id, p.name])));
 
@@ -331,11 +413,15 @@ function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; o
       <>
         <div className="alert info">
           <MapPin size={20} />
-          <span>No landmarks stood out in this video. Try again pointing at boards and gates, or add them yourself.</span>
+          <span>
+            {fromPhotos
+              ? "No landmarks stood out in these photos. Try closer shots of boards and gates, or add them yourself."
+              : "No landmarks stood out in this video. Try again pointing at boards and gates, or add them yourself."}
+          </span>
         </div>
         <button className="btn primary block" type="button" onClick={onRecordAgain}>
-          <VideoCamera size={18} />
-          Record again
+          {fromPhotos ? <Images size={18} /> : <VideoCamera size={18} />}
+          {fromPhotos ? "Choose other photos" : "Record again"}
         </button>
         <button className="btn ghost block" type="button" onClick={() => onDone([], [])}>
           Add landmarks myself
@@ -372,7 +458,11 @@ function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; o
                       {p.nameKn && <span className="knda">{p.nameKn}</span>}
                     </span>
                   )}
-                  {p.osmId && <span className="label">Matched to a place on the map</span>}
+                  {p.osmId ? (
+                    <span className="label">Matched to a place on the map</span>
+                  ) : fromPhotos ? (
+                    <span className="label">Not on the map yet: it starts at your gate, move it to the right spot next.</span>
+                  ) : null}
                 </div>
               </div>
               <div className="row">
@@ -393,5 +483,84 @@ function Review({ proposals, onDone, onRecordAgain }: { proposals: Proposal[]; o
         Record again
       </button>
     </>
+  );
+}
+
+function PhotoPicker({
+  files,
+  onChange,
+  onSend,
+  onCancel,
+}: {
+  files: File[];
+  onChange: (files: File[]) => void;
+  onSend: () => void;
+  onCancel: () => void;
+}) {
+  const input = useRef<HTMLInputElement>(null);
+  const add = (list: FileList | null) => {
+    if (!list) return;
+    onChange([...files, ...[...list].filter((f) => f.type.startsWith("image/"))].slice(0, MAX_PHOTOS));
+    if (input.current) input.current.value = "";
+  };
+  return (
+    <>
+      <div className="stack" style={{ gap: 6 }}>
+        <h1 className="title">Add photos</h1>
+        <p className="muted">
+          Up to {MAX_PHOTOS} photos of what a rider sees on the way in: phone photos, or screenshots of your street. Locus reads the
+          boards and gates in them.
+        </p>
+      </div>
+      <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => add(e.target.files)} />
+      <button className="btn block" type="button" onClick={() => input.current?.click()} disabled={files.length >= MAX_PHOTOS}>
+        <Plus size={18} />
+        {files.length ? `Add more (${files.length} of ${MAX_PHOTOS})` : "Choose photos"}
+      </button>
+      {files.length > 0 && (
+        <ul className="photo-list">
+          {files.map((f, i) => (
+            <li key={`${f.name}-${i}`}>
+              <span className="small">{f.name}</span>
+              <button type="button" className="btn ghost icon" aria-label={`Remove ${f.name}`} onClick={() => onChange(files.filter((_, j) => j !== i))}>
+                <X size={16} />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button className="btn primary block" type="button" onClick={onSend} disabled={files.length === 0}>
+        Find landmarks
+        <ArrowRight size={18} />
+      </button>
+      <button className="btn ghost block" type="button" onClick={onCancel}>
+        Back
+      </button>
+    </>
+  );
+}
+
+/** The chosen photos, large, on the map side while choosing and uploading. */
+function PhotoGrid({ files }: { files: File[] }) {
+  const [urls, setUrls] = useState<string[]>([]);
+  useEffect(() => {
+    const made = files.map((f) => URL.createObjectURL(f));
+    setUrls(made);
+    return () => made.forEach((u) => URL.revokeObjectURL(u));
+  }, [files]);
+  return (
+    <div className="viewfinder photo-grid">
+      {urls.length === 0 ? (
+        <div className="viewfinder-idle">
+          <Images size={48} />
+          <span>Your photos appear here</span>
+        </div>
+      ) : (
+        urls.map((u, i) => (
+          // eslint-disable-next-line @next/next/no-img-element -- local previews
+          <img key={u} src={u} alt={`Photo ${i + 1}`} />
+        ))
+      )}
+    </div>
   );
 }

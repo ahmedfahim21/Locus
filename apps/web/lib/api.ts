@@ -154,3 +154,18 @@ export async function api<T>(path: string, init: { method?: "GET" | "PUT" | "POS
   if (!res.ok) throw new ApiError(res.status, json.error?.code ?? "UNKNOWN", json.error?.message ?? `Request failed (${res.status})`);
   return json;
 }
+
+/** POSTs multipart form data as the signed-in recipient (photo uploads). Errors are thrown, never swallowed. */
+export async function apiForm<T>(path: string, form: FormData): Promise<T> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new ApiError(401, "UNAUTHORIZED", "Sign in again");
+  const res = await fetch(`${process.env.NEXT_PUBLIC_LOCUS_API_URL}${path}`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${token}` },
+    body: form,
+  });
+  const json = (await res.json()) as T & { error?: { code: string; message: string } };
+  if (!res.ok) throw new ApiError(res.status, json.error?.code ?? "UNKNOWN", json.error?.message ?? `Request failed (${res.status})`);
+  return json;
+}

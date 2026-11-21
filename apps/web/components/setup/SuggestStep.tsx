@@ -6,7 +6,7 @@ import { api, scriptNames, type LatLon, type RouteLeg, type Suggestion, type Sug
 import { AccountMenu } from "../AccountMenu";
 import { RouteMap, StampPhoto } from "../RouteMap";
 
-const SOURCE_LABEL: Record<SuggestionSource, string> = { map: "Map", video: "Your video", street: "Street View" };
+const SOURCE_LABEL: Record<SuggestionSource, string> = { map: "Map", video: "From you", street: "Street View" };
 const SOURCE_ICON = { map: MapTrifold, video: VideoCamera, street: Binoculars } as const;
 
 /**
