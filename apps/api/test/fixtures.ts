@@ -4,6 +4,7 @@ import type { HomeProfile, Recipient } from "../src/domain/types.js";
 import type { PositionResolver } from "../src/guide/resolver.js";
 import { extractFrames, probeDurationS } from "../src/enrich/frames.js";
 import type { LandmarkVision, VisionFrame, VisionLandmark } from "../src/enrich/vision.js";
+import type { NameTranslator } from "../src/enrich/translate.js";
 import type { ObjectStorage } from "../src/storage/storage.js";
 import { MemoryStore } from "../src/store/memory.js";
 
@@ -115,6 +116,17 @@ export class FakeVision implements LandmarkVision {
   }
 }
 
+/** Deterministic "translations" that are easy to assert; `failFor` simulates a Sarvam outage for one name. */
+export class FakeTranslator implements NameTranslator {
+  calls: string[] = [];
+  failFor: string | null = null;
+  async translate(name: string) {
+    this.calls.push(name);
+    if (name === this.failFor) throw new Error("Sarvam translate returned 503: busy");
+    return { hi: `${name} हिं`, kn: `${name} ಕನ್ನ` };
+  }
+}
+
 export function setup() {
   const store = new MemoryStore();
   store.clients = [
@@ -158,6 +170,7 @@ export function setup() {
   const resolver = new FakeResolver();
   const storage = new MemoryStorage();
   const vision = new FakeVision();
+  const translator = new FakeTranslator();
   const pending: Promise<void>[] = [];
   const clock = { now: new Date(T0) };
   const logs: Record<string, unknown>[] = [];
@@ -174,6 +187,7 @@ export function setup() {
     webOrigin: WEB_ORIGIN,
     storage,
     vision,
+    translator,
     frames: { probeDurationS, extractFrames },
     background: (task) => {
       pending.push(task());
@@ -200,5 +214,5 @@ export function setup() {
   const say = (id: string, text: string, language?: string) =>
     call("POST", `/v1/sessions/${id}/utterances`, language ? { kind: "speech", text, language } : { kind: "speech", text });
 
-  return { store, resolver, storage, vision, clock, logs, app, call, startSession, say, settle };
+  return { store, resolver, storage, vision, translator, clock, logs, app, call, startSession, say, settle };
 }

@@ -101,15 +101,16 @@ describe("recipient routes: profile, home, switch", () => {
     const t = setup();
     await t.call("PUT", "/me/profile", profile, TOKEN);
     const res = await t.call("PUT", "/me/home", homeBody, TOKEN);
-    const typed = { aliases: [], source: "typed", photoUrl: null, proposalId: null };
-    const expectedCues = homeBody.cues.map((c) => ({ ...c, ...typed }));
+    const typed = { source: "typed", photoUrl: null, proposalId: null };
+    const expectedCues = homeBody.cues.map((c) => ({ ...c, aliases: [`${c.landmark} हिं`, `${c.landmark} ಕನ್ನ`], ...typed }));
     const expectedHome = {
       handoffPoint: homeBody.handoffPoint,
       digipin: "4P3JK852C9",
       confirmedAt: T0.toISOString(),
       cues: expectedCues,
     };
-    expect(res).toEqual({ status: 200, body: { home: expectedHome } });
+    expect(res).toEqual({ status: 200, body: { home: expectedHome, warnings: [] } });
+    expect(t.translator.calls.sort()).toEqual(["Iyengar bakery", "green gate"]);
     const stored = t.store.homes.find((h) => h.recipientId === "rcp_1")!;
     expect(stored.cues.map((c) => [c.id, c.ordinal, c.landmark])).toEqual([
       ["home_rcp_1_cue_1", 1, "Iyengar bakery"],
@@ -117,12 +118,36 @@ describe("recipient routes: profile, home, switch", () => {
     ]);
 
     await t.call("PUT", "/me/home", { ...homeBody, cues: [homeBody.cues[1]!] }, TOKEN);
+    // "green gate" kept its name, so its translations are reused rather than fetched again.
+    expect(t.translator.calls).toHaveLength(2);
     expect(t.store.homes.filter((h) => h.recipientId === "rcp_1")).toHaveLength(1);
     expect(t.store.homes.find((h) => h.recipientId === "rcp_1")!.cues).toHaveLength(1);
     expect(t.store.homes.find((h) => h.recipientId === recipient.id)).toBeDefined();
 
     const me = await t.call("GET", "/me", undefined, TOKEN);
     expect(me.body.home).toEqual({ ...expectedHome, cues: [expectedCues[1]] });
+  });
+
+  it("still saves when translation fails, and says which names are missing", async () => {
+    const t = setup();
+    await t.call("PUT", "/me/profile", profile, TOKEN);
+    t.translator.failFor = "green gate";
+    const res = await t.call("PUT", "/me/home", homeBody, TOKEN);
+    expect(res.status).toBe(200);
+    expect(res.body.warnings).toEqual(['Couldn\'t add Hindi and Kannada names for "green gate". Save again later to retry.']);
+    const cues = (res.body.home as { cues: { landmark: string; aliases: string[] }[] }).cues;
+    expect(cues.map((c) => [c.landmark, c.aliases])).toEqual([
+      ["Iyengar bakery", ["Iyengar bakery हिं", "Iyengar bakery ಕನ್ನ"]],
+      ["green gate", []],
+    ]);
+    expect(t.logs).toContainEqual(expect.objectContaining({ event: "translate.failed", landmark: "green gate" }));
+
+    // Saving again retries only the landmark that has no names yet.
+    t.translator.failFor = null;
+    t.translator.calls = [];
+    const again = await t.call("PUT", "/me/home", homeBody, TOKEN);
+    expect(again.body.warnings).toEqual([]);
+    expect(t.translator.calls).toEqual(["green gate"]);
   });
 
   it("rejects a handoff point outside India", async () => {

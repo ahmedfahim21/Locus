@@ -5,6 +5,8 @@ import { env, optionalEnv } from "./config.js";
 import { createSupabaseVerifier } from "./auth/supabaseJwt.js";
 import { createResolver } from "./guide/createResolver.js";
 import { extractFrames, probeDurationS } from "./enrich/frames.js";
+import { sweepWalkVideos } from "./enrich/sweep.js";
+import { SarvamTranslator } from "./enrich/translate.js";
 import { OpenAIVision } from "./enrich/vision.js";
 import { WALK_BUCKET } from "./storage/storage.js";
 import { SupabaseStorage } from "./storage/supabaseStorage.js";
@@ -32,11 +34,20 @@ const app = createApp({
   webOrigin: env("LOCUS_WEB_ORIGIN"),
   storage,
   vision: new OpenAIVision(env("OPENAI_API_KEY"), visionModel, log),
+  translator: new SarvamTranslator(env("SARVAM_API_KEY"), log),
   frames: { probeDurationS, extractFrames },
   background: (task) => {
     task().catch((err: Error) => log({ event: "background.failed", message: err.message, stack: err.stack }));
   },
 });
+
+// Walk videos never outlive a day in storage (section 4.6).
+const sweep = () =>
+  sweepWalkVideos({ store, storage, now: () => new Date(), log }).catch((err: Error) =>
+    log({ event: "walk.sweep_failed", message: err.message, stack: err.stack }),
+  );
+void sweep();
+setInterval(sweep, 6 * 3600_000).unref();
 
 const port = Number(optionalEnv("LOCUS_PORT") ?? "8787");
 serve({ fetch: app.fetch, port }, () => log({ event: "listening", port, resolver: provider, model, visionModel, bucket: WALK_BUCKET }));

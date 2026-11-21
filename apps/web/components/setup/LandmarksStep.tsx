@@ -82,6 +82,7 @@ export function LandmarksStep({
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const crosshair = (): LatLon | null => {
     const c = map.current?.getCenter();
@@ -123,7 +124,13 @@ export function LandmarksStep({
         location: d.location,
         ...(d.proposalId ? { proposalId: d.proposalId } : {}),
       }));
-      await api("/me/home", { method: "PUT", body: { handoffPoint: door, cues } });
+      const res = await api<{ warnings: string[] }>("/me/home", { method: "PUT", body: { handoffPoint: door, cues } });
+      // Saved either way; if some names couldn't be added, say so before leaving.
+      if (res.warnings.length > 0) {
+        setWarnings(res.warnings);
+        setSaving(false);
+        return;
+      }
       onDone();
     } catch (err) {
       console.error("[api] PUT /me/home failed", err);
@@ -237,6 +244,20 @@ export function LandmarksStep({
         {error && (
           <div className="alert err" role="alert">
             <span>Couldn&rsquo;t save your route: {error}</span>
+          </div>
+        )}
+        {warnings.length > 0 && (
+          <div className="alert warn" role="status">
+            <MapPin size={20} />
+            <div className="stack" style={{ gap: 8 }}>
+              <span>Your route is saved.</span>
+              {warnings.map((w) => (
+                <span key={w} className="small">{w}</span>
+              ))}
+              <button className="btn compact" type="button" onClick={onDone}>
+                Go to home
+              </button>
+            </div>
           </div>
         )}
         <button className="btn primary block" type="button" onClick={() => void save()} disabled={!complete || saving}>

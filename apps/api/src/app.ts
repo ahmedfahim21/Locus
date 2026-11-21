@@ -1,3 +1,4 @@
+import type { NameTranslator } from "./enrich/translate.js";
 import type { LandmarkVision } from "./enrich/vision.js";
 import type { WalkDeps } from "./enrich/processWalk.js";
 import type { ObjectStorage } from "./storage/storage.js";
@@ -28,6 +29,7 @@ export type Deps = {
   /** Walk videos and landmark frames. */
   storage: ObjectStorage;
   vision: LandmarkVision;
+  translator: NameTranslator;
   frames: WalkDeps["frames"];
   /** Runs work after the response is sent (walk processing). */
   background: (task: () => Promise<void>) => void;
@@ -248,6 +250,8 @@ export function createApp(deps: Deps) {
       newId: deps.newId,
       graphFor,
       storage: deps.storage,
+      translator: deps.translator,
+      log,
       walk: { vision: deps.vision, frames: deps.frames, log },
       background: deps.background,
     }),

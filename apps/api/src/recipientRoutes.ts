@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { z } from "zod";
 import type { RecipientIdentity, VerifyRecipient } from "./auth/supabaseJwt.js";
 import { encodeDigipin } from "./digipin/digipin.js";
-import { distinctNames } from "./clues/normalize.js";
+import { distinctNames, nameKey } from "./clues/normalize.js";
 import {
   EXPECTING_DELIVERY_MS,
   type Cue,
@@ -14,6 +14,7 @@ import {
   type WalkProposal,
 } from "./domain/types.js";
 import { processWalk, type WalkDeps } from "./enrich/processWalk.js";
+import type { NameTranslator } from "./enrich/translate.js";
 import { distanceM } from "./geo/distance.js";
 import type { RoadGraph } from "./geo/roadGraph.js";
 import { MAX_UPLOAD_BYTES, VIDEO_TYPES, type ObjectStorage } from "./storage/storage.js";
@@ -174,6 +175,8 @@ export function recipientRoutes(deps: {
   newId: () => string;
   graphFor: (home: HomeProfile) => Promise<RoadGraph>;
   storage: ObjectStorage;
+  translator: NameTranslator;
+  log: (event: Record<string, unknown>) => void;
   walk: Omit<WalkDeps, "store" | "storage" | "now" | "newId">;
   /** Runs work after the response is sent (walk processing). */
   background: (task: () => Promise<void>) => void;
@@ -260,8 +263,33 @@ export function recipientRoutes(deps: {
     } catch (err) {
       return fail(c, 400, "INVALID_BODY", `Handoff point is outside India: ${(err as Error).message}`);
     }
-    const proposals = await store.listRecipientProposals(recipient.id);
+    const [proposals, previous] = await Promise.all([store.listRecipientProposals(recipient.id), store.getHomeProfile(recipient.id)]);
     const byId = new Map(proposals.map((p) => [p.id, p]));
+
+    // Typed landmarks get Hindi and Kannada names. An unchanged name keeps the ones it already has;
+    // if translation fails the home still saves, and the response says which names are missing.
+    const isScript = (n: string) => /[^\x00-\x7f]/.test(n);
+    const knownScripts = new Map(
+      (previous?.cues ?? []).filter((c) => c.source === "typed").map((c) => [nameKey(c.landmark), c.aliases.filter(isScript)] as const),
+    );
+    const warnings: string[] = [];
+    const scriptNames = new Map<string, string[]>();
+    await Promise.all(
+      parsed.data.cues
+        .filter((cue) => !cue.proposalId)
+        .map(async (cue) => {
+          const key = nameKey(cue.landmark);
+          const known = knownScripts.get(key);
+          if (known && known.length > 0) return scriptNames.set(key, known);
+          try {
+            const { hi, kn } = await deps.translator.translate(cue.landmark);
+            scriptNames.set(key, [hi, kn]);
+          } catch (err) {
+            deps.log({ event: "translate.failed", landmark: cue.landmark, message: (err as Error).message });
+            warnings.push(`Couldn't add Hindi and Kannada names for "${cue.landmark}". Save again later to retry.`);
+          }
+        }),
+    );
     const homeId = `home_${recipient.id}`;
     const cues: Cue[] = [];
     for (const [i, input] of parsed.data.cues.entries()) {
@@ -278,7 +306,7 @@ export function recipientRoutes(deps: {
         aliases: distinctNames(
           [
           ...(input.aliases ?? []),
-          ...(proposal ? [proposal.name, proposal.nameHi, proposal.nameKn, ...proposal.aliases] : []),
+          ...(proposal ? [proposal.name, proposal.nameHi, proposal.nameKn, ...proposal.aliases] : (scriptNames.get(nameKey(input.landmark)) ?? [])),
           ],
           input.landmark,
         ),
@@ -305,7 +333,7 @@ export function recipientRoutes(deps: {
     await storage.remove(dropFrames);
     await store.updateProposals(changed);
 
-    return c.json({ home: await homeView(recipient.id, home) });
+    return c.json({ home: await homeView(recipient.id, home), warnings });
   });
 
   app.put("/expecting", async (c) => {
