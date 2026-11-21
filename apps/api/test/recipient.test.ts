@@ -1,0 +1,317 @@
+import { webcrypto } from "node:crypto";
+import { describe, expect, it } from "vitest";
+import { createSupabaseVerifier } from "../src/auth/supabaseJwt.js";
+import { EXPECTING_DELIVERY_MS } from "../src/domain/types.js";
+import { T0, WEB_ORIGIN, recipient, setup } from "./fixtures.js";
+
+const TOKEN = "tok:google-sub-1";
+
+const profile = {
+  firstName: "Priya",
+  platforms: ["zomato", "blinkit"],
+  fallbackNote: "Leave it with the guard",
+  phone: "+919811111111",
+};
+
+const homeBody = {
+  handoffPoint: { lat: 12.971601, lon: 77.594584 },
+  cues: [
+    { text: "Take the left after the bakery.", landmark: "Iyengar bakery", location: { lat: 12.9712, lon: 77.594 } },
+    { text: "Green gate, second house.", landmark: "green gate", location: { lat: 12.971601, lon: 77.594584 } },
+  ],
+};
+
+describe("recipient routes: auth", () => {
+  it("rejects requests without a valid Supabase token", async () => {
+    const t = setup();
+    for (const key of [null, "not-a-token"]) {
+      const res = await t.call("GET", "/me", undefined, key);
+      expect(res).toEqual({ status: 401, body: { error: { code: "UNAUTHORIZED", message: "Sign in again" } } });
+    }
+  });
+
+  it("an API client key is not a recipient token", async () => {
+    const t = setup();
+    const res = await t.call("GET", "/me");
+    expect(res.status).toBe(401);
+  });
+
+  it("answers CORS preflight for the web origin only", async () => {
+    const t = setup();
+    const res = await t.app.request("/me/profile", {
+      method: "OPTIONS",
+      headers: { origin: WEB_ORIGIN, "access-control-request-method": "PUT" },
+    });
+    expect(res.status).toBe(204);
+    expect(res.headers.get("access-control-allow-origin")).toBe(WEB_ORIGIN);
+  });
+});
+
+describe("recipient routes: profile, home, switch", () => {
+  it("new user has no recipient yet", async () => {
+    const t = setup();
+    const res = await t.call("GET", "/me", undefined, TOKEN);
+    expect(res).toEqual({
+      status: 200,
+      body: {
+        identity: { email: "google-sub-1@example.com", name: "Test User" },
+        recipient: null,
+        home: null,
+        number: null,
+      },
+    });
+  });
+
+  it("home and switch need a profile first", async () => {
+    const t = setup();
+    const home = await t.call("PUT", "/me/home", homeBody, TOKEN);
+    expect(home).toEqual({ status: 404, body: { error: { code: "PROFILE_NOT_SET_UP", message: "Save your profile first" } } });
+    const sw = await t.call("PUT", "/me/expecting", { on: true }, TOKEN);
+    expect(sw.status).toBe(404);
+    expect(t.store.recipients).toHaveLength(1);
+  });
+
+  it("creates the profile on first save and updates it later without touching other recipients", async () => {
+    const t = setup();
+    const before = structuredClone(t.store.recipients);
+    const res = await t.call("PUT", "/me/profile", profile, TOKEN);
+    expect(res).toEqual({ status: 200, body: { recipient: profile } });
+    expect(t.store.recipients).toHaveLength(2);
+    expect(t.store.recipients[0]).toEqual(before[0]);
+    expect(t.store.recipients[1]).toEqual({ id: "rcp_1", ...profile, expectingDeliveryUntil: null });
+    expect(t.store.authSubjects.get("google-sub-1")).toBe("rcp_1");
+
+    const update = await t.call("PUT", "/me/profile", { ...profile, fallbackNote: "Ring the bell" }, TOKEN);
+    expect(update.status).toBe(200);
+    expect(t.store.recipients).toHaveLength(2);
+    expect(t.store.recipients[1]).toEqual({ id: "rcp_1", ...profile, fallbackNote: "Ring the bell", expectingDeliveryUntil: null });
+  });
+
+  it.each([
+    [{ ...profile, phone: "98111" }, "Phone must be E.164, e.g. +919800000000"],
+    [{ ...profile, platforms: [] }, "Too small: expected array to have >=1 items"],
+  ])("rejects an invalid profile %#", async (body, message) => {
+    const t = setup();
+    const res = await t.call("PUT", "/me/profile", body, TOKEN);
+    expect(res).toEqual({ status: 400, body: { error: { code: "INVALID_BODY", message } } });
+    expect(t.store.recipients).toHaveLength(1);
+  });
+
+  it("saves the home with ordered cues and a DIGIPIN, and replaces it on re-save", async () => {
+    const t = setup();
+    await t.call("PUT", "/me/profile", profile, TOKEN);
+    const res = await t.call("PUT", "/me/home", homeBody, TOKEN);
+    const typed = { aliases: [], source: "typed", photoUrl: null, proposalId: null };
+    const expectedCues = homeBody.cues.map((c) => ({ ...c, ...typed }));
+    const expectedHome = {
+      handoffPoint: homeBody.handoffPoint,
+      digipin: "4P3JK852C9",
+      confirmedAt: T0.toISOString(),
+      cues: expectedCues,
+    };
+    expect(res).toEqual({ status: 200, body: { home: expectedHome } });
+    const stored = t.store.homes.find((h) => h.recipientId === "rcp_1")!;
+    expect(stored.cues.map((c) => [c.id, c.ordinal, c.landmark])).toEqual([
+      ["home_rcp_1_cue_1", 1, "Iyengar bakery"],
+      ["home_rcp_1_cue_2", 2, "green gate"],
+    ]);
+
+    await t.call("PUT", "/me/home", { ...homeBody, cues: [homeBody.cues[1]!] }, TOKEN);
+    expect(t.store.homes.filter((h) => h.recipientId === "rcp_1")).toHaveLength(1);
+    expect(t.store.homes.find((h) => h.recipientId === "rcp_1")!.cues).toHaveLength(1);
+    expect(t.store.homes.find((h) => h.recipientId === recipient.id)).toBeDefined();
+
+    const me = await t.call("GET", "/me", undefined, TOKEN);
+    expect(me.body.home).toEqual({ ...expectedHome, cues: [expectedCues[1]] });
+  });
+
+  it("rejects a handoff point outside India", async () => {
+    const t = setup();
+    await t.call("PUT", "/me/profile", profile, TOKEN);
+    const res = await t.call("PUT", "/me/home", { ...homeBody, handoffPoint: { lat: 51.5, lon: -0.12 } }, TOKEN);
+    expect(res).toEqual({
+      status: 400,
+      body: { error: { code: "INVALID_BODY", message: "Handoff point is outside India: Latitude out of range" } },
+    });
+    expect(t.store.homes.find((h) => h.recipientId === "rcp_1")).toBeUndefined();
+  });
+
+  it("switch on sets a 3-hour window; off clears it", async () => {
+    const t = setup();
+    await t.call("PUT", "/me/profile", profile, TOKEN);
+    const on = await t.call("PUT", "/me/expecting", { on: true }, TOKEN);
+    const until = new Date(T0.getTime() + EXPECTING_DELIVERY_MS);
+    expect(on).toEqual({ status: 200, body: { expectingDeliveryUntil: until.toISOString() } });
+    expect(t.store.recipients[1]!.expectingDeliveryUntil).toEqual(until);
+    expect(t.store.recipients[0]!.expectingDeliveryUntil).toEqual(recipient.expectingDeliveryUntil);
+
+    const off = await t.call("PUT", "/me/expecting", { on: false }, TOKEN);
+    expect(off).toEqual({ status: 200, body: { expectingDeliveryUntil: null } });
+    expect(t.store.recipients[1]!.expectingDeliveryUntil).toBeNull();
+  });
+});
+
+describe("recipient routes: calls", () => {
+  it("lists only the recipient's own calls with their turns", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    await t.startSession();
+    await t.say("ses_1", "Ahmed ka Swiggy order");
+    await t.say("ses_1", "petrol pump");
+
+    const res = await t.call("GET", "/me/calls", undefined, "tok:owner");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      calls: [
+        {
+          id: "ses_1",
+          state: "guiding",
+          noTranscript: false,
+          createdAt: T0.toISOString(),
+          endedAt: null,
+          message: null,
+          reachedCue: 1,
+          handoff: null,
+          turns: [
+            expect.objectContaining({ utterance: "Ahmed ka Swiggy order", lost: false }),
+            expect.objectContaining({ utterance: "petrol pump", lost: false }),
+          ],
+        },
+      ],
+    });
+
+    const stranger = await t.call("GET", "/me/calls", undefined, "tok:someone-else");
+    expect(stranger).toEqual({ status: 200, body: { calls: [] } });
+  });
+});
+
+describe("recipient routes: route", () => {
+  const n = (lat: number, lon: number) => ({ lat, lon });
+
+  it("follows OSM roads from the first landmark to the door, without a duplicate door leg", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    const res = await t.call("GET", "/me/route", undefined, "tok:owner");
+    expect(res).toEqual({
+      status: 200,
+      body: {
+        legs: [
+          // cue 1 (on node n2) → cue 2 (on n3) along 2nd Cross Road
+          { onRoads: true, line: [n(13.035, 77.596), n(13.035, 77.596), n(13.0354, 77.5966), n(13.0354, 77.5966)] },
+          // cue 2 → cue 3 (the blue gate, which is the door: no extra leg)
+          { onRoads: true, line: [n(13.0354, 77.5966), n(13.0354, 77.5966), n(13.0357, 77.5969), n(13.0357, 77.5969)] },
+        ],
+      },
+    });
+  });
+
+  it("marks legs with no road connection as straight lines", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    t.store.ways = [];
+    const res = await t.call("GET", "/me/route", undefined, "tok:owner");
+    expect(res.body).toEqual({
+      legs: [
+        { onRoads: false, line: [n(13.035, 77.596), n(13.0354, 77.5966)] },
+        { onRoads: false, line: [n(13.0354, 77.5966), n(13.0357, 77.5969)] },
+      ],
+    });
+  });
+
+  it("adds a door leg when the last landmark isn't the door, and rebuilds after the door moves", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    await t.call("GET", "/me/route", undefined, "tok:owner"); // warm the graph cache for the old door
+    const moved = {
+      handoffPoint: n(13.0357, 77.5969),
+      cues: [
+        { text: "Bakery se seedha.", landmark: "Iyengar bakery", location: n(13.0345, 77.5975) },
+        { text: "Mandir se left.", landmark: "Hanuman temple", location: n(13.0354, 77.5966) },
+      ],
+    };
+    expect((await t.call("PUT", "/me/home", moved, "tok:owner")).status).toBe(200);
+    const res = await t.call("GET", "/me/route", undefined, "tok:owner");
+    expect(res.body).toEqual({
+      legs: [
+        { onRoads: true, line: [n(13.0345, 77.5975), n(13.0345, 77.5975), n(13.035, 77.596), n(13.0354, 77.5966), n(13.0354, 77.5966)] },
+        { onRoads: true, line: [n(13.0354, 77.5966), n(13.0354, 77.5966), n(13.0357, 77.5969), n(13.0357, 77.5969)] },
+      ],
+    });
+  });
+
+  it("asks for a profile, then a home, before there is a route", async () => {
+    const t = setup();
+    expect(await t.call("GET", "/me/route", undefined, "tok:nobody")).toEqual({
+      status: 404,
+      body: { error: { code: "PROFILE_NOT_SET_UP", message: "Save your profile first" } },
+    });
+    t.store.authSubjects.set("owner", recipient.id);
+    t.store.homes = [];
+    expect(await t.call("GET", "/me/route", undefined, "tok:owner")).toEqual({
+      status: 404,
+      body: { error: { code: "HOME_NOT_SET_UP", message: "Save your door and landmarks first" } },
+    });
+  });
+});
+
+describe("createSupabaseVerifier", () => {
+  async function keyPair() {
+    const pair = await webcrypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+    const jwk = { ...(await webcrypto.subtle.exportKey("jwk", pair.publicKey)), kid: "k1", alg: "ES256" };
+    return { pair, jwk };
+  }
+
+  async function sign(privateKey: webcrypto.CryptoKey, payload: object, kid = "k1") {
+    const enc = (o: object) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const input = `${enc({ alg: "ES256", kid, typ: "JWT" })}.${enc(payload)}`;
+    const sig = await webcrypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privateKey, Buffer.from(input));
+    return `${input}.${Buffer.from(sig).toString("base64url")}`;
+  }
+
+  const ISSUER = "https://ref.supabase.co/auth/v1";
+  const nowMs = T0.getTime();
+  const valid = { sub: "u1", iss: ISSUER, aud: "authenticated", exp: nowMs / 1000 + 600, email: "a@b.c", user_metadata: { full_name: "A B" } };
+
+  async function verifierFor(jwk: object) {
+    let fetches = 0;
+    const verify = createSupabaseVerifier({
+      jwksUrl: "https://ref.supabase.co/auth/v1/.well-known/jwks.json",
+      issuer: ISSUER,
+      now: () => nowMs,
+      fetchFn: (async () => {
+        fetches++;
+        return new Response(JSON.stringify({ keys: [jwk] }));
+      }) as typeof fetch,
+    });
+    return { verify, fetches: () => fetches };
+  }
+
+  it("accepts a valid token and caches the JWKS", async () => {
+    const { pair, jwk } = await keyPair();
+    const v = await verifierFor(jwk);
+    const token = await sign(pair.privateKey, valid);
+    expect(await v.verify(token)).toEqual({ sub: "u1", email: "a@b.c", name: "A B" });
+    expect(await v.verify(token)).toEqual({ sub: "u1", email: "a@b.c", name: "A B" });
+    expect(v.fetches()).toBe(1);
+  });
+
+  it.each([
+    ["expired", { ...valid, exp: nowMs / 1000 - 1 }],
+    ["wrong issuer", { ...valid, iss: "https://evil.example/auth/v1" }],
+    ["wrong audience", { ...valid, aud: "anon" }],
+    ["no subject", { ...valid, sub: undefined }],
+  ])("rejects a token with %s", async (_name, payload) => {
+    const { pair, jwk } = await keyPair();
+    const v = await verifierFor(jwk);
+    expect(await v.verify(await sign(pair.privateKey, payload))).toBeNull();
+  });
+
+  it("rejects a token signed by another key, and garbage", async () => {
+    const { jwk } = await keyPair();
+    const other = await keyPair();
+    const v = await verifierFor(jwk);
+    expect(await v.verify(await sign(other.pair.privateKey, valid))).toBeNull();
+    expect(await v.verify("not.a.jwt")).toBeNull();
+    expect(await v.verify("abc")).toBeNull();
+  });
+});

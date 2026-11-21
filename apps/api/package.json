@@ -1,0 +1,38 @@
+{
+  "name": "@locus/api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "worker": "tsx src/voice/worker.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "eval": "tsx src/eval/run.ts",
+    "osm:import": "tsx src/geo/importOsm.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx src/db/migrate.ts",
+    "seed:home": "tsx src/scripts/seedHome.ts",
+    "admin": "tsx src/scripts/admin.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.11",
+    "@livekit/agents": "^1.10.1",
+    "@livekit/agents-plugin-openai": "^1.10.1",
+    "@livekit/agents-plugin-sarvam": "^1.10.1",
+    "@livekit/agents-plugin-silero": "^1.10.1",
+    "drizzle-orm": "^0.45.4",
+    "hono": "^4.13.19",
+    "livekit-server-sdk": "^2.20.1",
+    "openai": "^7.62.0",
+    "postgres": "^4.1.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "drizzle-kit": "^0.31.11",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.1.1"
+  }
+}

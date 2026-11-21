@@ -1,0 +1,257 @@
+import type { LandmarkVision } from "./enrich/vision.js";
+import type { WalkDeps } from "./enrich/processWalk.js";
+import type { ObjectStorage } from "./storage/storage.js";
+import { createHash, randomUUID } from "node:crypto";
+import { Hono, type Context } from "hono";
+import { z } from "zod";
+import type { ApiClient, HomeProfile, Language, Session } from "./domain/types.js";
+import { RoadGraph } from "./geo/roadGraph.js";
+import { applyHandoffResult, handleRiderInput, isOpen } from "./guide/engine.js";
+import { say } from "./guide/phrases.js";
+import type { PositionResolver } from "./guide/resolver.js";
+import type { VerifyRecipient } from "./auth/supabaseJwt.js";
+import { recipientRoutes } from "./recipientRoutes.js";
+import { inHandoffWindow } from "./handoff/loopGuard.js";
+import type { Store } from "./store/store.js";
+
+export const SEARCH_RADIUS_M = 500;
+
+export type Deps = {
+  store: Store;
+  resolver: PositionResolver;
+  now: () => Date;
+  newId: () => string;
+  log: (event: Record<string, unknown>) => void;
+  verifyRecipient: VerifyRecipient;
+  /** Origin of the recipient web app, allowed by CORS on /me. */
+  webOrigin: string;
+  /** Walk videos and landmark frames. */
+  storage: ObjectStorage;
+  vision: LandmarkVision;
+  frames: WalkDeps["frames"];
+  /** Runs work after the response is sent (walk processing). */
+  background: (task: () => Promise<void>) => void;
+};
+
+export type ErrorCode =
+  | "UNAUTHORIZED"
+  | "INVALID_BODY"
+  | "NUMBER_NOT_SET_UP"
+  | "RECIPIENT_NOT_FOUND"
+  | "HOME_NOT_SET_UP"
+  | "DELIVERY_NOT_EXPECTED"
+  | "LOOP_REJECTED"
+  | "SESSION_NOT_FOUND"
+  | "SESSION_CLOSED"
+  | "NOT_IN_HANDOFF"
+  | "INTERNAL";
+
+export const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
+
+type Env = { Variables: { client: ApiClient; requestId: string } };
+
+const createSessionBody = z
+  .object({
+    did: z.string().min(1).optional(),
+    recipientId: z.string().min(1).optional(),
+    callerId: z.string().min(1).optional(),
+    language: z.enum(["hi", "en"]).optional(),
+  })
+  .strict()
+  .refine((b) => (b.did === undefined) !== (b.recipientId === undefined), {
+    message: "Provide exactly one of did or recipientId",
+  });
+
+const utteranceBody = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("speech"), text: z.string().min(1), language: z.string().min(2).optional() }).strict(),
+  z.object({ kind: z.literal("silence") }).strict(),
+]);
+
+const handoffBody = z.object({ answered: z.boolean() }).strict();
+
+function fail(c: Context, status: 400 | 401 | 404 | 409 | 500, code: ErrorCode, message: string, extra = {}) {
+  return c.json({ error: { code, message, ...extra } }, status);
+}
+
+export function createApp(deps: Deps) {
+  const { store, log } = deps;
+  const graphs = new Map<string, RoadGraph>();
+
+  /** Road graph around a home, cached per handoff point so moving the door rebuilds it. */
+  async function graphFor(home: HomeProfile) {
+    const key = `${home.id}@${home.handoffPoint.lat},${home.handoffPoint.lon}`;
+    let graph = graphs.get(key);
+    if (!graph) {
+      graph = new RoadGraph(await store.nearbyWays(home.handoffPoint, SEARCH_RADIUS_M));
+      graphs.set(key, graph);
+    }
+    return graph;
+  }
+
+  async function contextFor(home: HomeProfile) {
+    const [features, graph] = await Promise.all([store.nearbyFeatures(home.handoffPoint, SEARCH_RADIUS_M), graphFor(home)]);
+    return { features, graph };
+  }
+
+  async function ownedSession(c: Context<Env>): Promise<Session | null> {
+    const session = await store.getSession(c.req.param("id")!);
+    if (!session || session.clientId !== c.get("client").id) return null;
+    return session;
+  }
+
+  const app = new Hono<Env>();
+
+  app.onError((err, c) => {
+    const requestId = c.get("requestId") ?? randomUUID();
+    log({ event: "error", requestId, path: c.req.path, message: err.message, stack: err.stack });
+    return fail(c, 500, "INTERNAL", "Internal error", { requestId });
+  });
+
+  app.use("/v1/*", async (c, next) => {
+    c.set("requestId", randomUUID());
+    const auth = c.req.header("authorization") ?? "";
+    const key = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    const client = key ? await store.getClientByKeyHash(sha256(key)) : null;
+    if (!client) return fail(c, 401, "UNAUTHORIZED", "Missing or invalid API key");
+    c.set("client", client);
+    await next();
+  });
+
+  app.post("/v1/sessions", async (c) => {
+    const parsed = createSessionBody.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
+    const body = parsed.data;
+    const now = deps.now();
+
+    // Loop guard part 1 (P3): Locus's own numbers never reach the agent.
+    if (body.callerId && (await store.isLocusNumber(body.callerId))) {
+      return fail(c, 409, "LOOP_REJECTED", "Caller is a Locus number");
+    }
+
+    let recipientId = body.recipientId;
+    if (body.did) {
+      const number = await store.getNumberByDid(body.did);
+      if (!number) return fail(c, 404, "NUMBER_NOT_SET_UP", "This number isn't set up");
+      recipientId = number.recipientId;
+    }
+    const recipient = await store.getRecipient(recipientId!);
+    if (!recipient) return fail(c, 404, "RECIPIENT_NOT_FOUND", "Recipient not found");
+
+    // Loop guard part 2 (P3): during a handoff leg and 60 s after it.
+    if (inHandoffWindow(await store.latestHandoff(recipient.id), now)) {
+      return fail(c, 409, "LOOP_REJECTED", "Recipient has an active or recent handoff call");
+    }
+    // P2/P4: the switch is checked by the server for every client.
+    if (!recipient.expectingDeliveryUntil || recipient.expectingDeliveryUntil <= now) {
+      return fail(c, 409, "DELIVERY_NOT_EXPECTED", "Recipient isn't expecting a delivery right now");
+    }
+    const home = await store.getHomeProfile(recipient.id);
+    if (!home || home.cues.length === 0) return fail(c, 409, "HOME_NOT_SET_UP", "Recipient has no confirmed cues");
+
+    const language: Language = body.language ?? "hi";
+    const session: Session = {
+      id: `ses_${deps.newId()}`,
+      clientId: c.get("client").id,
+      recipientId: recipient.id,
+      callerIdHash: body.callerId ? sha256(body.callerId) : null,
+      state: "screening",
+      mode: "normal",
+      language,
+      currentCue: -1,
+      lostTurns: 0,
+      screening: { nameHeard: false, platformHeard: false, attempts: 0, objected: false },
+      handoff: null,
+      message: null,
+      createdAt: now,
+      endedAt: null,
+    };
+    await store.createSession(session);
+    log({ event: "session.created", sessionId: session.id, clientId: session.clientId });
+    return c.json({ sessionId: session.id, state: session.state, instruction: say.notice(language) }, 201);
+  });
+
+  app.post("/v1/sessions/:id/utterances", async (c) => {
+    const session = await ownedSession(c);
+    if (!session) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    if (!isOpen(session)) return fail(c, 409, "SESSION_CLOSED", `Session is ${session.state}`);
+    const parsed = utteranceBody.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
+
+    const recipient = await store.getRecipient(session.recipientId);
+    const home = await store.getHomeProfile(session.recipientId);
+    if (!recipient || !home) throw new Error(`recipient or home missing for session ${session.id}`);
+    const { features, graph } = await contextFor(home);
+
+    const started = Date.now();
+    const outcome = await handleRiderInput(session, parsed.data, {
+      recipient,
+      home,
+      features,
+      graph,
+      resolver: deps.resolver,
+      now: deps.now(),
+    });
+    await store.updateSession(outcome.session);
+    // No-transcript mode (rider objected) writes no turn rows at all.
+    if (outcome.session.mode === "normal") await store.addTurn(outcome.turn);
+    log({
+      event: "turn",
+      sessionId: session.id,
+      state: outcome.session.state,
+      lost: outcome.turn.lost,
+      ms: Date.now() - started,
+    });
+    const enteredHandoff = outcome.session.state === "handoff" && session.state !== "handoff";
+    return c.json({
+      instruction: outcome.instruction,
+      state: outcome.session.state,
+      lostTurns: outcome.session.lostTurns,
+      // Only Locus's own worker places the handoff call; third parties hand off to their own user.
+      ...(enteredHandoff && c.get("client").firstParty ? { handoffPhone: recipient.phone } : {}),
+    });
+  });
+
+  app.post("/v1/sessions/:id/handoff-result", async (c) => {
+    const session = await ownedSession(c);
+    if (!session) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    if (session.state !== "handoff") return fail(c, 409, "NOT_IN_HANDOFF", `Session is ${session.state}`);
+    const parsed = handoffBody.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
+    const recipient = await store.getRecipient(session.recipientId);
+    if (!recipient) throw new Error(`recipient missing for session ${session.id}`);
+    const result = applyHandoffResult(session, parsed.data.answered, recipient, deps.now());
+    await store.updateSession(result.session);
+    return c.json({ instruction: result.instruction, state: result.session.state });
+  });
+
+  app.post("/v1/sessions/:id/end", async (c) => {
+    const session = await ownedSession(c);
+    if (!session) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    const now = deps.now();
+    const ended: Session = {
+      ...session,
+      state: "ended",
+      endedAt: session.endedAt ?? now,
+      handoff: session.handoff && session.handoff.endedAt === null ? { ...session.handoff, endedAt: now } : session.handoff,
+    };
+    await store.updateSession(ended);
+    return c.json({ state: ended.state });
+  });
+
+  app.route(
+    "/me",
+    recipientRoutes({
+      store,
+      verifyRecipient: deps.verifyRecipient,
+      webOrigin: deps.webOrigin,
+      now: deps.now,
+      newId: deps.newId,
+      graphFor,
+      storage: deps.storage,
+      walk: { vision: deps.vision, frames: deps.frames, log },
+      background: deps.background,
+    }),
+  );
+
+  return app;
+}

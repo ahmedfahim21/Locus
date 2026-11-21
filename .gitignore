@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+node_modules/
+dist/
+eval/phrases.jsonl
+.DS_Store
+.next/
+*.tsbuildinfo
+.pnpm-store/
