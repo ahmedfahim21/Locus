@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { LatLon, RouteLeg } from "../lib/api";
 import { FitTo, Map, MapMarker, MapRoute } from "./mapcn/Map";
 
@@ -8,6 +9,8 @@ export type Stop = {
   /** Other scripts for the same place (Hindi, Kannada). Shown under the name. */
   alt?: { text: string; script: "deva" | "knda" }[];
   location: LatLon;
+  /** The walk-video frame showing this landmark. */
+  photoUrl?: string | null;
 };
 
 /**
@@ -81,6 +84,7 @@ export function Stamp({ stop, index, reached = false, draft = false }: { stop: S
   const rotation = index % 2 ? 2.5 : -2.5;
   return (
     <div className={`stamp${reached ? " reached" : ""}${draft ? " draft" : ""}`} style={{ ["--r" as string]: `${rotation}deg` }}>
+      {stop.photoUrl && <StampPhoto url={stop.photoUrl} alt={stop.name} />}
       <span className="num">{index + 1}</span> <span className="name">{stop.name}</span>
       {stop.alt?.map((a) => (
         <span key={a.text} className={`alt ${a.script}`}>
@@ -88,5 +92,29 @@ export function Stamp({ stop, index, reached = false, draft = false }: { stop: S
         </span>
       ))}
     </div>
+  );
+}
+
+/** The landmark's real frame, with a shimmer until it loads (never a stand-in photo). */
+export function StampPhoto({ url, alt }: { url: string; alt: string }) {
+  const [state, setState] = useState<"loading" | "ready" | "failed">("loading");
+  return (
+    <span className={`stamp-photo ${state === "loading" ? "skeleton" : ""}`}>
+      {state === "failed" ? (
+        <span className="label">Photo unavailable</span>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- signed storage URLs, not optimisable
+        <img
+          src={url}
+          alt={`Photo of ${alt} from your walk`}
+          onLoad={() => setState("ready")}
+          onError={() => {
+            console.error("[photo] failed to load", alt);
+            setState("failed");
+          }}
+          style={{ opacity: state === "ready" ? 1 : 0 }}
+        />
+      )}
+    </span>
   );
 }

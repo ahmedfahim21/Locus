@@ -7,7 +7,49 @@ export const supabase = createClient(
 
 export type LatLon = { lat: number; lon: number };
 export type Profile = { firstName: string; platforms: string[]; fallbackNote: string; phone: string };
-export type Cue = { text: string; landmark: string; location: LatLon };
+export type Cue = {
+  text: string;
+  landmark: string;
+  location: LatLon;
+  /** Other names a rider might say, including Hindi and Kannada script. */
+  aliases: string[];
+  source: "typed" | "walkVideo";
+  /** Short-lived signed URL of the walk-video frame, for walk-video landmarks. */
+  photoUrl: string | null;
+  /** The walk proposal this landmark came from; send it back to keep the photo. */
+  proposalId: string | null;
+};
+
+/** What PUT /me/home takes for each landmark. */
+export type CueInput = { text: string; landmark: string; location: LatLon; aliases?: string[]; proposalId?: string };
+
+export type WalkStatus = "awaitingUpload" | "processing" | "ready" | "failed";
+export type Walk = { id: string; status: WalkStatus; error: string | null; createdAt: string; processedAt: string | null };
+export type Proposal = {
+  id: string;
+  ordinal: number;
+  name: string;
+  nameHi: string | null;
+  nameKn: string | null;
+  aliases: string[];
+  kind: string;
+  location: LatLon;
+  osmId: string | null;
+  atS: number;
+  status: "proposed" | "kept" | "rejected";
+  photoUrl: string | null;
+};
+export type TrackPoint = { t: number; lat: number; lon: number; accuracyM: number };
+
+/** Hindi (Devanagari) and Kannada names among a landmark's aliases, for the stamps. */
+export function scriptNames(aliases: string[]): { text: string; script: "deva" | "knda" }[] {
+  const out: { text: string; script: "deva" | "knda" }[] = [];
+  const deva = aliases.find((a) => /[\u0900-\u097F]/.test(a));
+  const knda = aliases.find((a) => /[\u0C80-\u0CFF]/.test(a));
+  if (deva) out.push({ text: deva, script: "deva" });
+  if (knda) out.push({ text: knda, script: "knda" });
+  return out;
+}
 export type Home = { handoffPoint: LatLon; digipin: string; confirmedAt: string; cues: Cue[] };
 export type Me = {
   identity: { email: string | null; name: string | null };
@@ -56,7 +98,7 @@ export class ApiError extends Error {
 }
 
 /** Calls the Locus API as the signed-in recipient. Errors are thrown, never swallowed. */
-export async function api<T>(path: string, init: { method?: "GET" | "PUT"; body?: unknown } = {}): Promise<T> {
+export async function api<T>(path: string, init: { method?: "GET" | "PUT" | "POST"; body?: unknown } = {}): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new ApiError(401, "UNAUTHORIZED", "Sign in again");

@@ -142,6 +142,8 @@ a { color: var(--ballpoint); text-underline-offset: 3px; }
 .stamp .num { font-stretch: 75%; color: var(--ink-muted); }
 .stamp .name { font-family: var(--hand); font-size: 15px; color: var(--ink); overflow-wrap: anywhere; }
 .stamp .alt { display: block; font-stretch: 75%; color: var(--ink-muted); }
+.stamp-photo { display: grid; place-items: center; height: 64px; margin: -2px -3px 6px; border: 1.5px solid var(--ink); border-radius: 1px; overflow: hidden; background: var(--ghost); }
+.stamp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; transition: opacity .3s ease-out; }
 .stamp.reached { background: color-mix(in srgb, var(--turmeric) 35%, var(--paper)); }
 .stamp.draft { border-style: dashed; box-shadow: none; }
 .door { font-family: var(--hand); color: var(--kumkum); font-size: 44px; line-height: 1; text-align: center; text-shadow: 0 1px 0 var(--paper); pointer-events: none; }
@@ -172,3 +174,15 @@ a { color: var(--ballpoint); text-underline-offset: 3px; }
 .poster { position: absolute; left: 16px; top: 14px; z-index: 2; pointer-events: none; max-width: 68%; }
 .poster .street { font-stretch: 125%; font-size: clamp(26px, 3.4vw, 42px); line-height: 1.02; text-shadow: 0 1px 0 var(--card); }
 @media (max-width: 640px) { .poster { max-width: 92%; } }
+
+/* ---------- walk recording ---------- */
+.viewfinder { position: absolute; inset: 0; background: #11161F; color: #FAFAF2; overflow: hidden; }
+.viewfinder video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.viewfinder-idle { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; color: #A7B1C8; }
+.vf-top { position: absolute; left: 12px; right: 12px; top: calc(14px + 7.5em); display: flex; justify-content: space-between; gap: 12px; text-shadow: 0 1px 2px #000; }
+.vf-tip { position: absolute; left: 12px; right: 12px; bottom: 16px; text-shadow: 0 1px 2px #000; }
+.setup-map:has(.viewfinder) .poster .street, .setup-map:has(.viewfinder) .poster .label { color: #FAFAF2; text-shadow: 0 1px 2px #000; }
+.tips { margin: 0; padding-left: 18px; display: grid; gap: 6px; color: var(--ink-muted); }
+.proposal-row { display: grid; grid-template-columns: 112px 1fr; gap: 12px; align-items: start; }
+.proposal-row .stamp { transform: rotate(var(--r)); }
+.landmark.proposal.skipped { opacity: .6; }

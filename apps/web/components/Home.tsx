@@ -1,9 +1,9 @@
 "use client";
 
-import { ArrowRight, MapPinLine, PlayCircle, SignOut, UserCircle } from "@phosphor-icons/react";
+import { ArrowRight, MapPinLine, PlayCircle, SignOut, UserCircle, VideoCamera } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useEffect } from "react";
-import { supabase, type Me } from "../lib/api";
+import { scriptNames, supabase, type Me } from "../lib/api";
 import { useMe, useRoute } from "../lib/hooks";
 import { Calls } from "./Calls";
 import { DeliverySwitch } from "./DeliverySwitch";
@@ -61,7 +61,7 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
   const home = me.home!;
   const recipient = me.recipient!;
   const route = useRoute(true, home.confirmedAt);
-  const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location }));
+  const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl }));
 
   return (
     <main className="home">
@@ -123,6 +123,11 @@ function HomeLoaded({ me, reload }: { me: Me; reload: () => Promise<void> }) {
           <Link className="btn block" href="/setup?step=landmarks">
             <MapPinLine size={18} />
             Edit door and landmarks
+            <ArrowRight size={16} style={{ marginLeft: "auto" }} />
+          </Link>
+          <Link className="btn block ghost" href="/setup?step=walk">
+            <VideoCamera size={18} />
+            Film your walk for landmark photos
             <ArrowRight size={16} style={{ marginLeft: "auto" }} />
           </Link>
           <Link className="btn block ghost" href="/setup">

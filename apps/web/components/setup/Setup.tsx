@@ -8,10 +8,11 @@ import { TopBar } from "../TopBar";
 import { AboutStep } from "./AboutStep";
 import { DoorStep } from "./DoorStep";
 import { LandmarksStep } from "./LandmarksStep";
+import { WalkStep, type KeptProposal } from "./WalkStep";
 import "./setup.css";
 
-export type Step = "about" | "door" | "landmarks";
-const STEPS: Step[] = ["about", "door", "landmarks"];
+export type Step = "about" | "door" | "walk" | "landmarks";
+const STEPS: Step[] = ["about", "door", "walk", "landmarks"];
 
 function stepFrom(param: string | null): Step {
   return STEPS.includes(param as Step) ? (param as Step) : "about";
@@ -22,6 +23,7 @@ export function Setup() {
   const params = useSearchParams();
   const [step, setStep] = useState<Step>(() => stepFrom(params.get("step")));
   const [door, setDoor] = useState<LatLon | null>(null);
+  const [fromWalk, setFromWalk] = useState<KeptProposal[]>([]);
 
   // Keep the URL in step with the screen so reload and back work.
   useEffect(() => {
@@ -58,7 +60,8 @@ export function Setup() {
 
   // Steps that need earlier ones send you back to the first one missing.
   const data: Me = me.data;
-  const effective: Step = !data.recipient ? "about" : step === "landmarks" && !door && !data.home ? "door" : step;
+  const needsDoor = (step === "walk" || step === "landmarks") && !door && !data.home;
+  const effective: Step = !data.recipient ? "about" : needsDoor ? "door" : step;
   const index = STEPS.indexOf(effective);
   const progress = (
     <span className="label" aria-label={`Step ${index + 1} of ${STEPS.length}`}>
@@ -86,6 +89,20 @@ export function Setup() {
         onBack={() => setStep("about")}
         onDone={(point) => {
           setDoor(point);
+          setStep("walk");
+        }}
+      />
+    );
+  }
+  if (effective === "walk") {
+    return (
+      <WalkStep
+        door={door ?? data.home!.handoffPoint}
+        progress={progress}
+        onBack={() => setStep("door")}
+        onSkip={() => setStep("landmarks")}
+        onDone={(kept) => {
+          setFromWalk(kept);
           setStep("landmarks");
         }}
       />
@@ -95,8 +112,9 @@ export function Setup() {
     <LandmarksStep
       me={data}
       door={door ?? data.home!.handoffPoint}
+      fromWalk={fromWalk}
       progress={progress}
-      onBack={() => setStep("door")}
+      onBack={() => setStep("walk")}
       onDone={() => window.location.assign("/")}
     />
   );

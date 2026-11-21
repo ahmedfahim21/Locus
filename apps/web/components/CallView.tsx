@@ -2,7 +2,7 @@
 
 import { PhoneSlash } from "@phosphor-icons/react";
 import { useEffect, useState } from "react";
-import { LIVE_STATES, STATE_LABEL, type Call } from "../lib/api";
+import { LIVE_STATES, scriptNames, STATE_LABEL, type Call } from "../lib/api";
 import { useMe, useRoute } from "../lib/hooks";
 import { useCalls } from "./Calls";
 import { LiveCall, type LiveTurn } from "./LiveCall";
@@ -54,7 +54,7 @@ export function CallView({ id }: { id: string }) {
   }
 
   const home = me.data.home;
-  const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location }));
+  const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl }));
   const arrived = call.state === "arrived";
   const reached = Math.min(call.reachedCue, stops.length);
   const next = stops[reached];

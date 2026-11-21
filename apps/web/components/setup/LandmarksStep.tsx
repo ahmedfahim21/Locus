@@ -3,24 +3,39 @@
 import { ArrowDown, ArrowLeft, ArrowUp, MapPin, Plus, Trash } from "@phosphor-icons/react";
 import type * as MapLibre from "maplibre-gl";
 import { useRef, useState, type ReactNode } from "react";
-import { api, type Cue, type LatLon, type Me } from "../../lib/api";
+import { api, scriptNames, type CueInput, type LatLon, type Me } from "../../lib/api";
+import type { KeptProposal } from "./WalkStep";
 import { Map, MapMarker } from "../mapcn/Map";
 import { Stamp } from "../RouteMap";
 import { MapHandle } from "./MapHandle";
 
 const MAX_LANDMARKS = 8; // Same cap as the API (MAX_CUES).
 
-type Draft = { key: number; landmark: string; text: string; location: LatLon };
+type Draft = {
+  key: number;
+  landmark: string;
+  text: string;
+  location: LatLon;
+  /** Set for landmarks from the walk video: keeps the photo and the names the API stored. */
+  proposalId: string | null;
+  photoUrl: string | null;
+  alt: { text: string; script: "deva" | "knda" }[];
+};
+
+/** A starting instruction for a walk-video landmark; the recipient edits it before saving. */
+const suggestedText = (name: string) => `Aage ${name} dikhega, wahan tak aaiye.`;
 
 export function LandmarksStep({
   me,
   door,
+  fromWalk,
   progress,
   onBack,
   onDone,
 }: {
   me: Me;
   door: LatLon;
+  fromWalk: KeptProposal[];
   progress: ReactNode;
   onBack: () => void;
   onDone: () => void;
@@ -28,9 +43,30 @@ export function LandmarksStep({
   const map = useRef<MapLibre.Map | null>(null);
   const nextKey = useRef(0);
   const [mapReady, setMapReady] = useState(false);
-  const [drafts, setDrafts] = useState<Draft[]>(() =>
-    (me.home?.cues ?? []).map((c) => ({ key: nextKey.current++, landmark: c.landmark, text: c.text, location: c.location })),
-  );
+  const [drafts, setDrafts] = useState<Draft[]>(() => {
+    const existing: Draft[] = (me.home?.cues ?? []).map((c) => ({
+      key: nextKey.current++,
+      landmark: c.landmark,
+      text: c.text,
+      location: c.location,
+      proposalId: c.proposalId,
+      photoUrl: c.photoUrl,
+      alt: scriptNames(c.aliases),
+    }));
+    const have = new Set(existing.flatMap((d) => (d.proposalId ? [d.proposalId] : [])));
+    const walked: Draft[] = fromWalk
+      .filter((p) => !have.has(p.id))
+      .map((p) => ({
+        key: nextKey.current++,
+        landmark: p.keptName,
+        text: suggestedText(p.keptName),
+        location: p.location,
+        proposalId: p.id,
+        photoUrl: p.photoUrl,
+        alt: scriptNames([p.nameHi ?? "", p.nameKn ?? ""]),
+      }));
+    return [...existing, ...walked].slice(0, MAX_LANDMARKS);
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -42,7 +78,7 @@ export function LandmarksStep({
   function add() {
     const location = crosshair();
     if (!location || drafts.length >= MAX_LANDMARKS) return;
-    setDrafts((d) => [...d, { key: nextKey.current++, landmark: "", text: "", location }]);
+    setDrafts((d) => [...d, { key: nextKey.current++, landmark: "", text: "", location, proposalId: null, photoUrl: null, alt: [] }]);
   }
 
   const update = (key: number, patch: Partial<Draft>) => setDrafts((d) => d.map((x) => (x.key === key ? { ...x, ...patch } : x)));
@@ -68,7 +104,12 @@ export function LandmarksStep({
     setSaving(true);
     setError(null);
     try {
-      const cues: Cue[] = drafts.map((d) => ({ landmark: d.landmark.trim(), text: d.text.trim(), location: d.location }));
+      const cues: CueInput[] = drafts.map((d) => ({
+        landmark: d.landmark.trim(),
+        text: d.text.trim(),
+        location: d.location,
+        ...(d.proposalId ? { proposalId: d.proposalId } : {}),
+      }));
       await api("/me/home", { method: "PUT", body: { handoffPoint: door, cues } });
       onDone();
     } catch (err) {
@@ -95,7 +136,7 @@ export function LandmarksStep({
           </MapMarker>
           {drafts.map((d, i) => (
             <MapMarker key={d.key} at={d.location} anchor={i % 2 ? "left" : "right"} offset={[i % 2 ? 10 : -10, 0]}>
-              <Stamp stop={{ name: d.landmark.trim() || "Unnamed", location: d.location }} index={i} draft={!d.landmark.trim()} />
+              <Stamp stop={{ name: d.landmark.trim() || "Unnamed", location: d.location, photoUrl: d.photoUrl, alt: d.alt }} index={i} draft={!d.landmark.trim()} />
             </MapMarker>
           ))}
         </Map>
@@ -137,7 +178,7 @@ export function LandmarksStep({
           {drafts.map((d, i) => (
             <li key={d.key} className="landmark">
               <div className="landmark-head">
-                <span className="label">Stop {i + 1}</span>
+                <span className="label">Stop {i + 1}{d.proposalId ? " · from your walk" : ""}</span>
                 <div className="row" style={{ gap: 4 }}>
                   <button className="btn ghost icon compact" type="button" onClick={() => moveToCrosshair(d.key)} aria-label={`Move stop ${i + 1} to the +`} title="Move to the +" style={{ width: 40 }}>
                     <MapPin size={18} />
