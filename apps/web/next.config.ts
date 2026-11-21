@@ -19,7 +19,8 @@ const config: NextConfig = {
   env: {
     NEXT_PUBLIC_SUPABASE_URL: required("SUPABASE_URL"),
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: required("SUPABASE_PUBLISHABLE_KEY"),
-    NEXT_PUBLIC_LOCUS_API_URL: required("LOCUS_API_URL"),
+    // Optional: until the API is hosted, signed-in pages say the site isn't connected (lib/api.ts).
+    NEXT_PUBLIC_LOCUS_API_URL: process.env.LOCUS_API_URL ?? "",
   },
 };
 

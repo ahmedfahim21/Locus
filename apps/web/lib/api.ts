@@ -130,6 +130,13 @@ export const STATE_LABEL: Record<string, string> = {
   ended: "Ended",
 };
 
+/** The Locus API's address; a clear error when this deployment isn't connected to one yet. */
+function apiUrl(): string {
+  const url = process.env.NEXT_PUBLIC_LOCUS_API_URL;
+  if (!url) throw new ApiError(503, "API_NOT_CONFIGURED", "This site isn't connected to a Locus server yet.");
+  return url;
+}
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -145,7 +152,7 @@ export async function api<T>(path: string, init: { method?: "GET" | "PUT" | "POS
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new ApiError(401, "UNAUTHORIZED", "Sign in again");
-  const res = await fetch(`${process.env.NEXT_PUBLIC_LOCUS_API_URL}${path}`, {
+  const res = await fetch(`${apiUrl()}${path}`, {
     method: init.method ?? "GET",
     headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
@@ -160,7 +167,7 @@ export async function apiForm<T>(path: string, form: FormData): Promise<T> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   if (!token) throw new ApiError(401, "UNAUTHORIZED", "Sign in again");
-  const res = await fetch(`${process.env.NEXT_PUBLIC_LOCUS_API_URL}${path}`, {
+  const res = await fetch(`${apiUrl()}${path}`, {
     method: "POST",
     headers: { authorization: `Bearer ${token}` },
     body: form,
