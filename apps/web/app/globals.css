@@ -147,13 +147,13 @@ a { color: var(--ballpoint); text-underline-offset: 3px; }
 .stamp.reached { background: color-mix(in srgb, var(--turmeric) 35%, var(--paper)); }
 .stamp.draft { border-style: dashed; box-shadow: none; }
 .door { font-family: var(--hand); color: var(--kumkum); font-size: 44px; line-height: 1; text-align: center; text-shadow: 0 1px 0 var(--paper); pointer-events: none; }
-.door small { display: block; font-size: 14px; margin-top: -6px; }
+.door small { display: block; font-size: 14px; margin-bottom: 2px; }
 .rider-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--turmeric); border: 2.5px solid var(--ink); box-shadow: 0 0 0 6px color-mix(in srgb, var(--turmeric) 35%, transparent); }
 .map-note { pointer-events: none; }
 .map-note span { display: block; font-family: var(--hand); color: var(--ballpoint); font-size: 17px; line-height: 1.15; max-width: 200px; transform: rotate(-3deg); text-shadow: 0 1px 0 var(--card); animation: write-on .9s ease-out both; }
 @keyframes write-on { from { clip-path: inset(0 100% 0 0); opacity: 0; } to { clip-path: inset(0 0 0 0); opacity: 1; } }
 .crosshair { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -82%); z-index: 3; pointer-events: none; text-align: center; color: var(--kumkum); font-family: var(--hand); font-size: 48px; line-height: .8; }
-.crosshair.landmark { color: var(--ballpoint); }
+.crosshair.crosshair-blue { color: var(--ballpoint); }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }

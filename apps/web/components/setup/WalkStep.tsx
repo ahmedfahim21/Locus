@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, Check, MapPin, Record, Stop, VideoCamera, Warnin
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, scriptNames, supabase, type LatLon, type Proposal, type Walk } from "../../lib/api";
 import { MAX_RECORD_S, useWalkRecorder, type Recording } from "../../lib/useWalkRecorder";
-import { Map, MapMarker } from "../mapcn/Map";
+import { FitTo, Map, MapMarker } from "../mapcn/Map";
 import { Stamp } from "../RouteMap";
 
 const BUCKET = "locus-walks";
@@ -24,6 +24,17 @@ type Phase =
 const clock = (s: number) => `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
+/** The walk being processed or reviewed lives in the URL, so a reload picks it back up. */
+function walkInUrl(): string | null {
+  return new URL(window.location.href).searchParams.get("walk");
+}
+function setWalkInUrl(walkId: string | null) {
+  const url = new URL(window.location.href);
+  if (walkId) url.searchParams.set("walk", walkId);
+  else url.searchParams.delete("walk");
+  window.history.replaceState(null, "", url);
+}
+
 export function WalkStep({
   door,
   progress,
@@ -37,7 +48,14 @@ export function WalkStep({
   onSkip: () => void;
   onDone: (kept: KeptProposal[]) => void;
 }) {
-  const [phase, setPhase] = useState<Phase>({ kind: "intro" });
+  const [phase, setPhase] = useState<Phase>(() => {
+    const walkId = walkInUrl();
+    return walkId ? { kind: "process", walkId } : { kind: "intro" };
+  });
+
+  useEffect(() => {
+    setWalkInUrl(phase.kind === "process" || phase.kind === "review" ? phase.walkId : null);
+  }, [phase]);
   const recorder = useWalkRecorder();
   const mounted = useRef(true);
   /** The recording already sent, so a re-run effect never uploads it twice. */
@@ -273,14 +291,16 @@ function ReviewMap({ door, proposals }: { door: LatLon; proposals: Proposal[] })
   const center = proposals[0]?.location ?? door;
   return (
     <Map center={center} zoom={17} className="fill" label="Landmarks found in your walk">
+      <FitTo points={[door, ...proposals.map((p) => p.location)]} padding={{ top: 140, bottom: 60, left: 150, right: 150 }} />
       <MapMarker at={door} anchor="bottom" offset={[0, 14]}>
         <div className="door">
-          ×<small>door</small>
+          <small>door</small>×
         </div>
       </MapMarker>
       {proposals.map((p, i) => (
         <MapMarker key={p.id} at={p.location} anchor={i % 2 ? "left" : "right"} offset={[i % 2 ? 10 : -10, 0]}>
-          <Stamp stop={{ name: p.name, location: p.location, photoUrl: p.photoUrl, alt: scriptNames([p.nameHi ?? "", p.nameKn ?? ""]) }} index={i} />
+          {/* Photos are in the list beside the map; the map keeps the stamps small. */}
+          <Stamp stop={{ name: p.name, location: p.location, alt: scriptNames([p.nameHi ?? "", p.nameKn ?? ""]) }} index={i} />
         </MapMarker>
       ))}
     </Map>

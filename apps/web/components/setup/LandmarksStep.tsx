@@ -22,6 +22,15 @@ type Draft = {
   alt: { text: string; script: "deva" | "knda" }[];
 };
 
+/** Same threshold as the API's route: a landmark this close to the door is the door. */
+const DOOR_SAME_AS_LANDMARK_M = 15;
+
+function metresBetween(a: LatLon, b: LatLon) {
+  const dLat = (a.lat - b.lat) * 111_320;
+  const dLon = (a.lon - b.lon) * 111_320 * Math.cos((b.lat * Math.PI) / 180);
+  return Math.hypot(dLat, dLon);
+}
+
 /** A starting instruction for a walk-video landmark; the recipient edits it before saving. */
 const suggestedText = (name: string) => `Aage ${name} dikhega, wahan tak aaiye.`;
 
@@ -65,7 +74,11 @@ export function LandmarksStep({
         photoUrl: p.photoUrl,
         alt: scriptNames([p.nameHi ?? "", p.nameKn ?? ""]),
       }));
-    return [...existing, ...walked].slice(0, MAX_LANDMARKS);
+    // The door stays last: new walk landmarks go before an existing landmark that is the door itself.
+    const last = existing[existing.length - 1];
+    const lastIsDoor = last !== undefined && metresBetween(last.location, door) <= DOOR_SAME_AS_LANDMARK_M;
+    const merged = lastIsDoor ? [...existing.slice(0, -1), ...walked, last] : [...existing, ...walked];
+    return merged.slice(0, MAX_LANDMARKS);
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +144,7 @@ export function LandmarksStep({
           />
           <MapMarker at={door} anchor="bottom" offset={[0, 14]}>
             <div className="door">
-              ×<small>door</small>
+              <small>door</small>×
             </div>
           </MapMarker>
           {drafts.map((d, i) => (
@@ -140,7 +153,7 @@ export function LandmarksStep({
             </MapMarker>
           ))}
         </Map>
-        <div className="crosshair landmark" aria-hidden="true">+</div>
+        <div className="crosshair crosshair-blue" aria-hidden="true">+</div>
         <div className="poster">
           <div className="street">What does a rider pass?</div>
           <div className="label">Put the blue + on a landmark and add it, in the order a rider meets them.</div>

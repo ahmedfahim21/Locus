@@ -4,7 +4,7 @@
 .home-map.skeleton { border-radius: 0; }
 .home-map .map.fill { position: absolute; inset: 0; }
 .home-panel { background: var(--card); border-left: 1.5px solid var(--ink); padding: 16px 20px 32px; display: grid; gap: 16px; align-content: start; max-height: 100dvh; overflow: auto; }
-.map-banner { position: absolute; left: 16px; right: 16px; bottom: 40px; z-index: 2; max-width: 440px; }
+.map-banner { position: absolute; left: 16px; right: 64px; bottom: 40px; z-index: 2; max-width: 440px; }
 
 @media (max-width: 860px) {
   .home { grid-template-columns: 1fr; }

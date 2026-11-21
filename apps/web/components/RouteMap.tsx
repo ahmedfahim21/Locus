@@ -49,6 +49,11 @@ export function RouteMap({
   const nextLeg = legs && !arrived && reached > 0 ? legs[reached - 1] : undefined;
   const noteAt = nextLeg ? nextLeg.line[Math.floor(nextLeg.line.length / 2)] : undefined;
   const points = [...stops.map((s) => s.location), door];
+  const last = stops[stops.length - 1];
+  // A last landmark at the door already marks it; the × alone avoids a label on top of its stamp.
+  const doorIsLastStop =
+    last !== undefined &&
+    Math.hypot((last.location.lat - door.lat) * 111_320, (last.location.lon - door.lon) * 111_320 * Math.cos((door.lat * Math.PI) / 180)) <= 15;
 
   return (
     <Map center={door} zoom={16} interactive={interactive} className={className} label={label}>
@@ -61,7 +66,7 @@ export function RouteMap({
       ))}
       <MapMarker at={door} anchor="bottom" offset={[0, 14]}>
         <div className="door" aria-label="Door">
-          ×<small>door</small>
+          {!doorIsLastStop && <small>door</small>}×
         </div>
       </MapMarker>
       {rider && (
