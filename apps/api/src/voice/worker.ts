@@ -21,6 +21,7 @@ import {
   type llm,
 } from "@livekit/agents";
 import * as silero from "@livekit/agents-plugin-silero";
+import { BackgroundVoiceCancellation, TelephonyBackgroundVoiceCancellation } from "@livekit/noise-cancellation-node";
 import { SipClient } from "livekit-server-sdk";
 import { env, optionalEnv } from "../config.js";
 import { GuideClient, type GuideReply } from "./guideClient.js";
@@ -33,6 +34,24 @@ const SILENCE_MS = 8_000;
 const HANDOFF_RING_SECONDS = 20;
 /** Pause after the last words before hanging up, so the phone network doesn't clip them. */
 const HANG_UP_GRACE_MS = 1_000;
+
+/**
+ * Voice detection tuned for riders on the road: a higher bar and a longer minimum
+ * so horns and wind don't count as speech, and a shorter trailing silence so the
+ * turn ends sooner (Silero's defaults are 0.5, 50 ms and 550 ms).
+ */
+const VAD_OPTIONS = { activationThreshold: 0.6, minSpeechDuration: 150, minSilenceDuration: 400 };
+
+/**
+ * Turn taking. The turn ends on voice detection: the automatic end-of-turn model can
+ * hold a Hinglish turn open for up to `maxDelay`. Noise alone can't cut Locus off: an
+ * interruption needs 0.6 s of speech that transcribes to at least one word.
+ */
+const TURN_HANDLING = {
+  turnDetection: "vad" as const,
+  endpointing: { minDelay: 400, maxDelay: 2_500 },
+  interruption: { minDuration: 600, minWords: 1 },
+};
 
 type Language = "hi" | "en";
 
@@ -148,7 +167,7 @@ class GuideAgent extends voice.Agent {
 
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
-    proc.userData.vad = await silero.VAD.load();
+    proc.userData.vad = await silero.VAD.load(VAD_OPTIONS);
   },
   entry: async (ctx: JobContext) => {
     const guide = new GuideClient(env("LOCUS_API_URL"), env("LOCUS_WORKER_API_KEY"));
@@ -173,7 +192,10 @@ export default defineAgent({
     const session = new voice.AgentSession({
       vad: ctx.proc.userData.vad as silero.VAD,
       ...createSpeech(speechProvider(), language, created.ok ? created.keyterms : []),
+      turnHandling: TURN_HANDLING,
     });
+    // Removes background noise and other voices before speech-to-text (LiveKit Cloud); phone audio has its own model.
+    const inputOptions = { noiseCancellation: sipDid ? TelephonyBackgroundVoiceCancellation() : BackgroundVoiceCancellation() };
 
     if (!created.ok) {
       log({ event: "worker.refused", did, code: created.code });
@@ -183,15 +205,23 @@ export default defineAgent({
       }
       const line = REFUSALS[created.code]?.[language];
       if (!line) throw new Error(`No spoken line for refusal ${created.code}`);
-      await session.start({ agent: new voice.Agent({ instructions: "Say only the given text." }), room: ctx.room });
+      await session.start({ agent: new voice.Agent({ instructions: "Say only the given text." }), room: ctx.room, inputOptions });
       await session.say(line, { allowInterruptions: false }).waitForPlayout();
       await ctx.deleteRoom();
       return;
     }
 
     log({ event: "worker.session", sessionId: created.sessionId });
+    // Where a turn's wait goes, next to worker.turn's apiMs: deciding the rider finished, the final transcript, the first audio back.
+    session.on(voice.AgentSessionEventTypes.MetricsCollected, ({ metrics: m }) => {
+      if (m.type === "eou_metrics") {
+        log({ event: "worker.timing", sessionId: created.sessionId, endOfTurnMs: Math.round(m.endOfUtteranceDelayMs), transcriptMs: Math.round(m.transcriptionDelayMs) });
+      } else if (m.type === "tts_metrics") {
+        log({ event: "worker.timing", sessionId: created.sessionId, firstAudioMs: Math.round(m.ttfbMs) });
+      }
+    });
     const agent = new GuideAgent(ctx, guide, created.sessionId, created.instruction);
-    await session.start({ agent, room: ctx.room });
+    await session.start({ agent, room: ctx.room, inputOptions });
   },
 });
 
