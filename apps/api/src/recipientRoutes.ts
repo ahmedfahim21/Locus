@@ -106,6 +106,8 @@ function publicHome(home: HomeProfile | null, photos: Map<string, string>, propo
       aliases: c.aliases,
       source: c.source,
       photoUrl: c.photoPath ? (photos.get(c.photoPath) ?? null) : null,
+      kind: c.kind,
+      color: c.color,
       proposalId: c.photoPath ? (proposalByFrame.get(c.photoPath) ?? null) : null,
     })),
   };
@@ -130,6 +132,7 @@ function publicProposal(p: WalkProposal, photos: Map<string, string>) {
     nameKn: p.nameKn,
     aliases: p.aliases,
     kind: p.kind,
+    color: p.color,
     location: p.location,
     osmId: p.osmId,
     atS: p.atS,
@@ -315,6 +318,8 @@ export function recipientRoutes(deps: {
         ),
         source: proposal ? "walkVideo" : "typed",
         photoPath: proposal?.framePath ?? null,
+        kind: proposal?.kind ?? null,
+        color: proposal?.color ?? null,
       });
     }
     const home: HomeProfile = {

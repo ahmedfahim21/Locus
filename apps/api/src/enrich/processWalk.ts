@@ -10,6 +10,16 @@ import type { Store } from "../store/store.js";
 import { sampleAlongTrack, WalkError } from "./track.js";
 import { MAX_PROPOSALS, type LandmarkVision, type VisionLandmark } from "./vision.js";
 
+const DEVANAGARI = /[\u0900-\u097F]/;
+const KANNADA = /[\u0C80-\u0CFF]/;
+
+/** The name if every letter is in the expected script (the model sometimes mixes scripts), else null. */
+function inScript(name: string, script: RegExp): string | null {
+  const trimmed = name.trim();
+  const letters = [...trimmed].filter((ch) => /\p{L}|\p{M}/u.test(ch));
+  return letters.length > 0 && letters.every((ch) => script.test(ch)) ? trimmed : null;
+}
+
 /** An OSM place this close to the GPS position with a matching name is the same place. */
 export const SNAP_RADIUS_M = 40;
 
@@ -84,10 +94,11 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
         recipientId: walk.recipientId,
         ordinal: i + 1,
         name: l.name.trim(),
-        nameHi: l.nameHi.trim() || null,
-        nameKn: l.nameKn.trim() || null,
+        nameHi: inScript(l.nameHi, DEVANAGARI),
+        nameKn: inScript(l.nameKn, KANNADA),
         aliases: distinctNames([...l.aliases, ...(osm ? [osm.name, ...osm.altNames] : [])], l.name),
         kind: l.kind,
+        color: /^#[0-9a-f]{6}$/i.test(l.color.trim()) ? l.color.trim().toLowerCase() : null,
         location: osm?.location ?? sample.location,
         osmId: osm?.osmId ?? null,
         framePath,

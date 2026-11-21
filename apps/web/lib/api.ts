@@ -16,6 +16,9 @@ export type Cue = {
   source: "typed" | "walkVideo";
   /** Short-lived signed URL of the walk-video frame, for walk-video landmarks. */
   photoUrl: string | null;
+  /** From the walk video, for the 3D view: what it is and its colour ("#rrggbb"). */
+  kind: string | null;
+  color: string | null;
   /** The walk proposal this landmark came from; send it back to keep the photo. */
   proposalId: string | null;
 };
@@ -33,6 +36,7 @@ export type Proposal = {
   nameKn: string | null;
   aliases: string[];
   kind: string;
+  color: string | null;
   location: LatLon;
   osmId: string | null;
   atS: number;

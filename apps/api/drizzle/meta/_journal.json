@@ -29,6 +29,13 @@
       "when": 1795283475368,
       "tag": "0003_gorgeous_shooting_star",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795290059353,
+      "tag": "0004_chubby_roughhouse",
+      "breakpoints": true
     }
   ]
 }

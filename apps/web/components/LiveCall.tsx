@@ -29,6 +29,7 @@ export function LiveCall({
   footer,
   activeTurn,
   onTurnClick,
+  doorProp,
 }: {
   stops: Stop[];
   door: LatLon;
@@ -46,6 +47,7 @@ export function LiveCall({
   footer?: ReactNode;
   activeTurn?: number;
   onTurnClick?: (index: number) => void;
+  doorProp?: { kind: string; color: string | null };
 }) {
   const transcript = useRef<HTMLOListElement>(null);
   useEffect(() => {
@@ -68,6 +70,7 @@ export function LiveCall({
           reached={reached}
           arrived={arrived}
           note={note}
+          doorProp={doorProp}
           drawIn
           className="fill"
           padding={{ top: 120, bottom: 60, left: 80, right: 220 }}

@@ -31,6 +31,10 @@ export type Cue = {
   source: CueSource;
   /** Storage path of the walk-video frame showing this landmark (walk-video cues only). */
   photoPath: string | null;
+  /** What the landmark is (gate, tree, temple…), for the 3D view. From the walk video; null when typed. */
+  kind: string | null;
+  /** Its most recognisable colour as "#rrggbb" (a blue gate, a green board). From the walk video. */
+  color: string | null;
 };
 
 export type CueSource = "typed" | "walkVideo";
@@ -143,6 +147,8 @@ export type WalkProposal = {
   nameKn: string | null;
   aliases: string[];
   kind: string;
+  /** Most recognisable colour as "#rrggbb", or null when the model saw none. */
+  color: string | null;
   location: LatLon;
   /** The OSM place it was snapped to, if one matched nearby. */
   osmId: string | null;

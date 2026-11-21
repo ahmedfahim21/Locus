@@ -61,7 +61,7 @@ export function CallView({
       <main className="page">
         <TopBar back={{ href: "/", label: "Home" }} />
         <LiveCall
-          stops={home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl }))}
+          stops={home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl, kind: c.kind, color: c.color }))}
           door={home.handoffPoint}
           legs={route.data?.legs ?? null}
           reached={0}
@@ -89,7 +89,7 @@ export function CallView({
   }
 
   const home = me.data.home;
-  const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl }));
+  const stops = home.cues.map((c) => ({ name: c.landmark, location: c.location, alt: scriptNames(c.aliases), photoUrl: c.photoUrl, kind: c.kind, color: c.color }));
   const arrived = call.state === "arrived";
   const reached = Math.min(call.reachedCue, stops.length);
   const next = stops[reached];

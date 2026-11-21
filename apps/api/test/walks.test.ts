@@ -29,6 +29,7 @@ const bakery: VisionLandmark = {
   nameKn: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
   aliases: ["Iyengar Bakery & Sweets"],
   kind: "food",
+  color: "#B8401C",
 };
 const temple: VisionLandmark = {
   frame: 13,
@@ -37,6 +38,7 @@ const temple: VisionLandmark = {
   nameKn: "ಹನುಮಾನ್ ದೇವಸ್ಥಾನ",
   aliases: ["Anjaneya temple"],
   kind: "temple",
+  color: "",
 };
 
 let dir: string;
@@ -158,6 +160,8 @@ describe("walks: processing", () => {
         // The OSM name ("Iyengar Bakery") is the same as the proposal's, so it isn't repeated.
         aliases: ["Iyengar Bakery & Sweets"],
         kind: "food",
+        // Lower-cased; the temple had no clear colour.
+        color: "#b8401c",
         location: { lat: 13.0345, lon: 77.5975 },
         osmId: "node/102",
         atS: expect.closeTo(0.67, 1),
@@ -173,6 +177,7 @@ describe("walks: processing", () => {
         // "Hanuman Mandir" normalises to the proposal's own name, so only the new names are added.
         aliases: ["Anjaneya temple", "Sri Anjaneya Temple"],
         kind: "temple",
+        color: null,
         location: TEMPLE,
         osmId: "node/101",
         atS: expect.closeTo(4.33, 1),
@@ -191,12 +196,21 @@ describe("walks: processing", () => {
     expect(t.logs).toContainEqual(expect.objectContaining({ event: "walk.ready", walkId, frames: 19, proposals: 2, snapped: 2 }));
   });
 
+  it("drops a Hindi or Kannada name written in the wrong script", async () => {
+    const t = await signedUp();
+    const { walkId } = await processedWalk(t, [{ ...bakery, nameHi: "ಐಯಂಗಾರ್ बेकरी", nameKn: "Iyengar" }]);
+    const [p] = (await t.call("GET", `/me/walks/${walkId}`, undefined, TOKEN)).body.proposals as { nameHi: string | null; nameKn: string | null }[];
+    expect([p!.nameHi, p!.nameKn]).toEqual([null, null]);
+  });
+
   it("keeps a landmark at its GPS position when no OSM place nearby has that name", async () => {
     const t = await signedUp();
-    const { walkId } = await processedWalk(t, [{ ...bakery, name: "Blue gate", aliases: ["neela gate", "Sharma house gate"], kind: "gate" }]);
+    const { walkId } = await processedWalk(t, [{ ...bakery, name: "Blue gate", aliases: ["neela gate", "Sharma house gate"], kind: "gate", color: "blue" }]);
     const res = await t.call("GET", `/me/walks/${walkId}`, undefined, TOKEN);
-    const [p] = res.body.proposals as { osmId: string | null; location: { lat: number; lon: number }; aliases: string[] }[];
+    const [p] = res.body.proposals as { osmId: string | null; location: { lat: number; lon: number }; aliases: string[]; kind: string; color: string | null }[];
     expect(p!.osmId).toBeNull();
+    // A colour name instead of a hex code is dropped, not stored.
+    expect([p!.kind, p!.color]).toEqual(["gate", null]);
     // "neela gate" is the matcher's synonym for "blue gate", so it adds nothing and is dropped.
     expect(p!.aliases).toEqual(["Sharma house gate"]);
     // Frame 2 is ~20.7 m along the first stretch, between the bakery and the temple.
@@ -293,6 +307,8 @@ describe("walks: keeping landmarks", () => {
         aliases: ["Bajrang Bali mandir", "हनुमान मंदिर", "ಹನುಮಾನ್ ದೇವಸ್ಥಾನ", "Anjaneya temple", "Sri Anjaneya Temple"],
         source: "walkVideo",
         photoUrl: `https://storage.test/${frame}?exp=3600`,
+        kind: "temple",
+        color: null,
         proposalId: "prp_4",
       },
       {
@@ -302,6 +318,8 @@ describe("walks: keeping landmarks", () => {
         aliases: ["blue gate हिं", "blue gate ಕನ್ನ"],
         source: "typed",
         photoUrl: null,
+        kind: null,
+        color: null,
         proposalId: null,
       },
     ]);

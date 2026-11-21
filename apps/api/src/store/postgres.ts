@@ -145,6 +145,8 @@ export class PostgresStore implements Store {
         aliases: c.aliases,
         source: c.source as CueSource,
         photoPath: c.photoPath,
+        kind: c.kind,
+        color: c.color,
       })),
     };
   }
@@ -262,6 +264,8 @@ export class PostgresStore implements Store {
           aliases: c.aliases,
           source: c.source,
           photoPath: c.photoPath,
+          kind: c.kind,
+          color: c.color,
         })),
       );
     });

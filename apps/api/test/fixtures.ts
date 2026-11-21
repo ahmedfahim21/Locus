@@ -41,6 +41,8 @@ export const home: HomeProfile = {
       aliases: [],
       source: "typed",
       photoPath: null,
+      kind: null,
+      color: null,
     },
     {
       id: "cue_2",
@@ -51,6 +53,8 @@ export const home: HomeProfile = {
       aliases: [],
       source: "typed",
       photoPath: null,
+      kind: null,
+      color: null,
     },
     {
       id: "cue_3",
@@ -61,6 +65,8 @@ export const home: HomeProfile = {
       aliases: [],
       source: "typed",
       photoPath: null,
+      kind: null,
+      color: null,
     },
   ],
 };

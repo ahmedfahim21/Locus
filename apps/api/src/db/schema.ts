@@ -68,6 +68,8 @@ export const cues = locus.table(
     aliases: text("aliases").array().notNull().default(sql`'{}'::text[]`),
     source: text("source").notNull().default("typed"),
     photoPath: text("photoPath"),
+    kind: text("kind"),
+    color: text("color"),
   },
   (t) => [index("cuesHomeProfileIdx").on(t.homeProfileId)],
 );
@@ -109,6 +111,7 @@ export const walkProposals = locus.table(
     nameKn: text("nameKn"),
     aliases: text("aliases").array().notNull(),
     kind: text("kind").notNull(),
+    color: text("color"),
     lat: doublePrecision("lat").notNull(),
     lon: doublePrecision("lon").notNull(),
     osmId: text("osmId"),

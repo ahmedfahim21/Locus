@@ -67,9 +67,9 @@ const STOP_AT = [0, 14, 30] as const;
 const DOOR_AT = ROUTE.length - 1;
 
 export const demoStops: Stop[] = [
-  { name: "Grey gate", alt: [{ text: "स्लेटी गेट", script: "deva" }, { text: "ಬೂದು ಗೇಟ್", script: "knda" }], location: at(STOP_AT[0]) },
-  { name: "Milk shop", alt: [{ text: "दूध की दुकान", script: "deva" }, { text: "ಹಾಲಿನ ಅಂಗಡಿ", script: "knda" }], location: at(STOP_AT[1]) },
-  { name: "Medical store", alt: [{ text: "मेडिकल स्टोर", script: "deva" }, { text: "ಮೆಡಿಕಲ್ ಸ್ಟೋರ್", script: "knda" }], location: at(STOP_AT[2]) },
+  { name: "Grey gate", kind: "gate", color: "#8d939b", alt: [{ text: "स्लेटी गेट", script: "deva" }, { text: "ಬೂದು ಗೇಟ್", script: "knda" }], location: at(STOP_AT[0]) },
+  { name: "Milk shop", kind: "shop", color: "#2f7ed8", alt: [{ text: "दूध की दुकान", script: "deva" }, { text: "ಹಾಲಿನ ಅಂಗಡಿ", script: "knda" }], location: at(STOP_AT[1]) },
+  { name: "Medical store", kind: "pharmacy", color: "#2fa56a", alt: [{ text: "मेडिकल स्टोर", script: "deva" }, { text: "ಮೆಡಿಕಲ್ ಸ್ಟೋರ್", script: "knda" }], location: at(STOP_AT[2]) },
 ];
 
 export const demoDoor: LatLon = at(DOOR_AT);

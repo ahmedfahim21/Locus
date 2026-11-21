@@ -102,7 +102,7 @@ describe("recipient routes: profile, home, switch", () => {
     const t = setup();
     await t.call("PUT", "/me/profile", profile, TOKEN);
     const res = await t.call("PUT", "/me/home", homeBody, TOKEN);
-    const typed = { source: "typed", photoUrl: null, proposalId: null };
+    const typed = { source: "typed", photoUrl: null, kind: null, color: null, proposalId: null };
     const expectedCues = homeBody.cues.map((c) => ({ ...c, aliases: [`${c.landmark} हिं`, `${c.landmark} ಕನ್ನ`], ...typed }));
     const expectedHome = {
       handoffPoint: homeBody.handoffPoint,

@@ -72,6 +72,7 @@ export function DemoCall() {
         note={!arrived && lastLocus ? lastLocus.text : null}
         activeTurn={active >= 0 ? active : undefined}
         onTurnClick={seek}
+        doorProp={{ kind: "gate", color: "#2f6fd6" }}
         footer={
           <div className="row" style={{ justifyContent: "space-between" }}>
             <button className="btn primary" type="button" onClick={() => void toggle()}>

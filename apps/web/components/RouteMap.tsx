@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { LatLon, RouteLeg } from "../lib/api";
-import { FitTo, Map, MapMarker, MapRoute } from "./mapcn/Map";
+import { FitTo, Map, Map3D, MapMarker, MapRoute } from "./mapcn/Map";
 
 export type Stop = {
   name: string;
@@ -11,6 +11,9 @@ export type Stop = {
   location: LatLon;
   /** The walk-video frame showing this landmark. */
   photoUrl?: string | null;
+  /** For the 3D view: what it is and its colour. */
+  kind?: string | null;
+  color?: string | null;
 };
 
 /**
@@ -29,6 +32,7 @@ export function RouteMap({
   className,
   padding = 64,
   label,
+  doorProp,
 }: {
   stops: Stop[];
   door: LatLon;
@@ -43,6 +47,8 @@ export function RouteMap({
   className?: string;
   padding?: number | { top: number; bottom: number; left: number; right: number };
   label: string;
+  /** What stands at the door in 3D (a blue gate, say). */
+  doorProp?: { kind: string; color: string | null };
 }) {
   const rider = arrived ? door : reached > 0 ? stops[reached - 1]?.location ?? null : null;
   const walkedLegs = arrived ? (legs?.length ?? 0) : Math.max(0, reached - 1);
@@ -59,6 +65,15 @@ export function RouteMap({
     <Map center={door} zoom={16} interactive={interactive} className={className} label={label}>
       <FitTo points={points} padding={padding} />
       {legs && <MapRoute legs={legs} walkedLegs={walkedLegs} drawIn={drawIn} />}
+      {interactive && (
+        <Map3D
+          focus={door}
+          props={[
+            ...stops.map((s) => ({ location: s.location, kind: s.kind, color: s.color })),
+            ...(doorProp ? [{ location: door, ...doorProp }] : []),
+          ]}
+        />
+      )}
       {stops.map((stop, i) => (
         <MapMarker key={`${i}-${stop.name}`} at={stop.location} anchor="left" offset={[stop.photoUrl ? -23 : -14, 0]}>
           <Stamp stop={stop} index={i} reached={arrived || i < reached} />
