@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { cleanTrack, MAX_FRAMES, sampleAlongTrack, WalkError } from "../src/enrich/track.js";
 import { matchUtterance } from "../src/clues/match.js";
 import { romanize, tokens } from "../src/clues/normalize.js";
 import { decodeDigipin, encodeDigipin } from "../src/digipin/digipin.js";
@@ -113,5 +114,36 @@ describe("handoff window", () => {
     const ended = { startedAt: start, endedAt: start, answered: false };
     expect(inHandoffWindow(ended, new Date(start.getTime() + 59_999))).toBe(true);
     expect(inHandoffWindow(ended, new Date(start.getTime() + 60_000))).toBe(false);
+  });
+});
+
+describe("walk track sampling", () => {
+  const fix = (t: number, lat: number, lon: number, accuracyM = 5) => ({ t, lat, lon, accuracyM });
+
+  it("drops imprecise fixes, sorts by time, and needs two good ones", () => {
+    const track = [fix(2000, 13.001, 77.5), fix(1000, 13.2, 77.9, 200), fix(0, 13.0, 77.5)];
+    expect(cleanTrack(track)).toEqual([fix(0, 13.0, 77.5), fix(2000, 13.001, 77.5)]);
+    expect(() => cleanTrack([fix(0, 13, 77.5), fix(1, 13.1, 77.5, 80)])).toThrow(WalkError);
+  });
+
+  it("caps a long walk at 24 frames spread evenly, inside the video", () => {
+    // ~1.1 km straight north over 60 s, but the video is only 30 s long.
+    const samples = sampleAlongTrack([fix(0, 13.0, 77.5), fix(60_000, 13.01, 77.5)], 30);
+    expect(samples).toHaveLength(MAX_FRAMES);
+    expect(samples[0]).toEqual({ atS: 0, location: { lat: 13.0, lon: 77.5 }, distanceM: 0 });
+    expect(samples.at(-1)!.distanceM).toBeCloseTo(1111.95, 1);
+    expect(samples.at(-1)!.location.lat).toBeCloseTo(13.01, 6);
+    expect(Math.max(...samples.map((s) => s.atS))).toBeCloseTo(29.9, 6);
+    const gaps = samples.slice(1).map((s, i) => s.distanceM - samples[i]!.distanceM);
+    for (const g of gaps) expect(g).toBeCloseTo(1111.95 / 23, 1);
+  });
+
+  it("samples every ~10 m on a short walk and refuses one that never moved", () => {
+    const samples = sampleAlongTrack([fix(0, 13.0, 77.5), fix(10_000, 13.0005, 77.5)], 10);
+    expect(samples).toHaveLength(6); // 55.6 m → floor(5.56) + 1
+    expect(samples[3]!.atS).toBeCloseTo(6, 1);
+    expect(() => sampleAlongTrack([fix(0, 13.0, 77.5), fix(5000, 13.00001, 77.5)], 5)).toThrow(
+      "The GPS track only moved 1 m. Start at the main road and walk to your door while recording.",
+    );
   });
 });

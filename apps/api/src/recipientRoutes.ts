@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { z } from "zod";
 import type { RecipientIdentity, VerifyRecipient } from "./auth/supabaseJwt.js";
 import { encodeDigipin } from "./digipin/digipin.js";
-import { normalize } from "./clues/normalize.js";
+import { distinctNames } from "./clues/normalize.js";
 import {
   EXPECTING_DELIVERY_MS,
   type Cue,
@@ -134,19 +134,6 @@ function publicProposal(p: WalkProposal, photos: Map<string, string>) {
     status: p.status,
     photoUrl: p.framePath ? (photos.get(p.framePath) ?? null) : null,
   };
-}
-
-/** Names unique by their normalised form, without the landmark's own name. */
-function aliasesFor(landmark: string, names: (string | null)[]): string[] {
-  const seen = new Set([normalize(landmark)]);
-  const out: string[] = [];
-  for (const n of names) {
-    const key = n ? normalize(n) : "";
-    if (!n || (!key && !/[^\x00-\x7f]/.test(n)) || seen.has(key || n)) continue;
-    seen.add(key || n);
-    out.push(n);
-  }
-  return out;
 }
 
 function publicCall(s: Session, turns: { utterance: string | null; instruction: string; lost: boolean; createdAt: Date }[]) {
@@ -288,10 +275,13 @@ export function recipientRoutes(deps: {
         text: input.text,
         landmark: input.landmark,
         location: input.location,
-        aliases: aliasesFor(input.landmark, [
+        aliases: distinctNames(
+          [
           ...(input.aliases ?? []),
           ...(proposal ? [proposal.name, proposal.nameHi, proposal.nameKn, ...proposal.aliases] : []),
-        ]),
+          ],
+          input.landmark,
+        ),
         source: proposal ? "walkVideo" : "typed",
         photoPath: proposal?.framePath ?? null,
       });

@@ -105,6 +105,29 @@ export function tokens(text: string): string[] {
     .filter((t) => !STOPWORDS.has(t));
 }
 
+/**
+ * Key for "is this the same name?": Latin-script names compare by their matcher
+ * tokens (so "Hanuman Mandir" = "hanuman temple"), names in other scripts by
+ * their exact text, because they're kept for display as well as matching.
+ */
+export function nameKey(name: string): string {
+  const trimmed = name.trim();
+  return /[^\x00-\x7f]/.test(trimmed) ? `script:${trimmed}` : tokens(trimmed).join(" ");
+}
+
+/** Distinct names, in order, leaving out empty ones and any that equal `except`. */
+export function distinctNames(names: (string | null | undefined)[], except?: string): string[] {
+  const seen = new Set(except ? [nameKey(except)] : []);
+  const out: string[] = [];
+  for (const n of names) {
+    const key = n ? nameKey(n) : "";
+    if (!n || !key || key === "script:" || seen.has(key)) continue;
+    seen.add(key);
+    out.push(n.trim());
+  }
+  return out;
+}
+
 /** Normalized Levenshtein similarity in [0, 1]. */
 export function similarity(a: string, b: string): number {
   if (a === b) return 1;

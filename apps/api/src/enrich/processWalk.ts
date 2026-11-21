@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { matchUtterance } from "../clues/match.js";
-import { normalize } from "../clues/normalize.js";
+import { distinctNames, nameKey } from "../clues/normalize.js";
 import type { LatLon, OsmFeature, Walk, WalkProposal } from "../domain/types.js";
 import { distanceM } from "../geo/distance.js";
 import type { ObjectStorage } from "../storage/storage.js";
@@ -38,16 +38,6 @@ export function snapToOsm(landmark: { name: string; aliases: string[] }, at: Lat
   return match && match.coverage >= 0.5 ? nearby.find((f) => f.osmId === match.candidate.id)! : null;
 }
 
-function uniqueNames(names: string[]): string[] {
-  const seen = new Set<string>();
-  return names.filter((n) => {
-    const key = normalize(n);
-    if (!n.trim() || !key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
 /**
  * Walk video → landmark proposals: sample frames every ~10 m along the GPS
  * track, ask the vision model what a rider could see, snap names to OSM places,
@@ -75,7 +65,7 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
     // One proposal per name, in walk order.
     const byName = new Map<string, VisionLandmark>();
     for (const l of valid.sort((a, b) => a.frame - b.frame)) {
-      const key = normalize(l.name);
+      const key = nameKey(l.name);
       if (!byName.has(key)) byName.set(key, l);
     }
     const chosen = [...byName.values()].slice(0, MAX_PROPOSALS);
@@ -96,7 +86,7 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
         name: l.name.trim(),
         nameHi: l.nameHi.trim() || null,
         nameKn: l.nameKn.trim() || null,
-        aliases: uniqueNames([...l.aliases, ...(osm ? [osm.name, ...osm.altNames] : [])]).filter((a) => normalize(a) !== normalize(l.name)),
+        aliases: distinctNames([...l.aliases, ...(osm ? [osm.name, ...osm.altNames] : [])], l.name),
         kind: l.kind,
         location: osm?.location ?? sample.location,
         osmId: osm?.osmId ?? null,
