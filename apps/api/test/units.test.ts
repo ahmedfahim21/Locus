@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { candidatesFor, passesGate, scoreArm } from "../src/eval/ablation.js";
+import { home as fixtureHome } from "./fixtures.js";
 import { cleanTrack, MAX_FRAMES, sampleAlongTrack, WalkError } from "../src/enrich/track.js";
 import { matchUtterance } from "../src/clues/match.js";
 import { romanize, tokens } from "../src/clues/normalize.js";
@@ -145,5 +147,47 @@ describe("walk track sampling", () => {
     expect(() => sampleAlongTrack([fix(0, 13.0, 77.5), fix(5000, 13.00001, 77.5)], 5)).toThrow(
       "The GPS track only moved 1 m. Start at the main road and walk to your door while recording.",
     );
+  });
+});
+
+describe("matching ablation", () => {
+  const home = structuredClone(fixtureHome);
+  home.cues[1] = { ...home.cues[1]!, source: "walkVideo", aliases: ["Bajrang Bali gudi"] };
+  const features = [
+    { osmId: "node/102", name: "Iyengar Bakery", altNames: [], kind: "bakery", location: { lat: 13.0345, lon: 77.5975 } },
+  ];
+  const phrases = [
+    { text: "petrol pump ke paas", expected: "cue_1" },
+    { text: "Iyengar bakery ke saamne", expected: "node/102" },
+    { text: "Bajrang Bali gudi", expected: "cue_2" },
+    { text: "kuch samajh nahi aa raha", expected: "lost" },
+  ];
+  const nobody = { resolve: async () => null };
+
+  it("each arm sees only its own candidates", () => {
+    const ids = (arm: "typed" | "osm" | "full") => candidatesFor(arm, home, features).map((c) => [c.id, c.names]);
+    expect(ids("typed")).toEqual([["cue_1", ["Shell petrol pump"]], ["cue_3", ["blue gate"]]]);
+    expect(ids("osm")).toEqual([["cue_1", ["Shell petrol pump"]], ["cue_3", ["blue gate"]], ["node/102", ["Iyengar Bakery"]]]);
+    expect(ids("full")).toEqual([
+      ["cue_1", ["Shell petrol pump"]],
+      ["cue_2", ["Hanuman temple", "Bajrang Bali gudi"]],
+      ["cue_3", ["blue gate"]],
+      ["node/102", ["Iyengar Bakery"]],
+    ]);
+  });
+
+  it("accuracy rises as geography and walk landmarks are added", async () => {
+    const run = (arm: "typed" | "osm" | "full") => scoreArm(arm, phrases, candidatesFor(arm, home, features), nobody);
+    const [typed, osm, full] = await Promise.all([run("typed"), run("osm"), run("full")]);
+    expect([typed.accuracy, osm.accuracy, full.accuracy]).toEqual([0.5, 0.75, 1]);
+    expect(typed.results.map((r) => r.got)).toEqual(["cue_1", "lost", "lost", "lost"]);
+    expect(full).toMatchObject({ falseCueMatches: 0, viaLlm: 1 });
+    expect([passesGate(typed), passesGate(full)]).toEqual([false, true]);
+  });
+
+  it("counts a wrong landmark named to the rider as a false match", async () => {
+    const wrong = { resolve: async () => "cue_3" };
+    const r = await scoreArm("typed", [{ text: "kuch samajh nahi aa raha", expected: "lost" }], candidatesFor("typed", home, features), wrong);
+    expect(r).toMatchObject({ accuracy: 0, falseCueMatches: 1, viaLlm: 1 });
   });
 });
