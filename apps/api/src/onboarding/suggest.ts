@@ -31,6 +31,12 @@ export type Suggestion = {
 
 /** A place this far off the route isn't something the rider passes. */
 export const NEAR_ROUTE_M = 35;
+/** Big places (a tech park, a hospital, a temple) are seen from the road even when set back. */
+export const NEAR_ROUTE_PROMINENT_M = 90;
+const PROMINENT_KINDS = new Set([
+  "commercial", "office", "retail", "industrial", "hotel", "hospital", "college", "university", "school",
+  "place_of_worship", "stadium", "park", "mall", "marketplace", "fuel", "yes", "apartments",
+]);
 /** Street View looks are taken this far apart along the route. */
 export const STREET_SPACING_M = 40;
 const MAX_LOOK_POINTS = 12;
@@ -125,14 +131,14 @@ export async function suggestLandmarks(input: {
   const { route } = input;
   const cum = cumulative(route.line);
   const drafts: Draft[] = [];
-  const near = (p: LatLon) => {
+  const near = (p: LatLon, maxOffM = NEAR_ROUTE_M) => {
     const pr = project(route.line, cum, p);
-    return pr.offM <= NEAR_ROUTE_M && pr.alongM < route.lengthM + 10 ? pr : null;
+    return pr.offM <= maxOffM && pr.alongM < route.lengthM + 10 ? pr : null;
   };
   const turnBonus = (alongM: number) => (route.turns.some((t) => t.atM >= alongM - 10 && t.atM - alongM <= 60) ? 4 : 0);
 
   for (const f of input.features) {
-    const pr = near(f.location);
+    const pr = near(f.location, PROMINENT_KINDS.has(f.kind) ? NEAR_ROUTE_PROMINENT_M : NEAR_ROUTE_M);
     if (!pr) continue;
     drafts.push({
       name: f.name, nameHi: null, nameKn: null, aliases: f.altNames, kind: MAP_KIND_TO_PROP[f.kind] ?? "shop", color: null,

@@ -118,6 +118,20 @@ describe("GET /me/suggestions", () => {
     expect(street.calls).toBe(1);
   });
 
+  it("reaches further for big places set back from the road", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    t.store.features.push(
+      // ~60 m off the route: a tech park counts, a tea stall doesn't.
+      { osmId: "way/park", name: "Cyber Towers", altNames: [], kind: "commercial", location: { lat: 13.0352, lon: 77.5970 } },
+      { osmId: "node/tea", name: "Raju Tea Stall", altNames: [], kind: "cafe", location: { lat: 13.0352, lon: 77.59705 } },
+    );
+    const res = await t.call("GET", "/me/suggestions", undefined, TOKEN);
+    const names = (res.body as { suggestions: { name: string }[] }).suggestions.map((s) => s.name);
+    expect(names).toContain("Cyber Towers");
+    expect(names).not.toContain("Raju Tea Stall");
+  });
+
   it("works for a door that isn't saved yet, without Street View when there's no key", async () => {
     const t = setup();
     t.store.authSubjects.set("owner", recipient.id);
@@ -164,5 +178,34 @@ describe("GET /me/suggestions", () => {
     };
     expect((await t.call("PUT", "/me/home", home, TOKEN)).status).toBe(200);
     expect(t.store.homes.find((h) => h.recipientId === recipient.id)!.cues[0]).toMatchObject({ source: "map", kind: "temple", color: "#e08a00", photoPath: null });
+  });
+});
+
+describe("planRoute without road types", () => {
+  it("treats a long named road as the main road when no road has a type", () => {
+    const untyped = new RoadGraph([
+      { osmId: "w-long", name: "Long Road", highway: null, nodes: [{ id: "m0", location: { lat: 13.0, lon: 76.998 } }, { id: "e", location: ENTRY }, { id: "m1", location: { lat: 13.0, lon: 77.006 } }] },
+      { osmId: "w-1c", name: "1st Cross", highway: null, nodes: [{ id: "e", location: ENTRY }, { id: "c", location: CORNER }] },
+      { osmId: "w-2l", name: "2nd Lane", highway: null, nodes: [{ id: "c", location: CORNER }, { id: "d", location: DOOR }] },
+    ]);
+    const route = planRoute(untyped, DOOR)!;
+    expect(route.entryStreet).toBe("Long Road");
+    expect(route.line).toEqual([ENTRY, CORNER, DOOR]);
+    expect(route.turns.map((t) => t.direction)).toEqual(["right"]);
+  });
+});
+
+describe("routing and reach for real neighbourhoods", () => {
+  it("never routes a scooter down a footpath", () => {
+    const withPath = new RoadGraph([
+      ...[
+        { osmId: "w-mg", name: "MG Road", highway: "primary", nodes: [{ id: "m0", location: { lat: 13.0, lon: 77.0 } }, { id: "e", location: ENTRY }, { id: "m1", location: { lat: 13.0, lon: 77.004 } }] },
+        { osmId: "w-1c", name: "1st Cross", highway: "residential", nodes: [{ id: "e", location: ENTRY }, { id: "c", location: CORNER }] },
+        { osmId: "w-2l", name: "2nd Lane", highway: "residential", nodes: [{ id: "c", location: CORNER }, { id: "d", location: DOOR }] },
+      ],
+      // A shortcut footpath straight from the main road to the door.
+      { osmId: "w-path", name: null, highway: "footway", nodes: [{ id: "m1", location: { lat: 13.0, lon: 77.004 } }, { id: "d", location: DOOR }] },
+    ]);
+    expect(planRoute(withPath, DOOR)!.line).toEqual([ENTRY, CORNER, DOOR]);
   });
 });

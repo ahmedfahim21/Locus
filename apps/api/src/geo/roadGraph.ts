@@ -1,7 +1,13 @@
 import type { LatLon, OsmWay } from "../domain/types.js";
 import { distanceM } from "./distance.js";
 
-type Edge = { to: string; lengthM: number; wayName: string | null; highway: string | null };
+type Edge = { to: string; lengthM: number; wayName: string | null; highway: string | null; wayId: string };
+
+/** Ways a rider on a scooter can't take; left out of routing when roads have types. */
+export const NOT_RIDEABLE = new Set(["footway", "path", "steps", "pedestrian", "cycleway", "bridleway", "corridor", "elevator"]);
+
+/** Without road types (data imported before they were stored), a named road at least this long counts as main. */
+export const FALLBACK_MAIN_ROAD_M = 300;
 
 /** Roads a rider arrives on before turning towards a home. */
 export const MAIN_ROADS = new Set(["motorway", "trunk", "primary", "secondary", "tertiary", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"]);
@@ -15,8 +21,21 @@ export type ApproachStep = { location: LatLon; street: string | null };
 export class RoadGraph {
   private readonly nodes = new Map<string, LatLon>();
   private readonly edges = new Map<string, Edge[]>();
+  /** Way ids treated as main roads by the approach search. */
+  private readonly mainWays = new Set<string>();
 
-  constructor(ways: OsmWay[]) {
+  constructor(allWays: OsmWay[]) {
+    const typed = allWays.some((w) => w.highway !== null);
+    const ways = allWays.filter((w) => w.highway === null || !NOT_RIDEABLE.has(w.highway));
+    for (const way of ways) {
+      if (typed) {
+        if (way.highway !== null && MAIN_ROADS.has(way.highway)) this.mainWays.add(way.osmId);
+      } else if (way.name) {
+        let length = 0;
+        for (let i = 1; i < way.nodes.length; i++) length += distanceM(way.nodes[i - 1]!.location, way.nodes[i]!.location);
+        if (length >= FALLBACK_MAIN_ROAD_M) this.mainWays.add(way.osmId);
+      }
+    }
     for (const way of ways) {
       for (let i = 0; i < way.nodes.length; i++) {
         const node = way.nodes[i]!;
@@ -24,8 +43,8 @@ export class RoadGraph {
         const prev = way.nodes[i - 1];
         if (prev) {
           const lengthM = distanceM(prev.location, node.location);
-          this.addEdge(prev.id, { to: node.id, lengthM, wayName: way.name, highway: way.highway });
-          this.addEdge(node.id, { to: prev.id, lengthM, wayName: way.name, highway: way.highway });
+          this.addEdge(prev.id, { to: node.id, lengthM, wayName: way.name, highway: way.highway, wayId: way.osmId });
+          this.addEdge(node.id, { to: prev.id, lengthM, wayName: way.name, highway: way.highway, wayId: way.osmId });
         }
       }
     }
@@ -113,7 +132,7 @@ export class RoadGraph {
   approach(door: LatLon, maxM = 2_000): { entryStreet: string | null; steps: ApproachStep[] } | null {
     const start = this.nearestNode(door);
     if (start === null) return null;
-    const touchesMainRoad = (id: string) => (this.edges.get(id) ?? []).some((e) => e.highway !== null && MAIN_ROADS.has(e.highway));
+    const touchesMainRoad = (id: string) => (this.edges.get(id) ?? []).some((e) => this.mainWays.has(e.wayId));
     const dist = new Map<string, number>([[start, 0]]);
     const prev = new Map<string, { node: string; edge: Edge }>();
     const done = new Set<string>();
@@ -150,7 +169,7 @@ export class RoadGraph {
       steps.push({ location: this.nodes.get(step.node)!, street: step.edge.wayName });
       at = step.node;
     }
-    const mainEdge = (this.edges.get(entry) ?? []).find((e) => e.highway !== null && MAIN_ROADS.has(e.highway) && e.wayName);
+    const mainEdge = (this.edges.get(entry) ?? []).find((e) => this.mainWays.has(e.wayId) && e.wayName);
     return { entryStreet: mainEdge?.wayName ?? null, steps };
   }
 
