@@ -8,7 +8,7 @@
 
 ## Status and next steps (2026-11-22)
 
-Read DESIGN.md before any UI work. Secrets live only in the root `.env` (never committed); see `.env.example`.
+Read DESIGN.md before any UI work (Spatial Agents chrome, Sadak map colours, since 2026-11-22). Secrets live only in the root `.env` (never committed); see `.env.example`.
 
 Done and tested (`pnpm typecheck`, `pnpm test`: 93 API tests):
 - Guide-session API, screening, matching, road graph, handoff and loop guards, Supabase store and auth.
@@ -20,19 +20,22 @@ Done and tested (`pnpm typecheck`, `pnpm test`: 93 API tests):
 - Web app on DESIGN.md, clicked through signed in (home, setup incl. walk review, landmarks).
 
 Voice, end to end without a phone number (verified):
-- `livekit-server --dev`, `pnpm --filter @locus/api start`, `pnpm --filter @locus/api worker dev` (with `LOCUS_DEV_DID` set), then
-  `pnpm --filter @locus/api voice:rider eval/voice-run -- "Ahmed ke liye hai, Swiggy se" "ITC Kohenur ke paas hoon" "Knowledge City aa gaya" "Qualcomm ke saamne hoon"`.
-  The rider speaks in a Sarvam voice, each Locus reply is saved as WAV and transcribed. Dev recipient `rcp_dev_ahmed` (Hyderabad, near the demo home) answers on `+910000000000`.
-- `voice:rider --token` prints a token for the LiveKit agents playground, to talk to the worker with your own microphone.
-- Measured: rider stops → Locus starts talking 2.6–4.2 s (median ~2.6 s on guiding turns). The API part is ~1.0 s, almost all round trips to Supabase in Sydney (ap-southeast-2, ~260 ms each).
+- Sarvam models: speech-to-text `saaras:v4` with per-call key terms (name, apps, landmarks, nearby places; sent through `patches/@livekit__agents-plugin-sarvam@1.10.1.patch`), voice `bulbul:v4-flash` (`simran_hi_conversation`), fallback matcher `sarvam-105b-conversations`, names `sarvam-translate:v1`. On phone audio, key terms turn "बहिन" back into "फहीम" (Fahim) and "Kohinoor" into "Kohenur".
+- Try a call from the web app: Home → "Try a call" (`/test-call`). `POST /me/test-call` issues a LiveKit token whose server-set attribute names the recipient; the worker runs the normal screening and guide loop.
+- Scripted: `livekit-server --dev`, `pnpm --filter @locus/api start`, `pnpm --filter @locus/api worker dev`, then
+  `pnpm --filter @locus/api voice:rider eval/voice-run --recipient rcp_dev_ahmed -- "Fahim ke liye hai, Swiggy se" "ITC Kohenur ke paas hoon" "Knowledge City aa gaya" "Qualcomm ke saamne hoon"`.
+  Dev recipient `rcp_dev_ahmed` (first name Fahim, Hyderabad, near the demo home). `voice:rider --token` prints a token for the LiveKit agents playground.
+- Measured: rider stops → Locus starts talking 2.1–4.3 s (median 2.2–4.0 s across runs; the spread is speech-to-text end-of-turn). The API part is ~1.0 s, mostly round trips to Supabase in Sydney.
 
 Needs your accounts or hands (in this order):
-1. Move Supabase to Mumbai (ap-south-1). Saves ~0.8 s per rider turn. New project, `db:migrate`, re-run `osm:import`, update `.env` and the Google OAuth redirect.
-2. LiveKit Cloud project (India region) with an inbound SIP trunk and a dispatch rule to agent `locus-guide`, plus an outbound trunk for handoff. Rent a number (Vobiz through Sarvam, or Plivo India) and point it at the trunk. Then in `.env`: `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_SIP_OUTBOUND_TRUNK_ID`, `LOCUS_OUTBOUND_NUMBER`; remove `LOCUS_DEV_DID`. Run `pnpm --filter @locus/api admin number <did> <recipientId> plivo` and `admin outbound <number>`.
-3. Demo call through a friend's phone: the friend orders on Swiggy or Zomato with the receiver's number set to the Locus number (or forwards unanswered calls to it); the rider's call reaches the worker.
-4. Deploy: API and worker on one EC2 in ap-south-1 behind Caddy (ffmpeg installed), web on Vercel. Set `LOCUS_WEB_ORIGIN`, `LOCUS_API_URL`, and the Supabase auth redirect.
-5. Record a real walk on a phone over HTTPS (needs step 4, or a tunnel).
-6. Record 40 real rider phrases for the demo home into `eval/phrases.jsonl` and run `pnpm eval <recipientId> --ablation`.
+1. Phone number and LiveKit: LiveKit Cloud project (India region) with an inbound SIP trunk, a dispatch rule to agent `locus-guide`, and an outbound trunk for handoff. Rent the number from Vobiz directly (SIP trunking) or Plivo India and point it at the inbound trunk. Not from Sarvam: Sarvam-rented numbers are wired to Sarvam's own Voice Agents, with no documented route to LiveKit. Then set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_SIP_OUTBOUND_TRUNK_ID`, `LOCUS_OUTBOUND_NUMBER`; remove `LOCUS_DEV_DID`; run `admin number <did> <recipientId> plivo` and `admin outbound <number>`.
+2. Move Supabase to Mumbai (ap-south-1): saves ~0.8 s per rider turn.
+3. Deploy: API and worker on one EC2 in ap-south-1 behind Caddy (ffmpeg installed), web on Vercel; set `LOCUS_WEB_ORIGIN`, `LOCUS_API_URL`, the Supabase auth redirect, and the LiveKit keys (test calls need them too).
+4. Demo through a friend's phone: they order on Swiggy or Zomato with the receiver's number set to the Locus number.
+5. Record a real walk on a phone over HTTPS (after step 3).
+6. Record 40 real rider phrases for the demo home into `eval/phrases.jsonl`; run `pnpm eval <recipientId> --ablation`.
+
+Optional: Sarvam Voice Agents as the "Equal adoption" demo (a Voice Agents agent calling the guide API as an HTTPS tool). Not the main call path: its LLM rephrases tool results and can't speak the recipient's instructions verbatim.
 
 Known gaps: OSM names with numbers ("T-hub 2.0") tokenise poorly and can go to the fallback model; stamps overlap when landmarks are close; the 3D route preview (Sadak port) has its own owner.
 
