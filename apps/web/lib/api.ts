@@ -125,6 +125,8 @@ export type Call = {
   id: string;
   state: string;
   noTranscript: boolean;
+  /** The delivery app the rider named ("swiggy"), or null. */
+  app: string | null;
   createdAt: string;
   endedAt: string | null;
   message: string | null;

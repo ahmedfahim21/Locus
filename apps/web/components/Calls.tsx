@@ -4,6 +4,7 @@ import { CaretRight, PhoneIncoming } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, LIVE_STATES, STATE_LABEL, type Call } from "../lib/api";
+import { AppTile, appById } from "./DeliveryApps";
 
 const POLL_MS = 3000;
 
@@ -63,13 +64,23 @@ export function Calls() {
           {calls.map((c) => {
             const live = LIVE_STATES.has(c.state);
             const last = c.turns[c.turns.length - 1];
+            const app = c.app ? appById(c.app) : undefined;
             return (
               <li key={c.id}>
                 <Link href={`/calls/${c.id}`} className="cell call-row">
+                  {/* The app the rider named, by its logo; a phone when he didn't say, or Locus has no logo for it. */}
+                  {app ? (
+                    <AppTile app={app} size={30} />
+                  ) : (
+                    <span className="cell-icon" title={c.app ?? undefined}>
+                      <PhoneIncoming size={17} />
+                    </span>
+                  )}
                   <div className="cell-main">
                     <span className="row" style={{ gap: 8 }}>
                       {live && <span className="live-dot" aria-label="Live" />}
                       {STATE_LABEL[c.state] ?? c.state}
+                      {c.app && <span className="cell-sub">· {app?.name ?? c.app}</span>}
                     </span>
                     <span className="cell-sub">
                       {c.noTranscript ? "Rider asked not to be recorded" : last ? (last.utterance ?? last.instruction) : "No words yet"}
