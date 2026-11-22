@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offline · Locus</title>
+<style>
+  :root { color-scheme: light dark; --bg: #f5f5f7; --ink: #000; --muted: #6e6e73; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #000; --ink: #fff; --muted: #98989f; } }
+  body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: var(--bg); color: var(--ink);
+    font: 400 17px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, sans-serif; padding: 24px; box-sizing: border-box; text-align: center; }
+  img { width: 64px; height: 64px; border-radius: 15px; }
+  h1 { font-weight: 400; font-size: 28px; margin: 18px 0 6px; }
+  p { color: var(--muted); margin: 0 0 22px; max-width: 32ch; }
+  button { font: inherit; font-size: 15px; padding: 12px 22px; border-radius: 999px; border: 0; background: var(--ink); color: var(--bg); cursor: pointer; }
+</style>
+</head>
+<body>
+  <main>
+    <img src="/icon-192.png" alt="">
+    <h1>You're offline</h1>
+    <p>Locus needs a connection to load your door and calls. Riders can still reach Locus while your phone is offline.</p>
+    <button type="button" onclick="location.reload()">Try again</button>
+  </main>
+</body>
+</html>
