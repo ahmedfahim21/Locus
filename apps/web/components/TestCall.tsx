@@ -1,23 +1,28 @@
 "use client";
 
-import { Microphone, MicrophoneSlash, Phone, PhoneDisconnect, PhoneOutgoing, Warning } from "@phosphor-icons/react";
+import { ChatText, Microphone, MicrophoneSlash, PaperPlaneRight, Phone, PhoneDisconnect, PhoneOutgoing, Warning } from "@phosphor-icons/react";
 import { Room, RoomEvent, Track, type RemoteTrack } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type Call, type Me } from "../lib/api";
 import { CallView } from "./CallView";
 
 type Ticket = { url: string; token: string; room: string };
+type TypedReply = { sessionId: string; state: string; instruction: string | null };
+/** States where a typed call has nothing more to say: arrived, ended, or Locus would now ring you. */
+const TYPED_DONE = new Set(["arrived", "ended", "handoff"]);
 type Phase =
   | { kind: "idle" }
   | { kind: "starting" }
   | { kind: "live"; since: number }
   | { kind: "ringing"; since: number; phone: string; own: boolean }
+  | { kind: "typing"; sessionId: string; state: string; reply: string; sending: boolean }
   | { kind: "ended" }
   | { kind: "error"; message: string; code: string | null };
 
 /**
  * A browser call to the recipient's own Locus: you play the rider with your mic,
  * the worker answers exactly as on a phone call, and the call view follows along.
+ * A typed call does the same without a mic: you type the rider's lines and read Locus's replies.
  */
 export function TestCall() {
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -31,7 +36,11 @@ export function TestCall() {
   const [riderPhone, setRiderPhone] = useState("");
   const riderPhoneOk = /^\+91\d{10}$/.test(riderPhone);
   /** Which way the last attempt went, so "Try again" repeats it. */
-  const via = useRef<"browser" | "phone">("browser");
+  const via = useRef<"browser" | "phone" | "typed">("browser");
+  /** What the rider says next in a typed call. */
+  const [line, setLine] = useState("");
+  /** An example first line, with your name and app, for the typed call's input. */
+  const [example, setExample] = useState("Fahim ke liye, Swiggy se");
 
   useEffect(() => {
     api<Me>("/me").then(
@@ -39,6 +48,10 @@ export function TestCall() {
         const phone = me.canCallRider && me.recipient ? me.recipient.phone : null;
         setOwnPhone(phone);
         setRiderPhone(phone ?? "");
+        if (me.recipient) {
+          const app = me.recipient.platforms[0] ?? "Swiggy";
+          setExample(`${me.recipient.firstName} ke liye, ${app.charAt(0).toUpperCase()}${app.slice(1)} se`);
+        }
       },
       (err) => console.error("[test-call] couldn't load /me for Call the rider", err),
     );
@@ -110,6 +123,46 @@ export function TestCall() {
     }
   }
 
+  /** A typed call: same screening and guide loop, with the rider's lines typed in. */
+  async function startTyped(turnOnFirst = false) {
+    via.current = "typed";
+    setPhase({ kind: "starting" });
+    setLine("");
+    try {
+      if (turnOnFirst) await api("/me/expecting", { method: "PUT", body: { on: true } });
+      const r = await api<TypedReply>("/me/typed-calls", { method: "POST" });
+      setPhase({ kind: "typing", sessionId: r.sessionId, state: r.state, reply: r.instruction ?? "", sending: false });
+    } catch (err) {
+      console.error("[test-call] failed to start a typed call", err);
+      setPhase({ kind: "error", code: err instanceof ApiError ? err.code : null, message: (err as Error).message });
+    }
+  }
+
+  async function sendLine() {
+    if (phase.kind !== "typing" || phase.sending || !line.trim()) return;
+    const { sessionId } = phase;
+    setPhase({ ...phase, sending: true });
+    try {
+      const r = await api<TypedReply>(`/me/typed-calls/${sessionId}/lines`, { method: "POST", body: { text: line.trim() } });
+      setLine("");
+      setPhase({ kind: "typing", sessionId, state: r.state, reply: r.instruction ?? "", sending: false });
+    } catch (err) {
+      console.error("[test-call] typed line failed", err);
+      setPhase({ kind: "error", code: err instanceof ApiError ? err.code : null, message: (err as Error).message });
+    }
+  }
+
+  async function endTyped() {
+    if (phase.kind !== "typing") return;
+    try {
+      await api<TypedReply>(`/me/typed-calls/${phase.sessionId}/end`, { method: "POST" });
+      setPhase({ kind: "ended" });
+    } catch (err) {
+      console.error("[test-call] couldn't end the typed call", err);
+      setPhase({ kind: "error", code: err instanceof ApiError ? err.code : null, message: (err as Error).message });
+    }
+  }
+
   async function toggleMute() {
     const r = room.current;
     if (!r) return;
@@ -119,10 +172,19 @@ export function TestCall() {
 
   // Follow the session this test started (the newest one created after we connected).
   const since = phase.kind === "live" || phase.kind === "ringing" ? phase.since - 10_000 : null;
+  const typedId = phase.kind === "typing" ? phase.sessionId : null;
   const pick = useCallback(
-    (calls: Call[]) => (since === null ? undefined : calls.find((c) => new Date(c.createdAt).getTime() >= since)),
-    [since],
+    (calls: Call[]) =>
+      typedId !== null
+        ? calls.find((c) => c.id === typedId)
+        : since === null
+          ? undefined
+          : calls.find((c) => new Date(c.createdAt).getTime() >= since),
+    [since, typedId],
   );
+
+  const retry = (turnOnFirst = false) =>
+    via.current === "phone" ? callRider(turnOnFirst) : via.current === "typed" ? startTyped(turnOnFirst) : start(turnOnFirst);
 
   const controls = (
     <div className="stack" style={{ gap: 10 }}>
@@ -155,6 +217,53 @@ export function TestCall() {
           </div>
         </>
       )}
+      {phase.kind === "typing" && (
+        <>
+          <p className="small" aria-live="polite">
+            <span className="muted">Locus: </span>
+            {phase.reply}
+          </p>
+          {TYPED_DONE.has(phase.state) ? (
+            <>
+              <p className="small muted">
+                {phase.state === "arrived"
+                  ? "The rider reached your door."
+                  : phase.state === "handoff"
+                    ? "On a phone call, Locus would ring you now and connect the rider. Typed calls stop here."
+                    : "Call ended."}
+              </p>
+              <button className="btn primary block" type="button" onClick={() => void startTyped()}>
+                <ChatText size={18} />
+                Type another call
+              </button>
+            </>
+          ) : (
+            <>
+              <form
+                className="row"
+                style={{ gap: 10 }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void sendLine();
+                }}
+              >
+                <label className="field" style={{ flex: 1 }}>
+                  <span>What the rider says</span>
+                  <input value={line} onChange={(e) => setLine(e.target.value)} placeholder={example} maxLength={300} autoFocus aria-label="What the rider says" />
+                </label>
+                <button className="btn primary" type="submit" disabled={phase.sending || !line.trim()} style={{ alignSelf: "end" }}>
+                  <PaperPlaneRight size={18} />
+                  {phase.sending ? "Sending…" : "Send"}
+                </button>
+              </form>
+              <button className="btn danger block" type="button" onClick={() => void endTyped()} disabled={phase.sending}>
+                <PhoneDisconnect size={18} />
+                End
+              </button>
+            </>
+          )}
+        </>
+      )}
       {phase.kind === "ringing" && (
         <>
           <p className="small muted">
@@ -176,6 +285,10 @@ export function TestCall() {
           <button className="btn primary block" type="button" onClick={() => void start()} disabled={phase.kind === "starting"}>
             <Phone size={18} />
             {phase.kind === "starting" ? "Connecting…" : phase.kind === "ended" ? "Call again" : "Start call"}
+          </button>
+          <button className="btn block" type="button" onClick={() => void startTyped()} disabled={phase.kind === "starting"}>
+            <ChatText size={18} />
+            Type as the rider instead
           </button>
           {ownPhone && (
             <div className="stack" style={{ gap: 10, marginTop: 8 }}>
@@ -206,11 +319,11 @@ export function TestCall() {
             <span>{phase.message}</span>
           </div>
           {phase.code === "DELIVERY_NOT_EXPECTED" ? (
-            <button className="btn primary block" type="button" onClick={() => void (via.current === "phone" ? callRider(true) : start(true))}>
+            <button className="btn primary block" type="button" onClick={() => void retry(true)}>
               Turn it on and call
             </button>
           ) : (
-            <button className="btn block" type="button" onClick={() => void (via.current === "phone" ? callRider() : start())}>
+            <button className="btn block" type="button" onClick={() => void retry()}>
               Try again
             </button>
           )}
@@ -226,7 +339,15 @@ export function TestCall() {
       <CallView
         pick={pick}
         controls={controls}
-        waiting={phase.kind === "live" ? "Locus is picking up…" : phase.kind === "ringing" ? "Waiting for the rider to pick up…" : "Ready when you are"}
+        waiting={
+          phase.kind === "live"
+            ? "Locus is picking up…"
+            : phase.kind === "ringing"
+              ? "Waiting for the rider to pick up…"
+              : phase.kind === "typing"
+                ? "Type what the rider says"
+                : "Ready when you are"
+        }
       />
     </>
   );
