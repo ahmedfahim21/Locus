@@ -2,7 +2,9 @@
 
 **Live:** [locus.ahmedfahim.dev](https://locus.ahmedfahim.dev) (web app) and `https://locus-api.ahmedfahim.dev` (guide API). The test logins below work there too, so you can try every journey without installing anything.
 
-In the submission zip, next to this file: `Locus demo.mp4` (the product end to end, under 3 minutes), `Locus slides.pdf` (5 slides) and `.env.reviewers` (the keys, section 2).
+**Demo video:** [youtu.be/X9NvQfkdu5g](https://youtu.be/X9NvQfkdu5g).
+
+In the submission zip, next to this file: `Locus demo.mp4` (the same video, under 3 minutes), `Locus slides.pdf` (5 slides) and `.env.reviewers` (the keys, section 2).
 
 Locus is a voice AI that answers a delivery rider's call on the recipient's behalf and guides them in Hinglish to the door, one landmark at a time. The recipient sets up their door once (a pin, then a short walk video or a few photos), switches Locus on when they expect a delivery, and gives the Locus number (or forwards their own) as the receiver's phone.
 
