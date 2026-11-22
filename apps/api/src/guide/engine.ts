@@ -2,7 +2,7 @@ import { heardAny, matchUtterance, type Candidate } from "../clues/match.js";
 import type { Cue, HomeProfile, Language, OsmFeature, Recipient, Session, Turn } from "../domain/types.js";
 import { distanceM } from "../geo/distance.js";
 import type { RoadGraph } from "../geo/roadGraph.js";
-import { ARRIVED_PHRASES, OBJECTION_PHRASES, PERSON_PHRASES, WRONG_PHRASES, say } from "./phrases.js";
+import { ARRIVED_PHRASES, DIRECTION_QUESTIONS, KNOWN_DELIVERY_NAMES, OBJECTION_PHRASES, PERSON_PHRASES, WRONG_PHRASES, say } from "./phrases.js";
 import type { PositionResolver } from "./resolver.js";
 
 /** An OSM place this close to a landmark is treated as that landmark. */
@@ -11,7 +11,7 @@ const SAME_PLACE_M = 20;
 export const ARRIVAL_RADIUS_M = 30;
 
 export const SUPPORTED_LANGUAGES: readonly string[] = ["hi", "en"];
-export const MAX_SCREENING_ATTEMPTS = 2;
+export const MAX_SCREENING_ATTEMPTS = 3;
 export const LOST_TURNS_FOR_HANDOFF = 2;
 
 export type RiderInput =
@@ -67,9 +67,10 @@ function screeningTurn(session: Session, input: RiderInput, ctx: GuideContext): 
   const objected = session.screening.objected || heardAny(text, OBJECTION_PHRASES);
   const screening = {
     nameHeard: session.screening.nameHeard || heardAny(text, [ctx.recipient.firstName]),
-    platformHeard: session.screening.platformHeard || heardAny(text, ctx.recipient.platforms),
+    platformHeard: session.screening.platformHeard || heardAny(text, [...ctx.recipient.platforms, ...KNOWN_DELIVERY_NAMES]),
     attempts: session.screening.attempts + 1,
     objected,
+    ...(session.screening.secondChance ? { secondChance: true } : {}),
   };
   let next: Session = { ...session, screening, mode: objected ? "noTranscript" : session.mode };
 
@@ -85,6 +86,11 @@ function screeningTurn(session: Session, input: RiderInput, ctx: GuideContext): 
   } else if (screening.attempts >= MAX_SCREENING_ATTEMPTS) {
     next = { ...next, state: "message" };
     instruction = say.takeMessage(lang);
+  } else if (screening.nameHeard) {
+    // Ask only for what's missing, so a rider who said the name doesn't repeat it.
+    instruction = say.askApp(lang);
+  } else if (screening.platformHeard) {
+    instruction = say.askName(lang);
   } else {
     instruction = say.screenAgain(lang);
   }
@@ -101,6 +107,12 @@ function noTranscript(session: Session): Session {
 }
 
 function messageTurn(session: Session, input: RiderInput, ctx: GuideContext): TurnOutcome {
+  // "Kidhar aana hai?" isn't a message: a rider asking the way gets one more try at screening.
+  if (input.kind === "speech" && !session.screening.secondChance && heardAny(input.text, DIRECTION_QUESTIONS)) {
+    const next: Session = { ...session, state: "screening", screening: { ...session.screening, attempts: MAX_SCREENING_ATTEMPTS - 1, secondChance: true } };
+    const instruction = say.secondChance(session.language);
+    return { session: next, instruction, turn: makeTurn(next, input, instruction, ctx.now) };
+  }
   // A rider who doesn't want to be recorded isn't written down as a message either.
   const objecting = objectsNow(session, input);
   const base = objecting ? noTranscript(session) : session;

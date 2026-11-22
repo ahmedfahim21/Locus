@@ -10,6 +10,14 @@ export const say = {
     l === "hi"
       ? "Ek baar phir bataiye: delivery kis naam par hai, aur kaunse app se?"
       : "Sorry, once more: whose name is the delivery under, and which app is it from?",
+  askApp: (l: Language) =>
+    l === "hi" ? "Aur order kaunse app se hai? Swiggy, Zomato, Amazon?" : "And which app is the order from? Swiggy, Zomato, Amazon?",
+  askName: (l: Language) =>
+    l === "hi" ? "Order kis naam par hai?" : "Whose name is the order under?",
+  secondChance: (l: Language) =>
+    l === "hi"
+      ? "Raasta batane se pehle bas itna bataiye: order kis naam par hai, aur kaunse app se?"
+      : "Before I give directions: whose name is the order under, and which app is it from?",
   takeMessage: (l: Language) =>
     l === "hi"
       ? "Main unhe message de dunga. Aap kya kehna chahenge?"
@@ -93,4 +101,21 @@ export const ARRIVED_PHRASES = [
   "reached",
   "i am here",
   "im here",
+];
+
+/**
+ * Delivery apps and couriers a genuine rider may name. Screening accepts any of them
+ * (with the recipient's first name): a recipient who orders from a new app, or a
+ * courier delivering for one, mustn't lock the rider out.
+ */
+export const KNOWN_DELIVERY_NAMES = [
+  "swiggy", "instamart", "zomato", "blinkit", "zepto", "amazon", "flipkart", "bigbasket", "big basket", "dunzo",
+  "myntra", "meesho", "nykaa", "ajio", "jiomart", "tata neu", "uber eats", "porter", "rapido", "magicpin",
+  // Not "Delhivery": speech-to-text writes it as "delivery", which nearly every rider says.
+  "ekart", "e kart", "blue dart", "bluedart", "dtdc", "xpressbees", "shadowfax", "ecom express", "india post", "speed post",
+];
+
+/** Rider asking the way ("where do I come?"): not a message to pass on. */
+export const DIRECTION_QUESTIONS = [
+  "kidhar", "kidhar aana", "kahan aana", "kaha aana", "kahan aaun", "kaha aau", "kahan hai", "address", "location", "rasta", "raasta", "where",
 ];

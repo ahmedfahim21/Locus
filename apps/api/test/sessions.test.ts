@@ -121,34 +121,69 @@ describe("POST /v1/sessions", () => {
 });
 
 describe("screening (P2, P4)", () => {
-  it("needs both first name and platform; a name alone twice leads to take-a-message", async () => {
+  it("needs the first name and an app; with only the name, it asks for the app, and three misses take a message", async () => {
     const t = setup();
     await t.startSession();
     const first = await t.say("ses_1", "Ahmed ke liye delivery hai");
-    expect(first).toEqual({ status: 200, body: { instruction: say.screenAgain("hi"), state: "screening", lostTurns: 0 } });
+    // It asks only for what's missing.
+    expect(first).toEqual({ status: 200, body: { instruction: say.askApp("hi"), state: "screening", lostTurns: 0 } });
     const second = await t.say("ses_1", "Ahmed bhai ka order");
-    expect(second).toEqual({ status: 200, body: { instruction: say.takeMessage("hi"), state: "message", lostTurns: 0 } });
-    for (const r of [first, second]) {
+    expect(second.body).toMatchObject({ instruction: say.askApp("hi"), state: "screening" });
+    const third = await t.say("ses_1", "bas Ahmed");
+    expect(third).toEqual({ status: 200, body: { instruction: say.takeMessage("hi"), state: "message", lostTurns: 0 } });
+    for (const r of [first, second, third]) {
       for (const c of home.cues) expect(String(r.body.instruction)).not.toContain(c.text);
     }
     const msg = await t.say("ses_1", "Main gate pe chhod raha hoon");
     expect(msg).toEqual({ status: 200, body: { instruction: say.messageThanks("hi"), state: "ended", lostTurns: 0 } });
     const s = t.store.sessions.get("ses_1")!;
     expect(s).toMatchObject({ state: "ended", message: "Main gate pe chhod raha hoon", endedAt: T0 });
-    expect(s.screening).toEqual({ nameHeard: true, platformHeard: false, attempts: 2, objected: false });
-    expect(t.store.turns.map((x) => x.utterance)).toEqual([
-      "Ahmed ke liye delivery hai",
-      "Ahmed bhai ka order",
-      "Main gate pe chhod raha hoon",
-    ]);
+    expect(s.screening).toEqual({ nameHeard: true, platformHeard: false, attempts: 3, objected: false });
+    expect(t.store.turns.map((x) => x.utterance)).toEqual(["Ahmed ke liye delivery hai", "Ahmed bhai ka order", "bas Ahmed", "Main gate pe chhod raha hoon"]);
   });
 
-  it("platform alone twice also leads to take-a-message", async () => {
+  it("with only the app, it asks whose order it is", async () => {
     const t = setup();
     await t.startSession();
-    await t.say("ses_1", "Swiggy se hoon");
-    const res = await t.say("ses_1", "Swiggy delivery");
-    expect(res.body).toEqual({ instruction: say.takeMessage("hi"), state: "message", lostTurns: 0 });
+    const res = await t.say("ses_1", "Swiggy se hoon");
+    expect(res.body).toEqual({ instruction: say.askName("hi"), state: "screening", lostTurns: 0 });
+  });
+
+  it("accepts any known delivery app or courier, not only the ones the recipient listed", async () => {
+    const t = setup();
+    // The fixture recipient lists only Swiggy; a rider from Amazon (or an Ekart courier) still gets through.
+    expect(recipient.platforms).not.toContain("amazon");
+    await t.startSession();
+    expect((await t.say("ses_1", "Ahmed ka Amazon order")).body).toMatchObject({ instruction: say.whereAreYou("hi"), state: "guiding" });
+    const t2 = setup();
+    await t2.startSession();
+    expect((await t2.say("ses_1", "Ekart se hoon, Ahmed ke liye")).body).toMatchObject({ state: "guiding" });
+    // "Delivery" alone isn't an app.
+    const t3 = setup();
+    await t3.startSession();
+    expect((await t3.say("ses_1", "Ahmed ke liye delivery hai")).body).toMatchObject({ instruction: say.askApp("hi"), state: "screening" });
+  });
+
+  it("a rider asking the way while leaving a message gets one more try at screening", async () => {
+    const t = setup();
+    await t.startSession();
+    for (const text of ["hello", "pata nahi", "kuch nahi"]) await t.say("ses_1", text);
+    expect(t.store.sessions.get("ses_1")!.state).toBe("message");
+    // "Where do I come?" in Devanagari, as speech-to-text writes it.
+    const ask = await t.say("ses_1", "मुझे किधर आना है?");
+    expect(ask.body).toEqual({ instruction: say.secondChance("hi"), state: "screening", lostTurns: 0 });
+    const ok = await t.say("ses_1", "Ahmed ka Swiggy order");
+    expect(ok.body).toMatchObject({ instruction: say.whereAreYou("hi"), state: "guiding" });
+  });
+
+  it("the second chance is given once: a second miss goes back to taking a message", async () => {
+    const t = setup();
+    await t.startSession();
+    for (const text of ["hello", "pata nahi", "kuch nahi", "kidhar aana hai"]) await t.say("ses_1", text);
+    const miss = await t.say("ses_1", "pata nahi bhai");
+    expect(miss.body).toMatchObject({ instruction: say.takeMessage("hi"), state: "message" });
+    const again = await t.say("ses_1", "kidhar aana hai");
+    expect(again.body).toMatchObject({ instruction: say.messageThanks("hi"), state: "ended" });
   });
 
   it("name and platform (across two answers) start guidance", async () => {
@@ -180,7 +215,8 @@ describe("screening (P2, P4)", () => {
     const t = setup();
     await t.startSession();
     await t.say("ses_1", "no recording please");
-    const res = await t.say("ses_1", "pata nahi");
+    await t.say("ses_1", "pata nahi");
+    const res = await t.say("ses_1", "kuch nahi");
     expect(res.body).toEqual({ instruction: say.takeMessage("hi"), state: "message", lostTurns: 0 });
     const s = t.store.sessions.get("ses_1")!;
     expect(s.handoff).toBeNull();
@@ -448,8 +484,7 @@ describe("recording objections, any time in the call", () => {
   it("leaving a message: an objecting rider isn't written down", async () => {
     const t = setup();
     await t.startSession();
-    await t.say("ses_1", "hello");
-    await t.say("ses_1", "pata nahi");
+    for (const text of ["hello", "pata nahi", "kuch nahi"]) await t.say("ses_1", text);
     expect(t.store.sessions.get("ses_1")!.state).toBe("message");
     await t.say("ses_1", "recording nahi chahiye, bas bol dena main aaya tha");
     expect(t.store.sessions.get("ses_1")).toMatchObject({ state: "ended", mode: "noTranscript", message: null });

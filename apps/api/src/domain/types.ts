@@ -89,7 +89,8 @@ export type Session = {
   /** Index (0-based) of the last cue the rider reached; -1 before the first. */
   currentCue: number;
   lostTurns: number;
-  screening: { nameHeard: boolean; platformHeard: boolean; attempts: number; objected: boolean };
+  /** `secondChance`: a rider asking the way while leaving a message gets one more try at screening. */
+  screening: { nameHeard: boolean; platformHeard: boolean; attempts: number; objected: boolean; secondChance?: boolean };
   handoff: { startedAt: Date; endedAt: Date | null; answered: boolean | null } | null;
   message: string | null;
   createdAt: Date;
