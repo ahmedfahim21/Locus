@@ -45,7 +45,7 @@ No lines. Keep it calm: this happens once.
 
 Rider is at the start of the route, near ITC Kohenur, about 600 m from the door. Fahim taps Call the rider. The rider's phone rings on the mount; he answers on speaker.
 
-> Locus: Namaste, yeh call ek AI assistant utha raha hai aur raasta batane ke liye transcribe ho rahi hai. Delivery kiske liye hai, aur kaunse app se?
+> Locus: Namaste, main ek AI assistant hoon, aur raasta batane ke liye yeh call transcribe ho rahi hai. Delivery kiske liye hai, aur kaunse app se?
 >
 > Rider: Fahim ke liye, Swiggy se.
 >

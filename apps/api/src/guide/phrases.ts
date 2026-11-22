@@ -4,7 +4,7 @@ import type { Language } from "../domain/types.js";
 export const say = {
   notice: (l: Language) =>
     l === "hi"
-      ? "Namaste, yeh call ek AI assistant utha raha hai aur raasta batane ke liye transcribe ho rahi hai. Delivery kiske liye hai, aur kaunse app se?"
+      ? "Namaste, main ek AI assistant hoon, aur raasta batane ke liye yeh call transcribe ho rahi hai. Delivery kiske liye hai, aur kaunse app se?"
       : "Hi, this call is answered by an AI assistant and transcribed to help guide you. Who is this delivery for, and which app is it from?",
   screenAgain: (l: Language) =>
     l === "hi"

@@ -125,6 +125,21 @@ describe("GET /me/suggestions", () => {
     expect(street.calls).toBe(1);
   });
 
+  it("offers every walk landmark the recipient kept, pre-selected, even far from the drafted road route", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    const base = { walkId: "walk_1", recipientId: recipient.id, nameHi: null, nameLocal: null, aliases: [], color: null, detail: null, osmId: null, atS: 1, status: "proposed" as const };
+    // GPS between tall buildings: ~110 m north of the route, nine landmarks within 90 m of each other.
+    t.store.proposals = Array.from({ length: 9 }, (_, i) => ({
+      ...base, id: `prp_${i}`, ordinal: i + 1, name: `Walk landmark ${i + 1}`, kind: "building",
+      location: { lat: 13.0364, lon: 77.5962 + i * 0.0001 }, framePath: `frames/rcp_seed/walk_1/${i + 1}.jpg`,
+    }));
+    const res = await t.call("GET", "/me/suggestions", undefined, TOKEN);
+    const walk = (res.body.suggestions as { proposalId: string | null; recommended: boolean }[]).filter((s) => s.proposalId);
+    expect(walk.map((s) => s.proposalId).sort()).toEqual(t.store.proposals.map((p) => p.id).sort());
+    expect(walk.every((s) => s.recommended)).toBe(true);
+  });
+
   it("reaches further for big places set back from the road", async () => {
     const t = setup();
     t.store.authSubjects.set("owner", recipient.id);

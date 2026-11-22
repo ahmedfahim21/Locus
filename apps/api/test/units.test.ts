@@ -9,6 +9,7 @@ import { romanize, tokens } from "../src/clues/normalize.js";
 import { decodeDigipin, encodeDigipin } from "../src/digipin/digipin.js";
 import { RoadGraph } from "../src/geo/roadGraph.js";
 import { HANDOFF_GRACE_MS, inHandoffWindow, MAX_OPEN_HANDOFF_MS } from "../src/handoff/loopGuard.js";
+import { say } from "../src/guide/phrases.js";
 
 describe("DIGIPIN (official India Post vectors)", () => {
   it("encodes the README example", () => {
@@ -337,5 +338,15 @@ describe("signed photo URLs", () => {
     await cache.remove(["c.jpg"]);
     await cache.signedUrls(["c.jpg"], 3600);
     expect(calls).toEqual([["a.jpg"], ["c.jpg"], ["a.jpg"], ["c.jpg"]]);
+  });
+});
+
+describe("opening notice", () => {
+  it("discloses the AI and the transcription in both languages", () => {
+    expect(say.notice("hi")).toMatch(/^Namaste, main ek AI assistant hoon, .*transcribe ho rahi hai\. Delivery kiske liye hai, aur kaunse app se\?$/);
+    expect(say.notice("en")).toMatch(/^Hi, this call is answered by an AI assistant and transcribed .*Who is this delivery for, and which app is it from\?$/);
+  });
+  it("does not open with 'yeh call ek', which Bulbul voiced as 'ya call' or 'ek call' in 2 of 5 takes", () => {
+    expect(say.notice("hi")).not.toMatch(/^Namaste, yeh call/);
   });
 });
