@@ -318,7 +318,7 @@ Cast: Fahim (recipient, at home with the laptop and his phone) and a teammate (r
 | 0:36 | Confirm three; the 3D view of the street, the blue gate highlighted | 3D diorama | You check them, once. |
 | 0:44 | Turn on "Expecting a delivery". Swiggy says the rider is 2 minutes away. Tap Call the rider | Try-a-call screen | When the rider is close, Locus calls them. |
 | 0:50 | The rider's phone rings on the mount; he answers | Split screen: helmet cam left, Fahim's live call view right (stays for the call) | |
-| 0:52 | Locus: "Namaste, yeh call ek AI assistant utha raha hai… Delivery kiske liye hai, aur kaunse app se?" Rider: "Fahim, Swiggy." | Transcript fills in live | It checks the rider first. |
+| 0:52 | Locus: "Namaste, main ek AI assistant hoon… Delivery kiske liye hai, aur kaunse app se?" Rider: "Fahim, Swiggy." | Transcript fills in live | It checks the rider first. |
 | 1:02 | Locus: "Aap abhi kahan hain?" Rider: "ITC Kohenur ke paas hoon." Locus gives the next step | The dot moves to ITC Kohenur on the map | He tells it what he sees… |
 | 1:14 | Rider: "Knowledge City dikh raha hai." Locus: towards Qualcomm | Dot moves on | …and it answers in his language. |
 | 1:26 | Rider pulls up at the gate: "Qualcomm ke saamne hoon." | Arrived (the Qualcomm landmark is the door) | |
