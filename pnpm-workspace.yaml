@@ -3,3 +3,7 @@ packages:
 
 patchedDependencies:
   '@livekit/agents-plugin-sarvam@1.10.1': patches/@livekit__agents-plugin-sarvam@1.10.1.patch
+
+# onnxruntime-node (via LiveKit's Silero VAD) unpacks its binaries with adm-zip; < 0.6.1 has high-severity advisories.
+overrides:
+  adm-zip: ^0.6.1
