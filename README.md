@@ -14,6 +14,8 @@ Try it at [locus.ahmedfahim.dev](https://locus.ahmedfahim.dev), or [hear the dem
 2. Turn on "Expecting a delivery". Give your Locus number as the receiver's number when you order, or forward calls to it.
 3. The rider calls. Locus checks they know your first name and the app, asks what they can see, places them on the route and gives the next direction. If it can't place them, it rings you and connects the call.
 
+In real use the rider calls you and your number forwards the call to Locus, which answers on your behalf. For demos without setting up forwarding, "Call the rider" on the test-call screen has Locus dial a phone instead: the same screening, guidance and voice, just started from the other end.
+
 | Landmarks found during setup | A finished call |
 |:---:|:---:|
 | <img src="screenshots/landmarks.webp" alt="Setup: suggested landmarks along the drafted route, each from the map or the walk video, with a Hinglish instruction" width="480"> | <img src="screenshots/call.webp" alt="Call view: the rider's route on the map and the Hinglish transcript ending in Rider arrived" width="480"> |
