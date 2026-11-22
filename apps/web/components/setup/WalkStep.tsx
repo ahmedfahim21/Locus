@@ -8,6 +8,7 @@ import { MAX_PHOTOS, toJpeg } from "../../lib/photos";
 import { MAX_RECORD_S, useWalkRecorder, type Recording } from "../../lib/useWalkRecorder";
 import { FitTo, Map, MapMarker } from "../mapcn/Map";
 import { DoorPin, Stamp, StampPhoto } from "../RouteMap";
+import { AnalysingStage, AnalysingSteps, videoThumbs } from "./Analysing";
 
 const BUCKET = "locus-walks";
 const POLL_MS = 2000;
@@ -65,12 +66,20 @@ export function WalkStep({
   const mounted = useRef(true);
   /** The recording already sent, so a re-run effect never uploads it twice. */
   const uploaded = useRef<Blob | null>(null);
+  /** Small frames of the recipient's own walk or photos, for the analysing screen. */
+  const [thumbs, setThumbs] = useState<string[]>([]);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
     };
   }, []);
+
+  // The recording screen opens the camera and warms up GPS straight away.
+  useEffect(() => {
+    if (phase.kind === "record" && recorder.state.phase === "idle") void recorder.prepare();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase.kind]);
 
   // A finished recording goes straight to upload.
   useEffect(() => {
@@ -81,6 +90,11 @@ export function WalkStep({
   useEffect(() => {
     if (phase.kind !== "upload" || uploaded.current === phase.recording.blob) return;
     uploaded.current = phase.recording.blob;
+    const { recording: rec0 } = phase;
+    // Decoration only: without thumbnails the stage still shows its map.
+    videoThumbs(rec0.blob, rec0.durationS)
+      .then((t) => mounted.current && setThumbs(t))
+      .catch((err) => console.error("[walk] couldn't read thumbnails from the recording", err));
     void (async () => {
       const { recording } = phase;
       try {
@@ -134,6 +148,7 @@ export function WalkStep({
   useEffect(() => {
     if (phase.kind !== "sendPhotos") return;
     let cancelled = false;
+    setThumbs(phase.files.map((f) => URL.createObjectURL(f)));
     void (async () => {
       try {
         const form = new FormData();
@@ -169,21 +184,31 @@ export function WalkStep({
 
   const rec = recorder.state;
   const recording = phase.kind === "record" && (rec.phase === "recording" || rec.phase === "starting");
+  const cameraOn = phase.kind === "record" && (rec.phase === "ready" || rec.phase === "recording");
 
   return (
     <main className="setup">
       <div className="setup-map">
         {phase.kind === "review" ? (
           <ReviewMap door={door} proposals={phase.proposals} />
-        ) : phase.kind === "photos" || phase.kind === "sendPhotos" ? (
+        ) : phase.kind === "upload" || phase.kind === "sendPhotos" || phase.kind === "process" ? (
+          <AnalysingStage thumbs={thumbs} photos={phase.kind === "sendPhotos" || (phase.kind === "process" && Boolean(phase.photos))} />
+        ) : phase.kind === "photos" ? (
           <PhotoGrid files={phase.files} />
         ) : (
           <div className="viewfinder">
             <video ref={recorder.preview} muted playsInline aria-label="Camera preview" />
-            {!recording && (
+            {!cameraOn && (
               <div className="viewfinder-idle">
                 <VideoCamera size={48} />
                 <span>Your camera appears here</span>
+              </div>
+            )}
+            {rec.phase === "ready" && (
+              <div className="vf-top">
+                <span className="vf-pill">
+                  <MapPin size={14} /> {rec.gpsError ?? (rec.accuracyM === null ? "Finding GPS…" : `GPS ready ±${Math.round(rec.accuracyM)} m`)}
+                </span>
               </div>
             )}
             {rec.phase === "recording" && (
@@ -205,12 +230,20 @@ export function WalkStep({
         )}
         <div className="poster glass">
           <div className="street">
-            {phase.kind === "review" ? "Is this right?" : phase.kind === "photos" || phase.kind === "sendPhotos" ? "Your photos" : "Walk it once."}
+            {phase.kind === "review"
+              ? "Is this right?"
+              : phase.kind === "upload" || phase.kind === "sendPhotos" || phase.kind === "process"
+                ? "Reading your way in."
+                : phase.kind === "photos"
+                  ? "Your photos"
+                  : "Walk it once."}
           </div>
           <div className="label">
             {phase.kind === "review"
               ? "Landmarks Locus found. Keep, rename or skip each one."
-              : phase.kind === "photos" || phase.kind === "sendPhotos"
+              : phase.kind === "upload" || phase.kind === "sendPhotos" || phase.kind === "process"
+                ? "Looking for what a rider will see on the way to your gate."
+                : phase.kind === "photos"
                 ? "Shop boards, gates, temples: anything a rider passes on the way in."
                 : "From the main road to your gate, filming as you go."}
           </div>
@@ -277,20 +310,24 @@ export function WalkStep({
           />
         )}
         {phase.kind === "sendPhotos" && (
-          <Waiting title="Uploading your photos" body={`${phase.files.length} photo${phase.files.length === 1 ? "" : "s"}, shrunk to save data.`} />
+          <AnalysingSteps uploading photos detail={`${phase.files.length} photo${phase.files.length === 1 ? "" : "s"}, shrunk to save data.`} />
         )}
 
         {phase.kind === "record" && (
           <>
             <div className="stack" style={{ gap: 6 }}>
-              <h1 className="title">{rec.phase === "recording" ? "Recording" : "Ready when you are"}</h1>
+              <h1 className="title">{rec.phase === "recording" ? "Recording" : rec.phase === "ready" && rec.accuracyM !== null ? "Ready when you are" : "Getting ready"}</h1>
               <p className="muted">
                 {rec.phase === "recording"
-                  ? "Walk to your gate, then stop."
-                  : "Your browser will ask for the camera and your location. Allow both."}
+                  ? "Walk to your gate, then stop. Keep Locus open; the screen stays on."
+                  : rec.phase === "ready"
+                    ? rec.accuracyM === null
+                      ? "Finding your position. Stand in the open for a few seconds."
+                      : "Stand where a rider turns off the main road, then start."
+                    : "Your browser will ask for the camera and your location. Allow both."}
               </p>
             </div>
-            {rec.phase === "recording" && rec.gpsError === "Location permission is off" && (
+            {(rec.phase === "recording" || rec.phase === "ready") && rec.gpsError === "Location permission is off" && (
               <div className="alert warn" role="alert">
                 <Warning size={20} />
                 <span>Location is off, so the walk can&rsquo;t be used. Allow location for this site and record again.</span>
@@ -302,19 +339,30 @@ export function WalkStep({
                 I&rsquo;m at my gate
               </button>
             ) : (
-              <button className="btn primary block" type="button" onClick={() => void recorder.start()} disabled={rec.phase === "starting"}>
+              <button
+                className="btn primary block"
+                type="button"
+                onClick={() => void (rec.phase === "ready" ? recorder.start() : recorder.prepare())}
+                disabled={rec.phase === "starting" || (rec.phase === "ready" && rec.accuracyM === null)}
+              >
                 <Record size={18} />
-                {rec.phase === "starting" ? "Opening the camera…" : "Start recording"}
+                {rec.phase === "starting"
+                  ? "Opening the camera…"
+                  : rec.phase === "ready"
+                    ? rec.accuracyM === null
+                      ? "Waiting for GPS…"
+                      : "Start recording"
+                    : "Open the camera"}
               </button>
             )}
           </>
         )}
 
         {phase.kind === "upload" && (
-          <Waiting title="Uploading your walk" body={`${mb(phase.recording.blob.size)}, ${Math.round(phase.recording.durationS)} s, ${phase.recording.track.length} GPS fixes.`} />
+          <AnalysingSteps uploading photos={false} detail={`${mb(phase.recording.blob.size)}, ${Math.round(phase.recording.durationS)} s, ${phase.recording.track.length} GPS fixes.`} />
         )}
         {phase.kind === "process" && (
-          <Waiting title="Finding landmarks" body="Reading shop boards and gates frame by frame. Usually under a minute; you can keep this screen open." />
+          <AnalysingSteps uploading={false} photos={Boolean(phase.photos)} detail="Usually under a minute. You can keep this screen open or come back to it." />
         )}
 
         {phase.kind === "failed" && phase.photos && (
@@ -363,16 +411,6 @@ export function WalkStep({
         )}
       </aside>
     </main>
-  );
-}
-
-function Waiting({ title, body }: { title: string; body: string }) {
-  return (
-    <div className="stack" style={{ gap: 10 }} aria-busy="true" role="status">
-      <h1 className="title">{title}</h1>
-      <p className="muted">{body}</p>
-      <div className="skeleton" style={{ height: 8 }} />
-    </div>
   );
 }
 

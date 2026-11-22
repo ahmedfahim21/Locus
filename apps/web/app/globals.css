@@ -18,11 +18,11 @@
   --glass: rgba(255, 255, 255, 0.82);
 
   /* Map UI (DESIGN.md "Map"): follows the theme, like the map palette. */
-  --map-ground: #eceef1;
+  --map-ground: #f3efe6;
   --map-ui: rgba(255, 255, 255, 0.94);
   --map-ui-text: #4a5361;
   --map-ui-line: #e1e4e8;
-  --map-skeleton: #dde1e6;
+  --map-skeleton: #e2dacb;
   --route: #2f7df6;
   --walked: #1fb257;
   --landmark: #f3d27a;
@@ -300,3 +300,15 @@ a.cell:hover, button.cell:hover { background: color-mix(in srgb, var(--fill) 55%
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* "Continue with Google" (Google's sign-in branding guidelines). Its font weight and
+   colours are Google's, not Locus's: Google Sans Medium, light #fff/#747775/#1f1f1f,
+   dark #131314/#8e918f/#e3e3e3. */
+.gsi-button { display: inline-flex; align-items: center; height: 44px; padding: 0 12px; gap: 10px; border-radius: 999px; background: #ffffff; border: 1px solid #747775; color: #1f1f1f; font-family: var(--font-google-sans), var(--sans); font-weight: 500; font-size: 14px; line-height: 20px; letter-spacing: 0.25px; cursor: pointer; transition: background 150ms var(--ease), box-shadow 150ms var(--ease); }
+.gsi-button:hover { box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3); background: #f8f8f8; }
+.gsi-button:disabled { cursor: default; opacity: 0.6; }
+.gsi-logo { width: 20px; height: 20px; flex: none; }
+.gsi-text { padding-right: 0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .gsi-button { background: #131314; border-color: #8e918f; color: #e3e3e3; } :root:not([data-theme="light"]) .gsi-button:hover { background: #1f1f21; } }
+:root[data-theme="dark"] .gsi-button { background: #131314; border-color: #8e918f; color: #e3e3e3; }
+:root[data-theme="dark"] .gsi-button:hover { background: #1f1f21; }
