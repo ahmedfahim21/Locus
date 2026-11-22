@@ -300,15 +300,42 @@ Matching eval (P8) and the P4 ablation: the same 40 labelled phrases scored thre
 
 Evaluation runs (P1, P12): teammates and friends on real streets, different riders per arm, time-to-gate by GPS track, calls needed, handoff rate, lost turns.
 
-## 7. Demo (3 minutes)
+## 7. Demo (2:30)
 
-| Time | Action | Shows |
-|---|---|---|
-| 0:00–0:35 | Recipient uploads a walk video; proposed landmarks appear with frames; they confirm three and see the route (3D preview if ready, else the map with photos) | Rich, one-time setup |
-| 0:35–1:35 | Teammate on a scooter calls; Locus answers in Hinglish and guides to the gate | The core loop |
-| 1:35–2:10 | Rider says something Locus can't place twice → handoff rings the recipient | Honest fallback |
-| 2:10–2:35 | Same route through a Sarvam Voice Agent calling the Locus API as a tool | A third-party assistant adopts Locus |
-| 2:35–3:00 | Ablation: cue-only vs + OSM vs + walk-video landmarks; time-to-gate vs control | Why geography wins (the Equal pitch) |
+In the Air Agents style: real footage, one plain line per shot, one live moment, then how it fits together. Tagline on the landing page and the video: "A home set up once, a rider guided to the door out loud, and how it all fits together."
+
+Cast: Fahim (recipient, at home with the laptop and his phone) and a teammate (rider, on a scooter with a phone mount and a GoPro or second phone filming). Route: the dev home, from Dallas Centre road past ITC Kohenur and Knowledge City to the blue gate at Qualcomm.
+
+| Time | Shot | On screen | Line (voice-over or caption) |
+|---|---|---|---|
+| 0:00 | Scooter stops at a junction. The rider's phone rings out, then a second call: "Bhaiya, location kidhar hai?" | Real footage, no UI | Every delivery in India ends with this call. |
+| 0:08 | Title card on black, the Locus mark | Locus | Your door, explained out loud. |
+| 0:12 | Sign in with Google; about you (name, apps, phone) | Setup, step 1 | Set up your home once. |
+| 0:18 | Drop the door pin; the route draws from the main road with its turns | Setup, the map | Locus finds the way in from the main road. |
+| 0:26 | Record a 30 s walk video, or add photos; suggestions appear from the map and the video | Setup, suggestions | It picks the landmarks a rider can see. |
+| 0:36 | Confirm three; the 3D view of the street, the blue gate highlighted | 3D diorama | You check them, once. |
+| 0:44 | Turn on "Expecting a delivery". Swiggy says the rider is 2 minutes away. Tap Call the rider | Try-a-call screen | When the rider is close, Locus calls them. |
+| 0:50 | The rider's phone rings on the mount; he answers | Split screen: helmet cam left, Fahim's live call view right (stays for the call) | |
+| 0:52 | Locus: "Namaste, yeh call ek AI assistant utha raha hai… Delivery kiske liye hai, aur kaunse app se?" Rider: "Fahim, Swiggy." | Transcript fills in live | It checks the rider first. |
+| 1:02 | Locus: "Aap abhi kahan hain?" Rider: "ITC Kohenur ke paas hoon." Locus gives the next step | The dot moves to ITC Kohenur on the map | He tells it what he sees… |
+| 1:14 | Rider: "Knowledge City dikh raha hai." Locus: towards Qualcomm | Dot moves on | …and it answers in his language. |
+| 1:26 | Rider: "Qualcomm ke saamne hoon." Locus: "Qualcomm ke saamne neela gate, wahi rukiye." Rider pulls up at the gate | Arrived | |
+| 1:36 | Locus: "Bas, aap pahunch gaye. Shukriya!" Call ends | Call record: 3 landmarks, time to the gate | Door to door, no call to you. |
+| 1:42 | Second take: the rider says "ek chai ki dukaan ke paas hoon", then "pata nahi bhaiya, kahin galat aa gaya". (Not "Mindspace": the resolver still places that at Knowledge City.) Locus: "Main unhe call kar raha hoon, line par rahiye." Fahim's phone rings | Handoff | When it can't place him, it doesn't guess. It calls you. |
+| 1:56 | Rider: "Recording mat karo." Locus: "Theek hai, ab se kuch record nahi hoga…" | The transcript blanks | Riders can say no to being recorded. Walk videos are deleted within a day. |
+| 2:04 | Architecture diagram builds step by step | `diagrams/architecture.html` | Phone call to LiveKit, Sarvam speech in Hinglish, then our guide API: the rider's words matched by name, Sarvam when they aren't. |
+| 2:16 | Two numbers on white | 92.5% · 0.1 s | 92.5% of rider phrases placed right, in a tenth of a second. |
+| 2:22 | The API in four lines: `POST /v1/sessions`, `POST /v1/sessions/:id/utterances` | Code card | Any voice assistant can use it. Equal included. |
+| 2:27 | Mark and URL | locus.ahmedfahim.dev | Locus. |
+
+Before the shoot:
+- Two phones. "Call the rider" on your own number makes the handoff ring the phone already on the call; the rider must be on the teammate's phone.
+- LiveKit Cloud keys, the outbound trunk and `LOCUS_OUTBOUND_NUMBER` on the server (set); call once end to end the day before.
+- The dev home has "Expecting a delivery" on (it expires) and the three landmarks above confirmed.
+- Record the call in a quiet lane first; road noise is the main risk to speech-to-text. Keep the best of three takes.
+- Numbers on screen are from the eval in section 4.9 (40 phrases, dev home). No time-to-gate number until it's measured against a control run (claims, section 1).
+
+Cut from the earlier outline: the Sarvam Voice Agents adoption segment (not built) and the ablation chart (not run). The API card at 2:22 carries the Equal point instead.
 
 ## 8. Risks
 
