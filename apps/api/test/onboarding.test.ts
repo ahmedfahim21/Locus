@@ -62,8 +62,8 @@ class FakeStreet implements StreetImagery {
 
 describe("GET /me/suggestions", () => {
   const TOKEN = "tok:owner";
-  const temple: VisionLandmark = { frame: 0, name: "Sri Anjaneya Temple", nameHi: "श्री अंजनेय मंदिर", nameKn: "", aliases: ["Hanuman temple"], kind: "temple", color: "#E08A00", detail: "" };
-  const gate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: [], kind: "gate", color: "#1F5FBF", detail: "neem ke ped ke saamne" };
+  const temple: VisionLandmark = { frame: 0, name: "Sri Anjaneya Temple", nameHi: "श्री अंजनेय मंदिर", nameKn: "", aliases: ["Hanuman temple"], kind: "temple", color: "#E08A00", detail: "", box: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } };
+  const gate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: [], kind: "gate", color: "#1F5FBF", detail: "neem ke ped ke saamne", box: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } };
 
   function withProposal(t: ReturnType<typeof setup>) {
     const p: WalkProposal = {

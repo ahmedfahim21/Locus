@@ -1,9 +1,10 @@
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EXPIRED_WALK_ERROR, sweepWalkVideos } from "../src/enrich/sweep.js";
+import { EXPIRED_WALK_ERROR, sweepUnreviewedFrames, sweepWalkVideos, UNREVIEWED_FRAME_TTL_MS } from "../src/enrich/sweep.js";
+import { cropJpeg, cropRegion, extractFrames } from "../src/enrich/frames.js";
 import type { VisionLandmark } from "../src/enrich/vision.js";
 import { T0, recipient, setup } from "./fixtures.js";
 
@@ -31,6 +32,7 @@ const bakery: VisionLandmark = {
   kind: "food",
   color: "#B8401C",
   detail: "",
+  box: { x: 0.1, y: 0.2, w: 0.3, h: 0.4 },
 };
 const temple: VisionLandmark = {
   frame: 13,
@@ -41,6 +43,7 @@ const temple: VisionLandmark = {
   kind: "temple",
   color: "",
   detail: "  laal building ke bagal mein. ",
+  box: { x: 0.5, y: 0.1, w: 0.25, h: 0.6 },
 };
 
 let dir: string;
@@ -428,6 +431,48 @@ describe("walks: video sweep", () => {
   });
 });
 
+describe("walks: privacy", () => {
+  it("keeps only a crop of each landmark and wipes the GPS track once the walk is read", async () => {
+    const t = await signedUp();
+    const { walkId } = await processedWalk(t, [bakery, temple]);
+    // The track is gone; the video was already deleted.
+    expect(t.store.walks.find((w) => w.id === walkId)).toMatchObject({ status: "ready", track: [], videoDeletedAt: T0 });
+    // Each stored image came from the landmark's box, not the whole frame.
+    expect(t.crops).toEqual([bakery.box, temple.box]);
+  });
+
+  it("crops a real frame to the landmark with a margin, and shrinks it", async () => {
+    const [frame] = await extractFrames(join(dir, "walk.mp4"), [1]);
+    const size = (jpeg: Buffer) => {
+      const f = join(dir, `size-${Math.random().toString(36).slice(2)}.jpg`);
+      writeFileSync(f, jpeg);
+      const [w, h] = execFileSync("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", f]).toString().trim().split(",").map(Number);
+      return { w: w!, h: h! };
+    };
+    const full = size(frame!);
+    const crop = size(await cropJpeg(frame!, { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }));
+    // Half the frame plus 15% margin each side: 65% of it.
+    expect(crop.w).toBeCloseTo(full.w * 0.65, -1);
+    expect(crop.w).toBeLessThanOrEqual(480);
+    // No usable box: the whole frame, small.
+    expect(size(await cropJpeg(frame!, { x: 0, y: 0, w: 0, h: 0 })).w).toBeLessThanOrEqual(320);
+    expect(cropRegion({ x: 0.9, y: 0.9, w: 0.5, h: 0.5 })).toEqual({ x: expect.closeTo(0.825, 5), y: expect.closeTo(0.825, 5), w: expect.closeTo(0.175, 5), h: expect.closeTo(0.175, 5) });
+    expect(cropRegion({ x: Number.NaN, y: 0, w: 1, h: 1 })).toBeNull();
+  });
+
+  it("deletes crops of landmarks never reviewed within a week, and sets them aside", async () => {
+    const t = await signedUp();
+    const { walkId } = await processedWalk(t, [bakery, temple]);
+    const frames = t.store.proposals.filter((p) => p.walkId === walkId).map((p) => p.framePath!);
+    expect(frames.every((f) => t.storage.objects.has(f))).toBe(true);
+    const sweep = (ms: number) => sweepUnreviewedFrames({ store: t.store, storage: t.storage, now: () => new Date(T0.getTime() + ms), log: () => {} });
+    expect(await sweep(UNREVIEWED_FRAME_TTL_MS - 60_000)).toBe(0);
+    expect(await sweep(UNREVIEWED_FRAME_TTL_MS + 60_000)).toBe(2);
+    expect(frames.some((f) => t.storage.objects.has(f))).toBe(false);
+    expect(t.store.proposals.filter((p) => p.walkId === walkId).map((p) => [p.status, p.framePath])).toEqual([["rejected", null], ["rejected", null]]);
+  });
+});
+
 describe("photos instead of a walk", () => {
   const jpeg = (n: number) => Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.from(`photo-${n}`)]);
   const gateForm = (photos: Buffer[], extra: Record<string, string> = {}) => {
@@ -442,7 +487,7 @@ describe("photos instead of a walk", () => {
     const res = await t.app.request("/me/photos", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: form });
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   }
-  const blueGate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: ["neela gate"], kind: "gate", color: "#1F5FBF", detail: "" };
+  const blueGate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: ["neela gate"], kind: "gate", color: "#1F5FBF", detail: "", box: { x: 0, y: 0, w: 1, h: 1 } };
 
   it("turns photos into proposals, placing known places from the map and the rest at the gate", async () => {
     const t = await signedUp();

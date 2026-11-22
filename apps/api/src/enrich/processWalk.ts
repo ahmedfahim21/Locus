@@ -60,6 +60,8 @@ export type WalkDeps = {
   frames: {
     probeDurationS(file: string): Promise<number>;
     extractFrames(file: string, timesS: number[]): Promise<Buffer[]>;
+    /** The landmark's part of a frame, small: the only image kept from a walk. */
+    crop(jpeg: Buffer, box: VisionLandmark["box"]): Promise<Buffer>;
   };
   now: () => Date;
   newId: () => string;
@@ -132,7 +134,7 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
       const sample = samples[l.frame]!;
       const osm = snapToOsm(l, sample.location, features);
       const framePath = `frames/${walk.recipientId}/${walk.id}/${i + 1}.jpg`;
-      await deps.storage.upload(framePath, jpegs[l.frame]!, "image/jpeg");
+      await deps.storage.upload(framePath, await deps.frames.crop(jpegs[l.frame]!, l.box), "image/jpeg");
       uploaded.push(framePath);
       proposals.push({
         id: `prp_${deps.newId()}`,
@@ -156,7 +158,8 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
 
     await deps.store.replaceWalkProposals(walk.id, proposals);
     await deps.storage.remove([walk.videoPath]);
-    const done: Walk = { ...walk, status: "ready", error: null, processedAt: deps.now(), videoDeletedAt: deps.now() };
+    // Privacy: the video is gone and the GPS track is wiped; only the landmarks (and a crop of each) remain.
+    const done: Walk = { ...walk, track: [], status: "ready", error: null, processedAt: deps.now(), videoDeletedAt: deps.now() };
     await deps.store.updateWalk(done);
     deps.log({ event: "walk.ready", walkId, frames: samples.length, proposals: proposals.length, snapped: proposals.filter((p) => p.osmId).length });
   } catch (err) {

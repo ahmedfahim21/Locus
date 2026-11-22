@@ -32,3 +32,24 @@ export async function sweepWalkVideos(deps: {
   deps.log({ event: "walk.sweep", deleted: stale.length });
   return stale.length;
 }
+
+/** Frames of landmarks the recipient never reviewed are kept this long, then deleted. */
+export const UNREVIEWED_FRAME_TTL_MS = 7 * 24 * 3600_000;
+
+/**
+ * Privacy: a walk's landmark crops exist only so the recipient can review them.
+ * Ones never reviewed within a week are deleted, and the landmarks set aside.
+ */
+export async function sweepUnreviewedFrames(deps: {
+  store: Store;
+  storage: ObjectStorage;
+  now: () => Date;
+  log: (event: Record<string, unknown>) => void;
+}): Promise<number> {
+  const stale = await deps.store.listUnreviewedProposals(new Date(deps.now().getTime() - UNREVIEWED_FRAME_TTL_MS));
+  if (stale.length === 0) return 0;
+  await deps.storage.remove(stale.map((p) => p.framePath!));
+  await deps.store.updateProposals(stale.map((p) => ({ ...p, status: "rejected", framePath: null })));
+  deps.log({ event: "walk.frames_sweep", deleted: stale.length });
+  return stale.length;
+}

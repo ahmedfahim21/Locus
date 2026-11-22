@@ -4,8 +4,8 @@ import { createApp } from "./app.js";
 import { env, optionalEnv } from "./config.js";
 import { createSupabaseVerifier } from "./auth/supabaseJwt.js";
 import { createResolver } from "./guide/createResolver.js";
-import { extractFrames, probeDurationS } from "./enrich/frames.js";
-import { sweepWalkVideos } from "./enrich/sweep.js";
+import { extractFrames, probeDurationS, cropJpeg } from "./enrich/frames.js";
+import { sweepUnreviewedFrames, sweepWalkVideos } from "./enrich/sweep.js";
 import { SarvamTranslator } from "./enrich/translate.js";
 import { OpenAIVision } from "./enrich/vision.js";
 import { LiveKitTestCalls } from "./voice/testCall.js";
@@ -44,17 +44,18 @@ const app = createApp({
   testCalls: optionalEnv("LIVEKIT_URL")
     ? new LiveKitTestCalls(env("LIVEKIT_URL"), env("LIVEKIT_API_KEY"), env("LIVEKIT_API_SECRET"))
     : null,
-  frames: { probeDurationS, extractFrames },
+  frames: { probeDurationS, extractFrames, crop: cropJpeg },
   background: (task) => {
     task().catch((err: Error) => log({ event: "background.failed", message: err.message, stack: err.stack }));
   },
 });
 
-// Walk videos never outlive a day in storage (section 4.6).
-const sweep = () =>
-  sweepWalkVideos({ store, storage, now: () => new Date(), log }).catch((err: Error) =>
-    log({ event: "walk.sweep_failed", message: err.message, stack: err.stack }),
-  );
+// Privacy: walk videos never outlive a day in storage, and unreviewed landmark crops a week.
+const sweep = () => {
+  const deps = { store, storage, now: () => new Date(), log };
+  sweepWalkVideos(deps).catch((err: Error) => log({ event: "walk.sweep_failed", message: err.message, stack: err.stack }));
+  sweepUnreviewedFrames(deps).catch((err: Error) => log({ event: "walk.frames_sweep_failed", message: err.message, stack: err.stack }));
+};
 void sweep();
 setInterval(sweep, 6 * 3600_000).unref();
 

@@ -3,6 +3,7 @@
  * Supabase Storage), with an in-memory store, then deletes what it stored.
  * Usage: pnpm --filter @locus/api smoke:photos <lat> <lon> <photo.jpg> [more.jpg…]
  */
+import { cropJpeg } from "../enrich/frames.js";
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { env, optionalEnv } from "../config.js";
@@ -28,7 +29,7 @@ await store.createWalk({
 const photos = await Promise.all(files.map((f) => readFile(f)));
 await processPhotos(
   {
-    store, storage, now: () => new Date(), newId: () => randomUUID().slice(0, 8), log,
+    store, storage, now: () => new Date(), newId: () => randomUUID().slice(0, 8), log, frames: { crop: cropJpeg },
     vision: new OpenAIVision(env("OPENAI_API_KEY"), optionalEnv("OPENAI_VISION_MODEL") ?? env("OPENAI_MODEL"), log),
   },
   walkId, photos, door,

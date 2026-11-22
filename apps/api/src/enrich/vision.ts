@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { Box } from "./frames.js";
 
 export const LANDMARK_KINDS = [
   "shop", "food", "temple", "mosque", "church", "school", "hospital", "pharmacy",
@@ -19,6 +20,8 @@ export type VisionLandmark = {
   color: string;
   /** Where it is relative to its neighbours, in romanised Hinglish; "" when nothing useful. */
   detail: string;
+  /** Where it is in its frame; only this part of the frame is kept. */
+  box: Box;
 };
 
 /** Finds landmarks a rider could navigate by in the frames of a walk video. */
@@ -39,6 +42,7 @@ Rules:
 - nameHi: the same in Devanagari as a Hindi speaker would say it. nameKn: the same in Kannada script.
 - aliases: up to 4 other ways a rider might say it, in Roman letters, including any shop-board text you can read ("neela gate", "Sri Ganesha Medicals").
 - detail: where it is relative to what's around it, in romanised Hinglish as you would tell a rider on the phone, under 12 words: "laal building ke bagal mein", "iske turant baad left mein patli gali", "petrol pump ke saamne". Empty string if there is nothing useful to add.
+- box: where the landmark is in its frame, as fractions of the frame's width and height from the top-left corner (x, y, w, h, each 0 to 1). Tight around the landmark itself: only this part of the image is kept.
 - kind "lane" is a gully or side road opening; kind "sign" is a street-name or direction board.
 - color: the landmark's most recognisable colour as a hex code, e.g. a gate's paint or a shop board's background ("#1f5fbf" for a blue gate). Empty string if there is no clear colour.
 - The images may instead be separate photos or screenshots of the same street. "frame" is always the number in the image's caption ("Frame 3" or "Photo 3").
@@ -55,7 +59,7 @@ const SCHEMA = {
       items: {
         type: "object",
         additionalProperties: false,
-        required: ["frame", "name", "nameHi", "nameKn", "aliases", "kind", "color", "detail"],
+        required: ["frame", "name", "nameHi", "nameKn", "aliases", "kind", "color", "detail", "box"],
         properties: {
           frame: { type: "integer" },
           name: { type: "string" },
@@ -65,6 +69,12 @@ const SCHEMA = {
           kind: { type: "string", enum: LANDMARK_KINDS },
           color: { type: "string" },
           detail: { type: "string" },
+          box: {
+            type: "object",
+            additionalProperties: false,
+            required: ["x", "y", "w", "h"],
+            properties: { x: { type: "number" }, y: { type: "number" }, w: { type: "number" }, h: { type: "number" } },
+          },
         },
       },
     },

@@ -2,7 +2,7 @@ import { createApp, sha256 } from "../src/app.js";
 import type { Candidate } from "../src/clues/match.js";
 import type { HomeProfile, Recipient } from "../src/domain/types.js";
 import type { PositionResolver } from "../src/guide/resolver.js";
-import { extractFrames, probeDurationS } from "../src/enrich/frames.js";
+import { extractFrames, probeDurationS, type Box } from "../src/enrich/frames.js";
 import type { LandmarkVision, VisionFrame, VisionLandmark } from "../src/enrich/vision.js";
 import type { NameTranslator } from "../src/enrich/translate.js";
 import type { TestCallIssuer } from "../src/voice/testCall.js";
@@ -194,6 +194,7 @@ export function setup(options: { testCalls?: boolean; streetImagery?: StreetImag
   const pending: Promise<void>[] = [];
   const clock = { now: new Date(T0) };
   const logs: Record<string, unknown>[] = [];
+  const crops: Box[] = [];
   let seq = 0;
   const app = createApp({
     store,
@@ -210,7 +211,15 @@ export function setup(options: { testCalls?: boolean; streetImagery?: StreetImag
     translator,
     testCalls: options.testCalls === false ? null : testCalls,
     streetImagery: options.streetImagery ?? null,
-    frames: { probeDurationS, extractFrames },
+    // Crops are recorded and passed through, so tests can check what box each stored image came from.
+    frames: {
+      probeDurationS,
+      extractFrames,
+      crop: async (jpeg: Buffer, box: Box) => {
+        crops.push(box);
+        return jpeg;
+      },
+    },
     background: (task) => {
       pending.push(task());
     },
@@ -236,5 +245,5 @@ export function setup(options: { testCalls?: boolean; streetImagery?: StreetImag
   const say = (id: string, text: string, language?: string) =>
     call("POST", `/v1/sessions/${id}/utterances`, language ? { kind: "speech", text, language } : { kind: "speech", text });
 
-  return { store, resolver, storage, vision, translator, testCalls, clock, logs, app, call, startSession, say, settle };
+  return { store, resolver, storage, vision, translator, testCalls, clock, logs, crops, app, call, startSession, say, settle };
 }

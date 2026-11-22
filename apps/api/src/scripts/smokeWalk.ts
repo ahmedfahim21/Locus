@@ -14,7 +14,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { env, optionalEnv } from "../config.js";
 import type { Walk } from "../domain/types.js";
-import { extractFrames, probeDurationS } from "../enrich/frames.js";
+import { cropJpeg, extractFrames, probeDurationS } from "../enrich/frames.js";
 import { processWalk } from "../enrich/processWalk.js";
 import { OpenAIVision } from "../enrich/vision.js";
 import { MemoryStore } from "../store/memory.js";
@@ -86,7 +86,7 @@ await processWalk(
     store,
     storage,
     vision: new OpenAIVision(env("OPENAI_API_KEY"), model, log),
-    frames: { probeDurationS, extractFrames },
+    frames: { probeDurationS, extractFrames, crop: cropJpeg },
     now: () => new Date(),
     newId: () => randomUUID().slice(0, 8),
     log,

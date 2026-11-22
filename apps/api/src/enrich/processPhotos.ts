@@ -28,7 +28,7 @@ export function placeByName(landmark: { name: string; aliases: string[] }, door:
  * doesn't know starts at the gate; the recipient drags it into place.
  * Never throws: failures are recorded on the walk.
  */
-export async function processPhotos(deps: Omit<WalkDeps, "frames">, walkId: string, photos: Buffer[], door: LatLon): Promise<void> {
+export async function processPhotos(deps: Omit<WalkDeps, "frames"> & { frames: Pick<WalkDeps["frames"], "crop"> }, walkId: string, photos: Buffer[], door: LatLon): Promise<void> {
   const walk = await deps.store.getWalk(walkId);
   if (!walk) throw new Error(`walk ${walkId} not found`);
   const uploaded: string[] = [];
@@ -46,7 +46,8 @@ export async function processPhotos(deps: Omit<WalkDeps, "frames">, walkId: stri
     for (const [i, l] of chosen.entries()) {
       const osm = placeByName(l, door, features);
       const framePath = `frames/${walk.recipientId}/${walk.id}/${i + 1}.jpg`;
-      await deps.storage.upload(framePath, photos[l.frame]!, "image/jpeg");
+      // Only the landmark's part of the photo is kept.
+      await deps.storage.upload(framePath, await deps.frames.crop(photos[l.frame]!, l.box), "image/jpeg");
       uploaded.push(framePath);
       proposals.push({
         id: `prp_${deps.newId()}`,

@@ -356,6 +356,15 @@ export class PostgresStore implements Store {
     return rows.map(toWalk);
   }
 
+  async listUnreviewedProposals(before: Date) {
+    const rows = await this.db
+      .select({ p: schema.walkProposals })
+      .from(schema.walkProposals)
+      .innerJoin(schema.walks, eq(schema.walks.id, schema.walkProposals.walkId))
+      .where(and(eq(schema.walkProposals.status, "proposed"), isNotNull(schema.walkProposals.framePath), lt(schema.walks.processedAt, before)));
+    return rows.map((r) => toProposal(r.p));
+  }
+
   async updateProposals(proposals: WalkProposal[]) {
     if (proposals.length === 0) return;
     await this.db.transaction(async (tx) => {
