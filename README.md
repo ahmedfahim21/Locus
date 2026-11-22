@@ -4,7 +4,24 @@ Locus answers a delivery rider's call in Hinglish and talks them to your door, o
 
 Riders in Indian neighbourhoods get lost in the last 200 metres: same-looking lanes, gates without numbers, a pin that lands on the wrong building. Locus knows the way in from the main road and the landmarks a rider can actually see on it. When the rider calls, it works out where they are from what they describe and gives the next turn.
 
-Try it at [locus.ahmedfahim.dev](https://locus.ahmedfahim.dev), or [hear the demo call](https://locus.ahmedfahim.dev/replay) without signing in.
+## Try Locus
+
+### Hear the demo without signing in
+
+Open the demo and select “Play the call”. Follow the rider from the grey gate to the blue gate as the transcript and map update. Select a transcript line to jump to it, or switch the map to 3D. The replay uses scripted Hinglish audio, sample landmarks, and real streets in Hebbal, Bengaluru. [Play the demo](https://locus.ahmedfahim.dev/replay)
+
+### Test the live guide in your browser
+
+1. Sign in with Google. Enter your first name, choose a delivery app such as Swiggy, and add a phone number you control in international format. Add a short message for Locus to read if you miss a handoff, such as “Leave it with the security guard.” [Open Locus](https://locus.ahmedfahim.dev)
+2. Pin a gate in an Indian neighbourhood you know. You can skip the walk video and use map suggestions or choose “Add landmark at the pin” to enter your own. Pick two recognisable landmarks along the approach, give each a short direction, then select “Save route”.
+3. On Home, turn on “Expecting a delivery”. Select “Try a call”, then “Start call”, and allow microphone access. This browser test works without an assigned Locus phone number. [Open the test-call screen](https://locus.ahmedfahim.dev/test-call)
+4. Play the rider. Say “Anita ke liye, Swiggy se”, substituting your first name and chosen app. When asked where you are, name a saved landmark, for example “Main milk shop ke paas hoon.” Name the next landmark when prompted. Check that the transcript, map progress, and spoken directions agree with your saved route. End the call and open it from “Calls” on Home to review the transcript.
+
+For a screening check, start another call and give the wrong recipient name. Confirm that Locus asks for the name again and withholds route directions. If the browser blocks the mic, enable it for this site and retry.
+
+### Test a phone call or handoff
+
+If Home shows a Locus number, turn on “Expecting a delivery” and dial that number from another phone. If “Call the rider” appears under “Try a call”, leave your own `+91` number in the field and answer when it rings. To test a handoff, pass screening and say “Customer se baat karao”. Use separate rider and recipient phones you control so you can answer both legs. These phone options depend on the Vobiz SIP configuration and account setup.
 
 <img src="screenshots/home.webp" alt="Home screen: a 3D map of the route from the grey gate past the milk shop and medical store to the door, next to the delivery switch, the Locus number and recent calls" width="100%">
 
@@ -13,6 +30,8 @@ Try it at [locus.ahmedfahim.dev](https://locus.ahmedfahim.dev), or [hear the dem
 1. Set up your door once. Pin your gate, then film a short walk from the main road or add a few photos. Locus combines what it sees with OpenStreetMap, drafts the route from the nearest main road and suggests landmarks along it, each with a line in Hinglish.
 2. Turn on "Expecting a delivery". Give your Locus number as the receiver's number when you order, or forward calls to it.
 3. The rider calls. Locus checks they know your first name and the app, asks what they can see, places them on the route and gives the next direction. If it can't place them, it rings you and connects the call.
+
+In real use the rider calls you and your number forwards the call to Locus, which answers on your behalf. For demos without setting up forwarding, "Call the rider" on the test-call screen has Locus dial a phone instead: the same screening, guidance and voice, just started from the other end.
 
 | Landmarks found during setup | A finished call |
 |:---:|:---:|
@@ -43,43 +62,7 @@ The API and call worker run on AWS EC2. Vercel hosts the web app, and Supabase p
 
 ## Run locally
 
-You need Node.js 22+, pnpm 10 and a Supabase project with Google sign-in. Copy [.env.example](.env.example) to `.env` at the repo root.
-
-The demo call needs only the web app, with `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` set:
-
-```bash
-pnpm install
-pnpm --filter @locus/web dev
-```
-
-Then open `http://localhost:3000/replay`.
-
-For the full app, add `http://localhost:3000` to Supabase's redirect URLs, fill in the API settings in `.env` (plus `SUPABASE_SECRET_KEY` for Storage) and install FFmpeg. Import the streets around your gate, using its coordinates and a radius in metres:
-
-```bash
-pnpm --filter @locus/api db:migrate
-pnpm --filter @locus/api osm:import 13.038 77.594 700
-pnpm --filter @locus/api dev
-```
-
-Browser test calls also need LiveKit credentials and a worker key. Create the key, save it as `LOCUS_WORKER_API_KEY`, then start the worker in another terminal:
-
-```bash
-pnpm --filter @locus/api admin client locus-worker --first-party
-```
-
-```bash
-pnpm --filter @locus/api worker dev
-```
-
-For phone calls, point your Vobiz number at LiveKit's inbound SIP trunk and configure a dispatch rule for `locus-guide`. Assign the number to the recipient and register it for outbound loop protection, substituting your E.164 number and recipient ID:
-
-```bash
-pnpm --filter @locus/api admin number +91XXXXXXXXXX YOUR_RECIPIENT_ID vobiz
-pnpm --filter @locus/api admin outbound +91XXXXXXXXXX
-```
-
-For outbound calls and handoffs, set the `VOBIZ_SIP_*` credentials from [.env.example](.env.example), then run `pnpm --filter @locus/api admin trunk +91XXXXXXXXXX`. Set `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and `LOCUS_OUTBOUND_NUMBER` from the command output. To check inbound routing, turn on “Expecting a delivery” and call the Vobiz number from another phone. [Vobiz’s LiveKit setup guide](https://www.vobiz.ai/integrations/livekit/)
+For the local setup, follow the runbook in [AGENTS.md](AGENTS.md#2-configure-the-local-environment). It covers where to get each environment variable, Google sign-in, PostGIS migrations and map import, the LiveKit worker, and Vobiz SIP setup. The [credential-free checks](AGENTS.md#1-install-and-run-credential-free-checks) run without provider accounts.
 
 ## Test
 
