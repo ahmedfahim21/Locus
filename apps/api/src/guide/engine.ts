@@ -9,6 +9,8 @@ import type { PositionResolver } from "./resolver.js";
 const SAME_PLACE_M = 20;
 /** A last landmark this close to the door is the door: reaching it is arriving. */
 export const ARRIVAL_RADIUS_M = 30;
+/** An off-route rider this close to a landmark further along is sent to it rather than back to the next one. */
+export const REJOIN_BESIDE_M = 60;
 
 export const SUPPORTED_LANGUAGES: readonly string[] = ["hi", "en"];
 export const MAX_SCREENING_ATTEMPTS = 3;
@@ -188,12 +190,14 @@ async function guidingTurn(session: Session, input: RiderInput, ctx: GuideContex
 
   if (!feature) return lostTurn(session, input, ctx);
 
-  // Rider is off the recorded route: one street-name step towards the nearest
-  // cue they haven't reached yet (P5). Never left/right: heading is unknown.
-  const pool = remaining.length > 0 ? remaining : cues;
-  const target = pool.reduce((best, c) =>
-    distanceM(feature.location, c.location) < distanceM(feature.location, best.location) ? c : best,
-  );
+  // Rider is off the recorded route: one street-name step (P5) to rejoin it at the next
+  // landmark he hasn't reached, which is where the route comes in. Not simply the nearest
+  // landmark: the door can be nearer as the crow flies than the gate he has to use. A later
+  // landmark only when he's right by it. Never left/right: heading is unknown.
+  const nearest = (pool: Cue[]) =>
+    pool.reduce((best, c) => (distanceM(feature.location, c.location) < distanceM(feature.location, best.location) ? c : best));
+  const besideLater = remaining.filter((c) => distanceM(feature.location, c.location) <= REJOIN_BESIDE_M);
+  const target = remaining.length === 0 ? nearest(cues) : besideLater.length > 0 ? nearest(besideLater) : remaining[0]!;
   const route = ctx.graph.firstStreet(feature.location, target.location);
   if (!route.reachable) return lostTurn(session, input, ctx);
   const instruction = route.street

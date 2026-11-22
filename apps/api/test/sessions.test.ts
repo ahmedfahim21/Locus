@@ -299,17 +299,38 @@ describe("guide loop", () => {
     expect(t.store.sessions.get("ses_1")!.currentCue).toBe(1);
   });
 
-  it("gives an off-route rider a street-name step towards the nearest remaining cue (P5)", async () => {
+  it("gives an off-route rider a street-name step to rejoin the route at the next landmark, not the nearest (P5)", async () => {
     const t = setup();
     await guiding(t);
+    // The bakery is nearer the Hanuman temple (~130 m) than the petrol pump (~170 m), but the route comes in by the pump.
     const res = await t.say("ses_1", "Iyengar bakery ke saamne hoon");
     expect(res.body).toEqual({
-      instruction: say.routeStep("hi", "Bellary Road", "Hanuman temple"),
+      instruction: say.routeStep("hi", "Bellary Road", "Shell petrol pump"),
       state: "guiding",
       lostTurns: 0,
     });
     expect(String(res.body.instruction)).not.toMatch(/\b(left|right|baayen|daayen)\b/i);
     expect(t.store.turns.at(-1)).toMatchObject({ matchedOsmId: "node/102", matchedCueId: null, lost: false });
+    // An off-route step doesn't move the rider along the route.
+    expect(t.store.sessions.get("ses_1")!.currentCue).toBe(-1);
+  });
+
+  it("once past a landmark, rejoins at the one after it", async () => {
+    const t = setup();
+    await guiding(t);
+    await t.say("ses_1", "Shell petrol pump ke paas hoon");
+    const res = await t.say("ses_1", "Iyengar bakery ke saamne hoon");
+    expect(res.body.instruction).toBe(say.routeStep("hi", "Bellary Road", "Hanuman temple"));
+  });
+
+  it("sends a rider who is right beside a later landmark to it, rather than back to the next one", async () => {
+    const t = setup();
+    // ~35 m from the blue gate (the last landmark): beside it, but not the same place.
+    t.store.features.push({ osmId: "node/103", name: "Ganesh Tea Stall", altNames: [], kind: "cafe", location: { lat: 13.0360, lon: 77.5970 } });
+    await guiding(t);
+    const res = await t.say("ses_1", "Ganesh tea stall ke paas hoon");
+    expect(String(res.body.instruction)).toContain("blue gate");
+    expect(t.store.turns.at(-1)).toMatchObject({ matchedOsmId: "node/103", matchedCueId: null });
   });
 
   it("falls back to OpenAI only when the name match finds nothing", async () => {
