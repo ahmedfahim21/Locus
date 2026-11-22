@@ -28,7 +28,7 @@ Voice, end to end without a phone number (verified):
 - Measured: rider stops → Locus starts talking 2.1–4.3 s (median 2.2–4.0 s across runs; the spread is speech-to-text end-of-turn). The API part is ~1.0 s, mostly round trips to Supabase in Sydney.
 
 Needs your accounts or hands (in this order):
-1. Phone number and LiveKit: LiveKit Cloud project (India region) with an inbound SIP trunk, a dispatch rule to agent `locus-guide`, and an outbound trunk for handoff. Rent the number from Vobiz directly (SIP trunking) or Plivo India and point it at the inbound trunk. Not from Sarvam: Sarvam-rented numbers are wired to Sarvam's own Voice Agents, with no documented route to LiveKit. Then set `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `LIVEKIT_SIP_OUTBOUND_TRUNK_ID`, `LOCUS_OUTBOUND_NUMBER`; remove `LOCUS_DEV_DID`; run `admin number <did> <recipientId> plivo` and `admin outbound <number>`.
+1. Phone verification: call the Vobiz Locus number and verify LiveKit dispatches `locus-guide`. Trigger a handoff and confirm that the Vobiz outbound trunk connects the recipient. See the [phone setup in the README](README.md#run-locally).
 2. Move Supabase to Mumbai (ap-south-1): saves ~0.8 s per rider turn.
 3. Deploy: API and worker on one EC2 in ap-south-1 behind Caddy (ffmpeg installed), web on Vercel; set `LOCUS_WEB_ORIGIN`, `LOCUS_API_URL`, the Supabase auth redirect, and the LiveKit keys (test calls need them too).
 4. Demo through a friend's phone: they order on Swiggy or Zomato with the receiver's number set to the Locus number.
@@ -44,11 +44,11 @@ Known gaps: OSM names with numbers ("T-hub 2.0") tokenise poorly and can go to t
 End to end:
 1. A rider taps "call customer" in the Swiggy or Zomato app. The platform's number masking places a fresh call to the receiver's number.
 2. That number is the Locus number (set as the receiver's number when ordering, or the recipient forwards unanswered calls to it).
-3. The number belongs to a SIP provider (Vobiz or Plivo India). The provider sends the call to LiveKit's inbound SIP trunk.
+3. Vobiz provides the number and sends the call to LiveKit's inbound SIP trunk.
 4. LiveKit's dispatch rule puts the call in a new room and dispatches the `locus-guide` worker.
 5. The worker asks the API for a session for that number (`POST /v1/sessions`), gets the greeting and the call's key terms, and starts Sarvam speech: `saaras:v4` listening for those key terms, `bulbul:v4-flash` speaking.
 6. Each rider turn goes to the API (`POST /v1/sessions/:id/utterances`), which runs screening, matching and the route, and returns the exact sentence to say.
-7. If Locus loses the rider twice, the API answers "handoff" with the recipient's phone. The worker dials it through LiveKit's outbound trunk and bridges the rider in, or plays the recipient's note if nobody answers.
+7. If Locus loses the rider twice, the API answers "handoff" with the recipient's phone. The worker dials it through the LiveKit outbound trunk to Vobiz and bridges the rider in, or plays the recipient's note if nobody answers.
 8. The recipient's web app shows the call live (`/me/calls`, polled), on the map, while it happens.
 
 What runs where:
@@ -59,7 +59,7 @@ What runs where:
 | Web app (`apps/web`) | Vercel (project root `apps/web`) | Env: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `LOCUS_API_URL`. |
 | Database, sign-in, storage | Supabase | Move the project to Mumbai for latency (~0.8 s per turn). |
 | Calls | LiveKit Cloud, India region | Inbound trunk, dispatch rule, outbound trunk. |
-| Phone number | Vobiz (direct) or Plivo India | Not rented through Sarvam: those only route to Sarvam's own agents. |
+| Phone number and SIP carrier | Vobiz | Inbound PSTN calls and outbound dialling. |
 | Speech | Sarvam API | Already set up. |
 | Vision, Street View | OpenAI; Google Maps (`GOOGLE_MAPS_API_KEY`, Street View Static API enabled) | Street View is optional. |
 
@@ -69,10 +69,10 @@ Deploy steps:
    This builds `apps/api/Dockerfile` and starts the API plus Caddy, which gets the TLS certificate. Add `--profile calls` once LiveKit keys are in the env to start the call worker too. Without Docker, `bash infra/setup-ec2.sh api.yourdomain.in` sets up the same thing on Ubuntu with systemd.
 2. `.env` on the server: everything in `.env.example`, with `LOCUS_API_URL=https://api.yourdomain.in`, `LOCUS_WEB_ORIGIN=https://<your Vercel domain>`, the LiveKit Cloud URL and keys, and no `LOCUS_DEV_DID`. Create the worker's key with `pnpm --filter @locus/api admin client locus-worker --first-party` and set it as `LOCUS_WORKER_API_KEY`.
 3. Vercel: import the repo, root directory `apps/web`, set the three env vars, deploy. Add the Vercel URL to Supabase Auth's redirect URLs.
-4. LiveKit Cloud: create a project (India region). Install the `lk` CLI. Rent the number from Vobiz or Plivo and point its SIP (origination) at the project's SIP URI. Then:
+4. LiveKit Cloud: create a project (India region). Install the `lk` CLI. Point the Vobiz number's SIP origination at the project's SIP URI. Then:
    - `lk sip inbound create infra/livekit/inbound-trunk.json` (your number filled in)
    - `lk sip dispatch create infra/livekit/dispatch-rule.json` (the inbound trunk id filled in)
-   - copy `infra/livekit/outbound-trunk.json` to `outbound-trunk.local.json` (gitignored), fill in the provider's SIP domain and credentials, `lk sip outbound create infra/livekit/outbound-trunk.local.json`, and set its id as `LIVEKIT_SIP_OUTBOUND_TRUNK_ID`.
+   - Set the `VOBIZ_SIP_*` credentials and run `pnpm --filter @locus/api admin trunk +91XXXXXXXXXX`. Save the printed `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and `LOCUS_OUTBOUND_NUMBER`.
 5. Tell Locus the number belongs to the recipient: `pnpm --filter @locus/api admin number +91XXXXXXXXXX <recipientId> vobiz`, and `admin outbound +91XXXXXXXXXX` for the loop guard.
 6. Test: turn on "Expecting a delivery", call the number from a friend's phone, then do it for real with a Swiggy order whose receiver number is the Locus number.
 
@@ -84,7 +84,7 @@ Deploy steps:
 - No scraping of Google Street View. Google's terms forbid scraping, storing or deriving data from it. Street View appears only as a live, display-only panorama in setup; any landmark taken from it is the recipient's own words and pin.
 - New: a 3D route preview in the recipient app, a trimmed port of Sadak's OSM → three.js renderer, built in parallel by a second owner (section 4.7). The 2D map with landmark photos stays as the fallback view.
 - New hypothesis P4 and an ablation that directly supports the Equal pitch: cue-only vs + OSM vs + street-level cues (section 6).
-- Providers are set by the credits the team has (section 4.9): Sarvam for call speech and the fallback matcher, OpenAI for walk-video vision and as the comparison arm, AWS Mumbai (one EC2 instance + S3) for hosting and walk-video storage, Supabase for Postgres + PostGIS and sign-in.
+- Providers are set by the credits the team has (section 4.9): Sarvam for call speech and the fallback matcher, OpenAI for walk-video vision and as the comparison arm, AWS Mumbai (one EC2 instance) for the API and worker, Supabase for Postgres + PostGIS, sign-in and media storage.
 - The masked-call front door (P10) is un-deferred into the Day-1 kill test: without it, real deliveries never reach Locus.
 - Sarvam's hosted Voice Agents platform is not Locus's call layer (its own LLM writes every reply and every call is recorded), but it is the demo's stand-in for Equal: a third-party voice agent that calls the guide-session API as a tool (section 4.4).
 
@@ -124,7 +124,7 @@ Deploy steps:
 
 Telephony and the front door are the biggest risks; walk-video work does not start until these pass.
 
-- [ ] Number: rent a Vobiz number through Sarvam (KYC, ₹59/30 days) and open a Plivo India-region account in parallel. Check with Vobiz/Sarvam whether a Vobiz number can SIP-trunk to LiveKit; Plivo → LiveKit is documented.
+- [ ] Number: configure the Vobiz number and SIP trunks using the [Vobiz LiveKit integration guide](https://www.vobiz.ai/integrations/livekit/).
 - [ ] Spike: inbound call → SIP trunk → LiveKit (India endpoint, region pinning) → Locus worker → Hinglish greeting.
 - [ ] Latency: full turn (rider stops speaking → first audio) on a real mobile call, Sarvam (default) vs OpenAI (`LOCUS_SPEECH_PROVIDER`). Record the number.
 - [ ] Front door (P10): place one real Swiggy or Zomato order with the recipient's phone forwarding to the Locus number; record whether the masked rider call arrives and what caller ID it shows. Also try Swiggy's receiver-number field with the Locus number.
@@ -144,22 +144,21 @@ Telephony and the front door are the biggest risks; walk-video work does not sta
 
 ```mermaid
 flowchart TD
-  Rider[Rider phone] -->|call| Tel[Plivo number]
-  Tel -->|SIP trunk| LK[LiveKit, India region]
+  Rider[Rider phone] <-->|phone call| Tel[Vobiz number]
+  Tel <-->|inbound and outbound SIP| LK[LiveKit, India region]
   LK --> Voice[LiveKit Agents worker]
   Voice --> API[Guide-session API]
   API --> Guide[Guide engine: screening, landmark + OSM match, lost turns]
   Guide --> DB[(Supabase Postgres + PostGIS)]
   Web[Recipient web app] --> API
-  Web -->|presigned upload| Storage[(S3, ap-south-1, private)]
   API --> Enrich[Enrichment jobs: frames → vision → proposals]
-  Enrich --> Storage
+  Enrich --> Storage[(Supabase Storage)]
   Enrich --> Vision[OpenAI vision]
   Web -->|display only| SV[Google Street View panorama]
   Web --> Scene[3D route preview, Sadak renderer]
 ```
 
-Stack: TypeScript, pnpm workspaces, Hono API, Next.js recipient app, Supabase (Postgres + PostGIS, Auth with Google), Drizzle, LiveKit Agents (Node) over SIP, Vitest. Speech and models per section 4.9 (Sarvam, OpenAI); walk videos on S3; hosting on AWS Mumbai. New for street-level cues: three.js (3D preview, as in Sadak), ffmpeg for frame extraction; optionally the Google Maps JavaScript API (Street View panorama, display only). The web app and the voice worker both go through the API; nothing else reads the DB directly.
+Stack: TypeScript, pnpm workspaces, Hono API, Next.js recipient app, Supabase (Postgres + PostGIS, Auth with Google), Drizzle, LiveKit Agents (Node) over SIP, Vitest. Speech and models per section 4.9 (Sarvam, OpenAI); walk videos in Supabase Storage; API and worker on AWS EC2 in Mumbai. New for street-level cues: three.js (3D preview, as in Sadak), ffmpeg for frame extraction; optionally the Google Maps JavaScript API (Street View panorama, display only). The web app and the voice worker both go through the API; nothing else reads the DB directly.
 
 ### 4.1 Number mapping and screening
 
@@ -190,7 +189,7 @@ Stack: TypeScript, pnpm workspaces, Hono API, Next.js recipient app, Supabase (P
 Existing: `apiClients`, `recipients`, `homeProfiles`, `cues`, `numbers`, `outboundNumbers`, `osmFeatures`, `osmWays`, `osmWayNodes`, `sessions`, `turns`.
 
 Changes for street-level landmarks:
-- `cues` gains `aliases text[]` (sign text, Hindi/Kannada names, "neela gate"), `source` (`typed | walkVideo | streetView`), `photoPath` (S3 key; walk-video frames only, never Street View).
+- `cues` gains `aliases text[]` (sign text, Hindi/Kannada names, "neela gate"), `source` (`typed | walkVideo | streetView`), `photoPath` (Supabase Storage path; walk-video frames only, never Street View).
 - `mediaUploads(id, recipientId, storagePath, kind, durationS, gpsTrack jsonb, status, createdAt, deletedAt)`. The GPS track is read whole with the video.
 - `landmarkProposals(id, recipientId, source, name, aliases, kind, location, photoPath, confidence, osmId, status (proposed | accepted | rejected), createdAt)`. Queried by recipient and status, so explicit columns.
 
@@ -212,10 +211,10 @@ All sources end the same way: proposals the recipient confirms, orders and edits
 
 **Walk video, end to end:**
 - The recipient records 30–60 s from the main road to their door in the web app (MediaRecorder over HTTPS); the browser records a GPS track alongside (Geolocation `watchPosition`).
-- The API issues a presigned upload URL for a private S3 bucket in ap-south-1; the video and track land there.
+- The API creates a signed upload URL for a private Supabase Storage bucket. The browser sends the video to Storage and the GPS track to the API.
 - The API extracts frames every ~10 m along the track (ffmpeg, in-process on the EC2 instance), sends them in batches to an OpenAI vision model with a strict schema (landmark name, kind, colour, sign text, side if visible, confidence), dedupes across frames, and attaches each to the GPS point of its frame.
 - Each proposal is snapped to a nearby OSM feature when names agree (adds `osmId` and the OSM name as an alias).
-- An S3 lifecycle rule deletes the video after extraction; only the confirmed landmarks' frames are kept, and the recipient can delete them.
+- The API deletes the video after processing. A sweep removes stale uploads, and unselected landmark frames are removed when the recipient saves their route.
 
 **Street View look-around (optional):** the Maps JavaScript API panorama opens at points along the route; the recipient types what they see and drops it on the map. Nothing from the panorama is captured, stored or sent to a model.
 
@@ -252,10 +251,10 @@ Locus/
 | Landmark aliases (Hindi/Kannada spellings) | Sarvam transliteration | Adds script variants of each confirmed landmark name |
 | Walk-video frame vision | OpenAI vision model (pinned) | Strict schema; proposals only |
 | Database, PostGIS, sign-in | Supabase | `locus` schema; Google sign-in |
-| Walk videos and kept frames | AWS S3, ap-south-1 | Private bucket; presigned uploads issued by the API; lifecycle rule deletes videos after extraction |
+| Walk videos and kept frames | Supabase Storage | Private bucket; the API issues signed video upload URLs and handles cleanup |
 | API, frame extraction, LiveKit worker | One AWS EC2 instance in ap-south-1 behind Caddy (HTTPS) | The worker connects out to LiveKit and needs no public URL; the API must be public for the web app and the Sarvam adoption demo; ffmpeg runs in-process. No ECS or queues |
 | Recipient web app | Vercel | Static + client; talks only to the API |
-| Calls | LiveKit Cloud (India SIP endpoint, region pinning) + Vobiz (via Sarvam) or Plivo number | LiveKit project data stays US/EU: keep agent observability off |
+| Calls | LiveKit Cloud (India SIP endpoint, region pinning) + Vobiz | Vobiz provides the number and SIP trunks for inbound and outbound calls |
 | Nearby places | OpenStreetMap; Ola Maps Nearby Search only if the Day-1 OSM count is low | Ola results used live, not stored, until its caching terms are checked |
 | Adoption demo | Sarvam Voice Agents | Equal stand-in calling the guide-session API as a tool (section 4.4) |
 
@@ -272,7 +271,7 @@ Days 2–4 — core on real calls
 - [ ] Record and label 40 rider phrases.
 
 Days 5–9 — walk video (section 4.6)
-- [ ] Recording with GPS track, S3 presigned upload, frame extraction, vision proposals, OSM snapping, review UI, photo strip on the 2D map.
+- [ ] Recording with GPS track, signed upload to Supabase Storage, frame extraction, vision proposals, OSM snapping, review UI, photo strip on the 2D map.
 - [ ] Handoff end to end on a real call.
 
 Days 10–11 — adoption demo
@@ -332,9 +331,8 @@ Evaluation runs (P1, P12): teammates and friends on real streets, different ride
 
 - Speech: Sarvam is the default; the Day 1 spike confirms it on a real call against OpenAI.
 - Fallback matcher: Sarvam vs OpenAI, decided by the matching eval (P8).
-- Number: Vobiz (via Sarvam) vs Plivo, decided by which reaches LiveKit first.
 - Vision model for frame proposals (an OpenAI vision-capable model, pinned like the others).
-- Keys to obtain: `SARVAM_API_KEY`, LiveKit project, Vobiz or Plivo number, AWS credentials (EC2 + S3); optional: Google Maps JavaScript API key (Street View), Ola Maps key.
+- Keys to obtain: `SARVAM_API_KEY`, LiveKit project, Vobiz number and outbound SIP credentials, AWS credentials (EC2); optional: Google Maps JavaScript API key (Street View), Ola Maps key.
 
 ## 10. Running the code
 
@@ -377,7 +375,8 @@ Implementation notes that differ from or add to the sections above:
 - Google Maps Platform terms (Street View: display only, no scraping or storage): https://cloud.google.com/maps-platform/terms
 - Sadak (sister repo, OSM → three.js renderer): ../sadak/game_engine/lib/game
 - Masked delivery calls (bridge places a call to the customer's registered number): https://assets.airtel.in/teams/simplycms/web/docs/Airtel_IQ_Swiggy_Case_Study-251020.pdf
-- Sarvam: rent numbers (Vobiz), API tools, call transfer: https://docs.sarvam.ai/voice-agents/deploy/telephony/rent-from-sarvam , https://docs.sarvam.ai/voice-agents/build/tools/https-tool , https://docs.sarvam.ai/voice-agents/build/tools/call-transfer
+- Vobiz: [LiveKit SIP integration](https://www.vobiz.ai/integrations/livekit/).
+- Sarvam Voice Agents adoption demo: API tools and call transfer: https://docs.sarvam.ai/voice-agents/build/tools/https-tool , https://docs.sarvam.ai/voice-agents/build/tools/call-transfer
 - LiveKit regions and region pinning: https://docs.livekit.io/deploy/admin/regions/endpoints , https://docs.livekit.io/telephony/features/region-pinning/
 - TRAI TCCCPR 2026 amendment (software-placed calls): https://www.trai.gov.in/sites/default/files/2026-09/PR_No119of2026.pdf
 - Ola Maps pricing and street-view API: https://maps.olakrutrim.com/pricing , https://maps.olakrutrim.com/docs/street-view
@@ -391,6 +390,8 @@ Target: `plan.md` (this file), rewritten before review per the approved office-h
 ### Scope record
 
 feature answers: D35 (recipient take-over → defer to after hackathon), D36 (DIGIPIN → keep); structure: smaller arrangement, D37; accepted scope: plan as rewritten, minus take-over (live view watch-only); `apps/voice` and `packages/*` become modules in `apps/api/src/`; pending remedies: P1.
+
+The review below records the options considered on 2026-11-21. The current call path uses Vobiz as described above.
 
 ## Decision ledger
 
@@ -1085,7 +1086,7 @@ REALITY: pr-count pass no ship policy; default one PR per wave plan.md:130
 ## Implementation Tasks
 Synthesized from this review's findings. Each task derives from a specific finding above. Run with Claude Code or Codex; checkbox as you ship.
 
-- [ ] **T1 (P1, human: ~1 day / CC: ~2h)** — voice — LiveKit Agents worker over Plivo SIP with India region pinning; STT/TTS spike measuring full turn latency
+- [ ] **T1 (P1, human: ~1 day / CC: ~2h)** — voice — LiveKit Agents worker over Vobiz SIP with India region pinning; STT/TTS spike measuring full turn latency
   - Surfaced by: Scope Challenge #1 — P1 (D38); outside voice #4, #5
   - Files: apps/api/src/voice/
   - Verify: Day 1 call answered in Hinglish; full-turn latency logged
