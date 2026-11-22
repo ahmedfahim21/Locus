@@ -186,6 +186,16 @@ describe("screening (P2, P4)", () => {
     expect(again.body).toMatchObject({ instruction: say.messageThanks("hi"), state: "ended" });
   });
 
+  it("records which app the rider named, even one the recipient didn't list, as an id for its logo", async () => {
+    const t = setup();
+    await t.startSession();
+    await t.say("ses_1", "Ahmed ka Big Basket order hai");
+    expect(t.store.sessions.get("ses_1")!.screening).toMatchObject({ platformHeard: true, platform: "bigbasket" });
+    // The first app named stays, even if the rider mentions another later.
+    await t.say("ses_1", "Zomato wala nahi");
+    expect(t.store.sessions.get("ses_1")!.screening.platform).toBe("bigbasket");
+  });
+
   it("name and platform (across two answers) start guidance", async () => {
     const t = setup();
     await t.startSession();
@@ -195,6 +205,7 @@ describe("screening (P2, P4)", () => {
     expect(t.store.sessions.get("ses_1")!.screening).toEqual({
       nameHeard: true,
       platformHeard: true,
+      platform: "swiggy",
       attempts: 2,
       objected: false,
     });
@@ -606,7 +617,7 @@ describe("live calls are kept in memory", () => {
     expect(t.store.sessions.get("ses_1")).toEqual({
       ...before,
       state: "guiding",
-      screening: { nameHeard: true, platformHeard: true, attempts: 1, objected: false },
+      screening: { nameHeard: true, platformHeard: true, platform: "swiggy", attempts: 1, objected: false },
     });
     expect(t.store.turns.map((turn) => [turn.sessionId, turn.utterance, turn.instruction])).toEqual([
       ["ses_1", "Ahmed ka Swiggy order", say.whereAreYou("hi")],

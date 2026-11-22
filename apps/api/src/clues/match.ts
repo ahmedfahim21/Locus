@@ -92,11 +92,18 @@ function withJoinedPairs(heard: string[]): string[] {
   return [...heard, ...heard.slice(1).map((t, i) => heard[i]! + t)];
 }
 
+/** The first of the phrases whose every token was heard (fuzzy), allowing a word split in two; null if none. */
+export function heardWhich(utterance: string, phrases: string[]): string | null {
+  const heard = withJoinedPairs(tokens(utterance));
+  return (
+    phrases.find((p) => {
+      const pt = tokens(p);
+      return pt.length > 0 && pt.every((t) => tokenHeard(t, heard));
+    }) ?? null
+  );
+}
+
 /** True if every token of any of the phrases was heard (fuzzy), allowing a word split in two. */
 export function heardAny(utterance: string, phrases: string[]): boolean {
-  const heard = withJoinedPairs(tokens(utterance));
-  return phrases.some((p) => {
-    const pt = tokens(p);
-    return pt.length > 0 && pt.every((t) => tokenHeard(t, heard));
-  });
+  return heardWhich(utterance, phrases) !== null;
 }

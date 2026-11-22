@@ -1,4 +1,4 @@
-import { heardAny, matchUtterance, type Candidate } from "../clues/match.js";
+import { heardAny, heardWhich, matchUtterance, type Candidate } from "../clues/match.js";
 import type { Cue, HomeProfile, Language, OsmFeature, Recipient, Session, Turn } from "../domain/types.js";
 import { distanceM } from "../geo/distance.js";
 import type { RoadGraph } from "../geo/roadGraph.js";
@@ -67,9 +67,11 @@ function screeningTurn(session: Session, input: RiderInput, ctx: GuideContext): 
   const lang = session.language;
   const text = input.kind === "speech" ? input.text : "";
   const objected = session.screening.objected || heardAny(text, OBJECTION_PHRASES);
+  const platform = session.screening.platform ?? appId(heardWhich(text, [...ctx.recipient.platforms, ...KNOWN_DELIVERY_NAMES]));
   const screening = {
     nameHeard: session.screening.nameHeard || heardAny(text, [ctx.recipient.firstName]),
-    platformHeard: session.screening.platformHeard || heardAny(text, [...ctx.recipient.platforms, ...KNOWN_DELIVERY_NAMES]),
+    platformHeard: session.screening.platformHeard || platform !== null,
+    ...(platform ? { platform } : {}),
     attempts: session.screening.attempts + 1,
     objected,
     ...(session.screening.secondChance ? { secondChance: true } : {}),
@@ -102,6 +104,11 @@ function screeningTurn(session: Session, input: RiderInput, ctx: GuideContext): 
 /** The rider objected to being recorded just now (any time in the call, not only while screening). */
 function objectsNow(session: Session, input: RiderInput): boolean {
   return session.mode === "normal" && input.kind === "speech" && heardAny(input.text, OBJECTION_PHRASES);
+}
+
+/** An app name as heard ("Big Basket", "Uber Eats") → its id ("bigbasket", "ubereats"). */
+function appId(name: string | null): string | null {
+  return name ? name.toLowerCase().replace(/[^a-z0-9]/g, "") : null;
 }
 
 function noTranscript(session: Session): Session {

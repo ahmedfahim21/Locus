@@ -166,6 +166,8 @@ function publicCall(s: Session, turns: { utterance: string | null; instruction: 
     id: s.id,
     state: s.state,
     noTranscript: s.mode === "noTranscript",
+    /** The delivery app the rider named ("swiggy"), or null. */
+    app: s.screening.platform ?? null,
     createdAt: s.createdAt.toISOString(),
     endedAt: s.endedAt?.toISOString() ?? null,
     message: s.message,

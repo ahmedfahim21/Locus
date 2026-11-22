@@ -241,6 +241,7 @@ describe("recipient routes: calls", () => {
           id: "ses_1",
           state: "guiding",
           noTranscript: false,
+          app: "swiggy",
           createdAt: T0.toISOString(),
           endedAt: null,
           message: null,
