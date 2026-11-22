@@ -203,6 +203,27 @@ describe("walks: processing", () => {
     expect([p!.nameHi, p!.nameKn]).toEqual([null, null]);
   });
 
+  it("lists a big place once when the model names its parts, but keeps neighbouring shops and a later stop", async () => {
+    const t = await signedUp();
+    const at = (frame: number, name: string, kind: VisionLandmark["kind"]): VisionLandmark => ({ ...bakery, frame, name, aliases: [], kind });
+    const { walkId } = await processedWalk(t, [
+      at(1, "Bus station", "bus_stop"),
+      at(2, "Bus stand platform", "bus_stop"), // ~10 m on: the same station
+      at(4, "Ganesh stores", "shop"),
+      at(5, "Ravi tailors", "shop"), // next door: a different shop
+      at(10, "BMTC bus stop", "bus_stop"), // ~90 m on: a different stop
+    ]);
+    const res = await t.call("GET", `/me/walks/${walkId}`, undefined, TOKEN);
+    const proposals = res.body.proposals as { ordinal: number; name: string; kind: string }[];
+    expect(proposals.map((p) => [p.ordinal, p.name, p.kind])).toEqual([
+      [1, "Bus station", "bus_stop"],
+      [2, "Ganesh stores", "shop"],
+      [3, "Ravi tailors", "shop"],
+      [4, "BMTC bus stop", "bus_stop"],
+    ]);
+    expect(t.logs).toContainEqual(expect.objectContaining({ event: "walk.same_place_dropped", walkId, dropped: 1 }));
+  });
+
   it("keeps a landmark at its GPS position when no OSM place nearby has that name", async () => {
     const t = await signedUp();
     const { walkId } = await processedWalk(t, [{ ...bakery, name: "Blue gate", aliases: ["neela gate", "Sharma house gate"], kind: "gate", color: "blue" }]);

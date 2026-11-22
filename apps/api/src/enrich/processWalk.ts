@@ -23,6 +23,25 @@ export function inScript(name: string, script: RegExp): string | null {
 /** An OSM place this close to the GPS position with a matching name is the same place. */
 export const SNAP_RADIUS_M = 40;
 
+/**
+ * Kinds of place too big to have a second one this close along the walk: two of
+ * them within ONE_PLACE_M are parts of one place (a bus station's platforms, a
+ * church's gate and tower), which the vision model tends to list separately.
+ * Shops, gates and the like are left alone: neighbours often share a kind.
+ */
+export const ONE_PLACE_KINDS = new Set(["bus_stop", "temple", "mosque", "church", "school", "hospital", "petrol_pump", "park"]);
+export const ONE_PLACE_M = 40;
+
+/** Drops a big place's repeats: the same kind within ONE_PLACE_M along the walk of one already kept. Input in walk order. */
+export function onePerPlace<T extends { kind: string }>(landmarks: T[], alongM: (l: T) => number): T[] {
+  const kept: T[] = [];
+  for (const l of landmarks) {
+    const repeat = ONE_PLACE_KINDS.has(l.kind) && kept.some((k) => k.kind === l.kind && Math.abs(alongM(k) - alongM(l)) <= ONE_PLACE_M);
+    if (!repeat) kept.push(l);
+  }
+  return kept;
+}
+
 export type WalkDeps = {
   store: Store;
   storage: ObjectStorage;
@@ -78,7 +97,9 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
       const key = nameKey(l.name);
       if (!byName.has(key)) byName.set(key, l);
     }
-    const chosen = [...byName.values()].slice(0, MAX_PROPOSALS);
+    const distinct = onePerPlace([...byName.values()], (l) => samples[l.frame]!.distanceM);
+    if (distinct.length !== byName.size) deps.log({ event: "walk.same_place_dropped", walkId, dropped: byName.size - distinct.length });
+    const chosen = distinct.slice(0, MAX_PROPOSALS);
 
     const features = await deps.store.nearbyFeatures(samples[Math.floor(samples.length / 2)]!.location, 600);
     const proposals: WalkProposal[] = [];
