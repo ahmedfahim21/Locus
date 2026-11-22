@@ -1,0 +1,38 @@
+# Release gate: every push to main and every pull request must typecheck, pass the
+# API tests and build the web app. The dependency audit reports but doesn't block
+# yet: the two open advisories are moderate, in dev-time glob libraries.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install ffmpeg (walk-video tests read real frames)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - run: pnpm install --frozen-lockfile
+      - name: Typecheck
+        run: pnpm -r typecheck
+      - name: API tests
+        run: pnpm --filter @locus/api test
+      - name: Web production build
+        run: pnpm --filter @locus/web build
+        env:
+          # Public values only; the build needs them to exist, not to be real.
+          SUPABASE_URL: https://ci.supabase.co
+          SUPABASE_PUBLISHABLE_KEY: ci-publishable-key
+          LOCUS_API_URL: https://ci.invalid
+      - name: Dependency audit (report only)
+        run: pnpm audit --prod --audit-level=high
+        continue-on-error: true
