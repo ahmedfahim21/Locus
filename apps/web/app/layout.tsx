@@ -20,11 +20,26 @@ const googleSans = Google_Sans({
   preload: false,
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://locus.ahmedfahim.dev";
+const DESCRIPTION = "When a delivery rider calls, Locus answers in Hinglish and guides them landmark by landmark to your door.";
+
 export const metadata: Metadata = {
+  // Absolute URLs for the link-preview image (app/opengraph-image.tsx) and canonical links.
+  metadataBase: new URL(SITE_URL),
   title: { default: "Locus · Talks your rider to your door", template: "%s · Locus" },
-  description: "When a delivery rider calls, Locus answers in Hinglish and guides them landmark by landmark to your door.",
+  description: DESCRIPTION,
   applicationName: "Locus",
-  openGraph: { title: "Locus", description: "Talks your rider to your door.", type: "website" },
+  keywords: ["delivery", "last mile", "voice AI", "Hinglish", "directions", "landmarks", "Swiggy", "Zomato"],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Locus",
+    title: "Locus · Talks your rider to your door",
+    description: DESCRIPTION,
+    locale: "en_IN",
+  },
+  twitter: { card: "summary_large_image", title: "Locus · Talks your rider to your door", description: DESCRIPTION },
   // Added to the iOS home screen, Locus opens full screen like an app.
   appleWebApp: { capable: true, title: "Locus", statusBarStyle: "default" },
   formatDetection: { telephone: false },
