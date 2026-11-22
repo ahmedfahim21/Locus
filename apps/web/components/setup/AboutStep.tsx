@@ -8,7 +8,6 @@ import { AppTile, appById } from "../DeliveryApps";
 import { TopBar } from "../TopBar";
 
 const COMMON_APPS = ["swiggy", "zomato", "blinkit", "zepto", "instamart", "amazon", "flipkart", "bigbasket"];
-const MAX_APPS = 6;
 const E164 = /^\+\d{8,15}$/;
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -28,12 +27,12 @@ export function AboutStep({ me, progress, onDone }: { me: Me; progress: ReactNod
   const complete = firstName.trim() && apps.length > 0 && phoneOk && fallbackNote.trim();
 
   function toggleApp(app: string) {
-    setApps((cur) => (cur.includes(app) ? cur.filter((a) => a !== app) : cur.length < MAX_APPS ? [...cur, app] : cur));
+    setApps((cur) => (cur.includes(app) ? cur.filter((a) => a !== app) : [...cur, app]));
   }
 
   function addOther() {
     const app = otherApp.trim().toLowerCase();
-    if (!app || apps.includes(app) || apps.length >= MAX_APPS) return;
+    if (!app || apps.includes(app)) return;
     setApps((cur) => [...cur, app]);
     setOtherApp("");
   }
@@ -72,7 +71,7 @@ export function AboutStep({ me, progress, onDone }: { me: Me; progress: ReactNod
         </label>
 
         <fieldset className="field" style={{ border: 0, padding: 0, margin: 0 }}>
-          <span>Apps you order from (up to {MAX_APPS})</span>
+          <span>Apps you order from</span>
           <div className="row">
             {choices.map((app) => (
               <button
@@ -81,7 +80,6 @@ export function AboutStep({ me, progress, onDone }: { me: Me; progress: ReactNod
                 className="chip"
                 aria-pressed={apps.includes(app)}
                 onClick={() => toggleApp(app)}
-                disabled={!apps.includes(app) && apps.length >= MAX_APPS}
               >
                 {appById(app) && <AppTile app={appById(app)!} size={22} />}
                 {titleCase(app)}
@@ -101,10 +99,9 @@ export function AboutStep({ me, progress, onDone }: { me: Me; progress: ReactNod
               placeholder="Another app"
               maxLength={30}
               style={{ flex: 1, minWidth: 160 }}
-              disabled={apps.length >= MAX_APPS}
               aria-label="Another app"
             />
-            <button className="btn compact" type="button" onClick={addOther} disabled={!otherApp.trim() || apps.length >= MAX_APPS}>
+            <button className="btn compact" type="button" onClick={addOther} disabled={!otherApp.trim()}>
               Add
             </button>
           </div>
