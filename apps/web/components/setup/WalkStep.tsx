@@ -1,7 +1,8 @@
 "use client";
 
 import { AccountMenu } from "../AccountMenu";
-import { ArrowLeft, ArrowRight, Check, DeviceMobile, Images, MapPin, Plus, Record, ShieldCheck, Stop, VideoCamera, Warning, X } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, ArrowsOut, Check, DeviceMobile, Images, MapPin, Plus, Record, ShieldCheck, Stop, VideoCamera, Warning, X } from "@phosphor-icons/react";
+import { PhotoViewer } from "../PhotoViewer";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, apiForm, scriptNames, scriptOf, supabase, type LatLon, type Proposal, type Walk } from "../../lib/api";
 import { MAX_PHOTOS, toJpeg } from "../../lib/photos";
@@ -457,6 +458,10 @@ function Review({
 }) {
   const [keep, setKeep] = useState(() => new Set(proposals.map((p) => p.id)));
   const [names, setNames] = useState(() => Object.fromEntries(proposals.map((p) => [p.id, p.name])));
+  /** Index into `withPhotos` of the photo shown full screen, or null. */
+  const [viewing, setViewing] = useState<number | null>(null);
+  const toggle = (id: string) => setKeep((k) => (k.has(id) ? new Set([...k].filter((x) => x !== id)) : new Set([...k, id])));
+  const withPhotos = proposals.filter((p) => p.photoUrl);
 
   if (proposals.length === 0) {
     return (
@@ -493,9 +498,21 @@ function Review({
           return (
             <li key={p.id} className={`landmark proposal${on ? "" : " skipped"}`}>
               <div className="proposal-row">
-                <span className="proposal-photo">
-                  {p.photoUrl ? <StampPhoto url={p.photoUrl} alt={p.name} /> : null}
-                </span>
+                {p.photoUrl ? (
+                  <button
+                    type="button"
+                    className="proposal-photo photo-expand"
+                    aria-label={`Expand photo of ${names[p.id] || p.name}`}
+                    onClick={() => setViewing(withPhotos.findIndex((x) => x.id === p.id))}
+                  >
+                    <StampPhoto url={p.photoUrl} alt={p.name} />
+                    <span className="expand-hint" aria-hidden="true">
+                      <ArrowsOut size={14} />
+                    </span>
+                  </button>
+                ) : (
+                  <span className="proposal-photo" />
+                )}
                 <div className="stack" style={{ gap: 6 }}>
                   <label className="field">
                     <span>What a rider would call it</span>
@@ -517,7 +534,7 @@ function Review({
                 </div>
               </div>
               <div className="row">
-                <button type="button" className="chip" aria-pressed={on} onClick={() => setKeep((k) => new Set(on ? [...k].filter((x) => x !== p.id) : [...k, p.id]))}>
+                <button type="button" className="chip" aria-pressed={on} onClick={() => toggle(p.id)}>
                   {on ? <Check size={16} /> : null}
                   {on ? "Keeping" : "Skipped"}
                 </button>
@@ -526,6 +543,14 @@ function Review({
           );
         })}
       </ol>
+      <PhotoViewer
+        photos={withPhotos.map((p) => ({ id: p.id, url: p.photoUrl!, name: names[p.id]!.trim() || p.name, detail: p.detail }))}
+        index={viewing}
+        onIndex={setViewing}
+        onClose={() => setViewing(null)}
+        isKept={(id) => keep.has(id)}
+        onToggle={toggle}
+      />
       <button className="btn primary block" type="button" onClick={() => onDone(kept.map((p) => ({ ...p, keptName: names[p.id]!.trim() })), proposals.filter((p) => !kept.includes(p)).map((p) => p.id))} disabled={kept.length === 0}>
         Use {kept.length} landmark{kept.length === 1 ? "" : "s"}
         <ArrowRight size={18} />

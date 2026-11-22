@@ -298,6 +298,33 @@ a.cell:hover, button.cell:hover { background: color-mix(in srgb, var(--fill) 55%
 .proposal-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .landmark.proposal.skipped { opacity: 0.5; }
 
+/* ---------- photo viewer (tap a landmark photo while choosing) ---------- */
+.photo-expand { padding: 0; border: 0; cursor: zoom-in; font: inherit; }
+.expand-hint { position: absolute; right: 4px; bottom: 4px; width: 22px; height: 22px; border-radius: 999px; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); color: #fff; pointer-events: none; }
+.suggestion-item { position: relative; }
+/* Same box as the row's thumbnail (16px in, 12px down, 48px square), transparent so the photo underneath shows. */
+.thumb-overlay { position: absolute; left: 16px; top: 12px; background: transparent; box-shadow: none; }
+.thumb-overlay .expand-hint { width: 18px; height: 18px; right: 3px; bottom: 3px; }
+
+.viewer { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: #000; color: #fff; display: none; }
+.viewer[open] { display: grid; grid-template-rows: auto 1fr auto; }
+.viewer::backdrop { background: rgba(0, 0, 0, 0.9); }
+.viewer-top { display: flex; align-items: center; gap: 12px; padding: max(12px, env(safe-area-inset-top)) 16px 12px; }
+.viewer-top > .stack { flex: 1; }
+.viewer-name { font-size: 20px; letter-spacing: -0.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.viewer-sub { font-size: 14px; color: #98989f; }
+.viewer-stage { display: grid; place-items: center; min-height: 0; padding: 0 12px; touch-action: pan-y; }
+.viewer-stage img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 12px; user-select: none; transition: opacity 300ms ease-out; }
+.viewer-stage img.skeleton { min-width: min(80vw, 480px); min-height: min(50dvh, 360px); }
+.viewer-bar { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; justify-items: center; gap: 12px; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); }
+.viewer-icon { width: 44px; height: 44px; border-radius: 999px; border: 0; display: grid; place-items: center; background: #2c2c2e; color: #fff; cursor: pointer; }
+.viewer-icon:disabled { opacity: 0.3; cursor: default; }
+.viewer-keep { min-width: 140px; justify-content: center; }
+/* The viewer is always dark, whatever the app theme. */
+.viewer .chip { background: #2c2c2e; color: #fff; box-shadow: none; }
+.viewer .chip[aria-pressed="true"] { background: #fff; color: #000; }
+.viewer .skeleton { background: linear-gradient(100deg, #1c1c1e 30%, #2c2c2e 50%, #1c1c1e 70%); background-size: 250% 100%; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }

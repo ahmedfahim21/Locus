@@ -1,6 +1,7 @@
 "use client";
 
-import { ArrowLeft, ArrowRight, Check, MapTrifold, Plus, VideoCamera, Warning, Binoculars } from "@phosphor-icons/react";
+import { ArrowLeft, ArrowRight, ArrowsOut, Check, MapTrifold, Plus, VideoCamera, Warning, Binoculars } from "@phosphor-icons/react";
+import { PhotoViewer } from "../PhotoViewer";
 import { useEffect, useState, type ReactNode } from "react";
 import { api, scriptNames, type LatLon, type RouteLeg, type Suggestion, type SuggestionSource, type Suggestions } from "../../lib/api";
 import { AccountMenu } from "../AccountMenu";
@@ -53,6 +54,9 @@ export function SuggestStep({
   const legs: RouteLeg[] | null = data ? [{ onRoads: true, line: data.route.line }] : null;
   const kept = data?.suggestions.filter((s) => keep.has(s.id)) ?? [];
   const toggle = (id: string) => setKeep((k) => (k.has(id) ? new Set([...k].filter((x) => x !== id)) : new Set([...k, id])));
+  /** Index into `withPhotos` of the photo shown full screen, or null. */
+  const [viewing, setViewing] = useState<number | null>(null);
+  const withPhotos = data?.suggestions.filter((s) => s.photoUrl) ?? [];
 
   return (
     <main className="setup">
@@ -144,7 +148,7 @@ export function SuggestStep({
                 {data.suggestions.map((s) => {
                   const on = keep.has(s.id);
                   return (
-                    <li key={s.id}>
+                    <li key={s.id} className="suggestion-item">
                       <button type="button" className="cell suggestion" aria-pressed={on} onClick={() => toggle(s.id)}>
                         <span className="suggestion-thumb" style={s.color ? { background: s.color } : undefined}>
                           {s.photoUrl ? <StampPhoto url={s.photoUrl} alt={s.name} /> : null}
@@ -167,11 +171,32 @@ export function SuggestStep({
                         </span>
                         <span className={`check${on ? " on" : ""}`} aria-hidden="true">{on && <Check size={14} />}</span>
                       </button>
+                      {/* Over the thumbnail, outside the row's button: tapping the photo expands it instead of toggling. */}
+                      {s.photoUrl && (
+                        <button
+                          type="button"
+                          className="suggestion-thumb photo-expand thumb-overlay"
+                          aria-label={`Expand photo of ${s.name}`}
+                          onClick={() => setViewing(withPhotos.findIndex((x) => x.id === s.id))}
+                        >
+                          <span className="expand-hint" aria-hidden="true">
+                            <ArrowsOut size={12} />
+                          </span>
+                        </button>
+                      )}
                     </li>
                   );
                 })}
               </ul>
             )}
+            <PhotoViewer
+              photos={withPhotos.map((s) => ({ id: s.id, url: s.photoUrl!, name: s.name, detail: s.text }))}
+              index={viewing}
+              onIndex={setViewing}
+              onClose={() => setViewing(null)}
+              isKept={(id) => keep.has(id)}
+              onToggle={toggle}
+            />
             <button className="btn primary block" type="button" onClick={() => onDone(kept)}>
               {kept.length ? `Use ${kept.length} landmark${kept.length === 1 ? "" : "s"}` : "Add landmarks myself"}
               <ArrowRight size={18} />
