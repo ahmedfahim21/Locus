@@ -224,6 +224,17 @@ describe("walks: processing", () => {
     expect(t.logs).toContainEqual(expect.objectContaining({ event: "walk.same_place_dropped", walkId, dropped: 1 }));
   });
 
+  it("over the limit, drops vague landmarks and then the earliest, keeping the ones nearest the door", async () => {
+    const t = await signedUp();
+    const kinds: VisionLandmark["kind"][] = ["other", "shop", "shop", "other", "shop", "shop", "shop", "shop", "shop", "shop"];
+    const { walkId } = await processedWalk(t, kinds.map((kind, frame) => ({ ...bakery, frame, name: `Landmark ${frame}`, aliases: [], kind })));
+    const res = await t.call("GET", `/me/walks/${walkId}`, undefined, TOKEN);
+    const proposals = res.body.proposals as { ordinal: number; name: string }[];
+    // 10 found, 8 allowed: both "other" go; every shop stays, in walk order.
+    expect(proposals.map((p) => [p.ordinal, p.name])).toEqual([1, 2, 4, 5, 6, 7, 8, 9].map((n, i) => [i + 1, `Landmark ${n}`]));
+    expect(t.logs).toContainEqual(expect.objectContaining({ event: "walk.over_limit_dropped", walkId, dropped: 2 }));
+  });
+
   it("keeps a landmark at its GPS position when no OSM place nearby has that name", async () => {
     const t = await signedUp();
     const { walkId } = await processedWalk(t, [{ ...bakery, name: "Blue gate", aliases: ["neela gate", "Sharma house gate"], kind: "gate", color: "blue" }]);

@@ -32,6 +32,17 @@ export const SNAP_RADIUS_M = 40;
 export const ONE_PLACE_KINDS = new Set(["bus_stop", "temple", "mosque", "church", "school", "hospital", "petrol_pump", "park"]);
 export const ONE_PLACE_M = 40;
 
+/**
+ * At most `max` landmarks, still in walk order. When there are too many, vague ones
+ * ("other") go first, then the earliest: those nearest the door matter most to a rider.
+ */
+export function keepBest<T extends { kind: string }>(landmarks: T[], max: number): T[] {
+  if (landmarks.length <= max) return landmarks;
+  const ranked = landmarks.map((l, i) => ({ l, i })).sort((a, b) => Number(a.l.kind === "other") - Number(b.l.kind === "other") || b.i - a.i);
+  const keep = new Set(ranked.slice(0, max).map((r) => r.i));
+  return landmarks.filter((_, i) => keep.has(i));
+}
+
 /** Drops a big place's repeats: the same kind within ONE_PLACE_M along the walk of one already kept. Input in walk order. */
 export function onePerPlace<T extends { kind: string }>(landmarks: T[], alongM: (l: T) => number): T[] {
   const kept: T[] = [];
@@ -99,7 +110,8 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
     }
     const distinct = onePerPlace([...byName.values()], (l) => samples[l.frame]!.distanceM);
     if (distinct.length !== byName.size) deps.log({ event: "walk.same_place_dropped", walkId, dropped: byName.size - distinct.length });
-    const chosen = distinct.slice(0, MAX_PROPOSALS);
+    const chosen = keepBest(distinct, MAX_PROPOSALS);
+    if (chosen.length !== distinct.length) deps.log({ event: "walk.over_limit_dropped", walkId, dropped: distinct.length - chosen.length });
 
     const features = await deps.store.nearbyFeatures(samples[Math.floor(samples.length / 2)]!.location, 600);
     const proposals: WalkProposal[] = [];

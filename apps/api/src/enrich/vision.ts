@@ -28,7 +28,7 @@ export const MAX_PROPOSALS = 8;
 
 const INSTRUCTIONS = `You look at frames from a short phone video. Someone in India walked from the main road to their own door so delivery riders can be guided there.
 Find up to ${MAX_PROPOSALS} landmarks a delivery rider on a scooter could spot and name on a phone call: shop and hotel boards, petrol bunks, bus stops and bus stations, temples, mosques, churches, schools, hospitals and clinics, pharmacies, banks and ATMs, distinctive gates, big trees, parks.
-Only what a rider sees from the road, never inside a building. A board whose name you can read is a good landmark. A few distinct places beat a long list.
+Only what a rider sees from the road, never inside a building. A board whose name you can read is a good landmark. A few distinct places beat a long list; spread them over the whole walk, including the last stretch before the door.
 Rules:
 - Skip people, faces, number plates, house numbers and anything private. Never transcribe phone numbers.
 - Vehicles are not landmarks, but the place they stand is: buses at a stand mean a bus stop or bus station.
