@@ -1,11 +1,12 @@
 "use client";
 
-import { GoogleLogo, PlayCircle } from "@phosphor-icons/react";
+import { PlayCircle } from "@phosphor-icons/react";
 import Link from "next/link";
 import { useState } from "react";
 import { supabase } from "../lib/api";
 import { AppearanceSwitch } from "./AppearanceSwitch";
 import { DemoCall } from "./DemoCall";
+import { GoogleSignInButton } from "./GoogleSignInButton";
 import { LogoMark } from "./Logo";
 import { TopBar } from "./TopBar";
 
@@ -42,10 +43,7 @@ export function Landing() {
           your home and the route you set once.
         </p>
         <div className="row" style={{ gap: 10 }}>
-          <button className="btn primary" type="button" onClick={() => void signIn()} disabled={busy}>
-            <GoogleLogo size={18} />
-            {busy ? "Opening Google…" : "Set up my door"}
-          </button>
+          <GoogleSignInButton onClick={() => void signIn()} busy={busy} />
           <Link className="btn" href="/replay">
             <PlayCircle size={18} />
             Hear a demo call
