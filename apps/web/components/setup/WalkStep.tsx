@@ -12,6 +12,8 @@ import { AnalysingStage, AnalysingSteps, videoThumbs } from "./Analysing";
 
 const BUCKET = "locus-walks";
 const POLL_MS = 2000;
+/** Failed status checks in a row (about a minute with backoff) before giving up. */
+const MAX_POLL_MISSES = 6;
 
 /** A proposal the recipient kept, possibly renamed. Becomes a landmark draft. */
 export type KeptProposal = Proposal & { keptName: string };
@@ -122,9 +124,11 @@ export function WalkStep({
     if (phase.kind !== "process") return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout>;
+    let misses = 0;
     const poll = async () => {
       try {
         const res = await api<{ walk: Walk; proposals: Proposal[] }>(`/me/walks/${phase.walkId}`);
+        misses = 0;
         if (stopped) return;
         if (res.walk.status === "ready") return setPhase({ kind: "review", walkId: phase.walkId, proposals: res.proposals, photos: phase.photos });
         if (res.walk.status === "failed") {
@@ -132,8 +136,16 @@ export function WalkStep({
           return setPhase({ kind: "failed", message: res.walk.error ?? "Processing failed", retryWalkId: phase.photos ? null : phase.walkId, photos: phase.photos });
         }
       } catch (err) {
-        console.error("[walk] status check failed", err);
-        if (!stopped) return setPhase({ kind: "failed", message: `Couldn't check on your walk: ${(err as Error).message}`, retryWalkId: null });
+        // A walk is read on the server either way: ride out a weak connection, keep checking.
+        misses++;
+        console.warn("[walk] status check failed; retrying", { misses, err });
+        if (misses >= MAX_POLL_MISSES) {
+          console.error("[walk] status check kept failing", err);
+          if (!stopped) setPhase({ kind: "failed", message: `Couldn't reach Locus to check on your walk: ${(err as Error).message}`, retryWalkId: null });
+          return;
+        }
+        if (!stopped) timer = setTimeout(poll, POLL_MS * 2 ** Math.min(misses, 3));
+        return;
       }
       if (!stopped) timer = setTimeout(poll, POLL_MS);
     };
