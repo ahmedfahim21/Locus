@@ -137,6 +137,16 @@ export function MapMarker({
 }
 
 /** Frames the given points once they're known (and again if they change). */
+/**
+ * Padding sized for a desktop map, scaled down to the map actually on screen: on a
+ * phone, 220 px of label room on a 300 px-wide map would leave no room for the route.
+ */
+export function fitPadding(padding: MapLibre.PaddingOptions | number, width: number, height: number): MapLibre.PaddingOptions {
+  const p = typeof padding === "number" ? { top: padding, bottom: padding, left: padding, right: padding } : padding;
+  const cap = (v: number | undefined, max: number) => Math.round(Math.max(0, Math.min(v ?? 0, max)));
+  return { top: cap(p.top, height * 0.22), bottom: cap(p.bottom, height * 0.14), left: cap(p.left, width * 0.12), right: cap(p.right, width * 0.28) };
+}
+
 export function FitTo({ points, padding }: { points: LatLon[]; padding: MapLibre.PaddingOptions | number }) {
   const { map, lib } = useMap();
   const key = points.map((p) => `${p.lat},${p.lon}`).join("|");
@@ -145,7 +155,16 @@ export function FitTo({ points, padding }: { points: LatLon[]; padding: MapLibre
     if (points.length === 0) return;
     const bounds = new lib.LngLatBounds();
     for (const p of points) bounds.extend([p.lon, p.lat]);
-    map.fitBounds(bounds, { padding: JSON.parse(paddingKey), maxZoom: 17.5, duration: 0 });
+    const fit = () => {
+      const el = map.getContainer();
+      map.fitBounds(bounds, { padding: fitPadding(JSON.parse(paddingKey), el.clientWidth, el.clientHeight), maxZoom: 17.5, duration: 0 });
+    };
+    fit();
+    // Phones rotate and panels change height: fit again to the new size.
+    map.on("resize", fit);
+    return () => {
+      map.off("resize", fit);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, paddingKey, map, lib]);
   return null;
