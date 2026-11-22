@@ -304,6 +304,8 @@ Evaluation runs (P1, P12): teammates and friends on real streets, different ride
 
 In the Air Agents style: real footage, one plain line per shot, one live moment, then how it fits together. Tagline on the landing page and the video: "A home set up once, a rider guided to the door out loud, and how it all fits together."
 
+Lines for the actors, take by take: `demo/acting.md`.
+
 Cast: Fahim (recipient, at home with the laptop and his phone) and a teammate (rider, on a scooter with a phone mount and a GoPro or second phone filming). Route: the dev home, from Dallas Centre road past ITC Kohenur and Knowledge City to the blue gate at Qualcomm.
 
 | Time | Shot | On screen | Line (voice-over or caption) |
@@ -319,7 +321,7 @@ Cast: Fahim (recipient, at home with the laptop and his phone) and a teammate (r
 | 0:52 | Locus: "Namaste, yeh call ek AI assistant utha raha hai… Delivery kiske liye hai, aur kaunse app se?" Rider: "Fahim, Swiggy." | Transcript fills in live | It checks the rider first. |
 | 1:02 | Locus: "Aap abhi kahan hain?" Rider: "ITC Kohenur ke paas hoon." Locus gives the next step | The dot moves to ITC Kohenur on the map | He tells it what he sees… |
 | 1:14 | Rider: "Knowledge City dikh raha hai." Locus: towards Qualcomm | Dot moves on | …and it answers in his language. |
-| 1:26 | Rider: "Qualcomm ke saamne hoon." Locus: "Qualcomm ke saamne neela gate, wahi rukiye." Rider pulls up at the gate | Arrived | |
+| 1:26 | Rider pulls up at the gate: "Qualcomm ke saamne hoon." | Arrived (the Qualcomm landmark is the door) | |
 | 1:36 | Locus: "Bas, aap pahunch gaye. Shukriya!" Call ends | Call record: 3 landmarks, time to the gate | Door to door, no call to you. |
 | 1:42 | Second take: the rider says "ek chai ki dukaan ke paas hoon", then "pata nahi bhaiya, kahin galat aa gaya". (Not "Mindspace": the resolver still places that at Knowledge City.) Locus: "Main unhe call kar raha hoon, line par rahiye." Fahim's phone rings | Handoff | When it can't place him, it doesn't guess. It calls you. |
 | 1:56 | Rider: "Recording mat karo." Locus: "Theek hai, ab se kuch record nahi hoga…" | The transcript blanks | Riders can say no to being recorded. Walk videos are deleted within a day. |
