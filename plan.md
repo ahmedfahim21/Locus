@@ -14,7 +14,7 @@ Done and tested (`pnpm typecheck`, `pnpm test`: 93 API tests):
 - Guide-session API, screening, matching, road graph, handoff and loop guards, Supabase store and auth.
 - Matching handles Sarvam's Devanagari output: consonant-skeleton comparison ("अहमद स्विगी" → Ahmed, Swiggy; "कोहिनूर" → Kohenur) and names split in two ("fil dos" → FilDOS).
 - When the rider reaches a landmark, Locus says that landmark's own text ("What Locus says there"); the last landmark means arrived. An OSM place within 20 m of a landmark not yet reached counts as that landmark.
-- Walk-video pipeline (section 4.6) on Supabase Storage, with a sweep that deletes videos older than a day. Typed landmarks get Hindi and Kannada names from Sarvam translate.
+- Walk-video pipeline (section 4.6) on Supabase Storage, with a sweep that deletes videos older than a day. Typed landmarks are spelled in Hindi and the home state's script (Telugu or Kannada) by Sarvam transliterate, as they sound ("नॉलेज सिटी", not "ज्ञान नगरी").
 - `osm:import` works (imported 35 places and 248 roads around the demo home). Overpass mirrors are often overloaded: retry, or set `OVERPASS_URL`.
 - `pnpm eval <recipientId> [phrases.jsonl] --ablation` scores typed only / + OSM / + walk landmarks. A 10-phrase dev run: 60% with 2 wrong landmarks named → 90% with none.
 - Web app on DESIGN.md (Spatial Agents chrome, Sadak map colours): light and dark themes with an appearance switch, map labels, a brand mark (`app/icon.svg`), and a 3D view. In 3D, buildings rise from OSM heights and each landmark stands up as a prop in its colour; the walk-video model reports each landmark's kind and colour (verified on the painted-board video: green, rust and saffron came back within a few shades).
@@ -169,7 +169,7 @@ Stack: TypeScript, pnpm workspaces, Hono API, Next.js recipient app, Supabase (P
 ### 4.2 Guide loop
 
 - Match the rider's answer against confirmed landmarks (name and every alias), then OSM features within 500 m of the pin. Name match first; OpenAI only when it finds nothing (P9). Weak words alone (lane, road, gate…) never match.
-- Matched landmark k → its next step. Matched a non-landmark OSM feature → one street-name step toward the nearest remaining landmark, never left/right (P5).
+- Matched landmark k → its next step. Matched a non-landmark OSM feature → one street-name step to rejoin the route at the next landmark not yet reached (a later one only if the rider is within 60 m of it), never left/right (P5). Changed 2026-11-22 from "nearest remaining landmark": at the Equal office a rider at ITC Kohenur was sent towards the door, which is nearer as the crow flies than the gate he has to come in by.
 - Arrival = rider names the final landmark (the gate or door).
 - Lost turn: no match; 8 s silence; "that's wrong"; unsupported language. Two in a row → handoff.
 
