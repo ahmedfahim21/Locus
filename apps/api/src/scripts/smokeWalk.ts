@@ -97,7 +97,7 @@ await processWalk(
 const done = await store.getWalk(walkId);
 const proposals = await store.listWalkProposals(walkId);
 log({ step: "walk", status: done?.status, error: done?.error, videoDeleted: Boolean(done?.videoDeletedAt) });
-for (const p of proposals) log({ step: "proposal", ordinal: p.ordinal, name: p.name, nameHi: p.nameHi, nameKn: p.nameKn, aliases: p.aliases, kind: p.kind, color: p.color, atS: p.atS });
+for (const p of proposals) log({ step: "proposal", ordinal: p.ordinal, name: p.name, nameHi: p.nameHi, nameKn: p.nameKn, aliases: p.aliases, kind: p.kind, color: p.color, detail: p.detail, atS: p.atS });
 
 // The video must be gone; each frame must be readable through its signed URL.
 const videoGone = await storage.download(videoPath).then(

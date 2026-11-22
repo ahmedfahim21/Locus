@@ -30,6 +30,7 @@ const bakery: VisionLandmark = {
   aliases: ["Iyengar Bakery & Sweets"],
   kind: "food",
   color: "#B8401C",
+  detail: "",
 };
 const temple: VisionLandmark = {
   frame: 13,
@@ -39,6 +40,7 @@ const temple: VisionLandmark = {
   aliases: ["Anjaneya temple"],
   kind: "temple",
   color: "",
+  detail: "  laal building ke bagal mein. ",
 };
 
 let dir: string;
@@ -162,6 +164,7 @@ describe("walks: processing", () => {
         kind: "food",
         // Lower-cased; the temple had no clear colour.
         color: "#b8401c",
+        detail: null,
         location: { lat: 13.0345, lon: 77.5975 },
         osmId: "node/102",
         // The sharpest frame within a second of the 0.67 s spot (at the video start, 0 s or later).
@@ -179,6 +182,8 @@ describe("walks: processing", () => {
         aliases: ["Anjaneya temple", "Sri Anjaneya Temple"],
         kind: "temple",
         color: null,
+        // Trimmed, as the model wrote it.
+        detail: "laal building ke bagal mein.",
         location: TEMPLE,
         osmId: "node/101",
         // The sharpest frame within a second of the 4.33 s spot.
@@ -228,12 +233,12 @@ describe("walks: processing", () => {
 
   it("over the limit, drops vague landmarks and then the earliest, keeping the ones nearest the door", async () => {
     const t = await signedUp();
-    const kinds: VisionLandmark["kind"][] = ["other", "shop", "shop", "other", "shop", "shop", "shop", "shop", "shop", "shop"];
+    const kinds: VisionLandmark["kind"][] = ["other", "shop", "shop", "other", ...Array<VisionLandmark["kind"]>(10).fill("shop")];
     const { walkId } = await processedWalk(t, kinds.map((kind, frame) => ({ ...bakery, frame, name: `Landmark ${frame}`, aliases: [], kind })));
     const res = await t.call("GET", `/me/walks/${walkId}`, undefined, TOKEN);
     const proposals = res.body.proposals as { ordinal: number; name: string }[];
-    // 10 found, 8 allowed: both "other" go; every shop stays, in walk order.
-    expect(proposals.map((p) => [p.ordinal, p.name])).toEqual([1, 2, 4, 5, 6, 7, 8, 9].map((n, i) => [i + 1, `Landmark ${n}`]));
+    // 14 found, 12 allowed: both "other" go; every shop stays, in walk order.
+    expect(proposals.map((p) => [p.ordinal, p.name])).toEqual([1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((n, i) => [i + 1, `Landmark ${n}`]));
     expect(t.logs).toContainEqual(expect.objectContaining({ event: "walk.over_limit_dropped", walkId, dropped: 2 }));
   });
 
@@ -437,7 +442,7 @@ describe("photos instead of a walk", () => {
     const res = await t.app.request("/me/photos", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: form });
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   }
-  const blueGate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: ["neela gate"], kind: "gate", color: "#1F5FBF" };
+  const blueGate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: ["neela gate"], kind: "gate", color: "#1F5FBF", detail: "" };
 
   it("turns photos into proposals, placing known places from the map and the rest at the gate", async () => {
     const t = await signedUp();
@@ -459,7 +464,7 @@ describe("photos instead of a walk", () => {
       proposals: [
         {
           id: "prp_3", ordinal: 1, name: "Iyengar bakery", nameHi: "अयंगर बेकरी", nameKn: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
-          aliases: ["Iyengar Bakery & Sweets"], kind: "food", color: "#b8401c",
+          aliases: ["Iyengar Bakery & Sweets"], kind: "food", color: "#b8401c", detail: null,
           // Found by name on the map: placed at the mapped bakery.
           location: { lat: 13.0345, lon: 77.5975 }, osmId: "node/102", atS: 0, status: "proposed",
           photoUrl: "https://storage.test/frames/rcp_1/walk_2/1.jpg?exp=3600",
@@ -467,7 +472,7 @@ describe("photos instead of a walk", () => {
         {
           id: "prp_4", ordinal: 2, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್",
           // "neela gate" is the matcher's synonym for the name itself, so it adds nothing.
-          aliases: [], kind: "gate", color: "#1f5fbf",
+          aliases: [], kind: "gate", color: "#1f5fbf", detail: null,
           // Not on the map: starts at the gate for the recipient to move.
           location: GATE, osmId: null, atS: 1, status: "proposed",
           photoUrl: "https://storage.test/frames/rcp_1/walk_2/2.jpg?exp=3600",

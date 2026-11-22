@@ -146,6 +146,7 @@ function publicProposal(p: WalkProposal, photos: Map<string, string>) {
     aliases: p.aliases,
     kind: p.kind,
     color: p.color,
+    detail: p.detail,
     location: p.location,
     osmId: p.osmId,
     atS: p.atS,

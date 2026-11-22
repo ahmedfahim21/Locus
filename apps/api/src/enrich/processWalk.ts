@@ -145,6 +145,7 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
         aliases: distinctNames([...l.aliases, ...(osm ? [osm.name, ...osm.altNames] : [])], l.name),
         kind: l.kind,
         color: /^#[0-9a-f]{6}$/i.test(l.color.trim()) ? l.color.trim().toLowerCase() : null,
+        detail: l.detail.trim() || null,
         location: osm?.location ?? sample.location,
         osmId: osm?.osmId ?? null,
         framePath,

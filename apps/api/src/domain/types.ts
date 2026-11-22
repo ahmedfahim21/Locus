@@ -152,6 +152,8 @@ export type WalkProposal = {
   kind: string;
   /** Most recognisable colour as "#rrggbb", or null when the model saw none. */
   color: string | null;
+  /** Where it sits relative to what's around it, in Hinglish as a rider would hear it ("laal building ke bagal mein"). */
+  detail: string | null;
   location: LatLon;
   /** The OSM place it was snapped to, if one matched nearby. */
   osmId: string | null;

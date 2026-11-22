@@ -112,6 +112,7 @@ export const walkProposals = locus.table(
     aliases: text("aliases").array().notNull(),
     kind: text("kind").notNull(),
     color: text("color"),
+    detail: text("detail"),
     lat: doublePrecision("lat").notNull(),
     lon: doublePrecision("lon").notNull(),
     osmId: text("osmId"),

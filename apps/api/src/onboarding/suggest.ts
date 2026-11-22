@@ -15,6 +15,8 @@ export type Suggestion = {
   aliases: string[];
   kind: string | null;
   color: string | null;
+  /** Where it sits relative to its neighbours, in Hinglish (from the walk video or Street View). */
+  detail: string | null;
   location: LatLon;
   /** Metres from the main-road entry. */
   alongM: number;
@@ -61,10 +63,18 @@ const POSITION_TRUST: Record<SuggestionSource, number> = { video: 3, map: 2, str
 type Draft = Omit<Suggestion, "id" | "text" | "recommended"> & { score: number; positionTrust: number };
 
 /** The instruction for a landmark: the next turn after it, or the door, or straight on. */
-export function draftText(name: string, alongM: number, route: RoutePlan): string {
+export function draftText(name: string, alongM: number, route: RoutePlan, detail: string | null = null): string {
   const turn = route.turns.find((t) => t.atM >= alongM - 10 && t.atM - alongM <= 90);
+  const atGate = route.lengthM - alongM <= 70;
+  // With a detail from the walk ("laal building ke bagal mein"), say where the landmark is first, then what to do.
+  if (detail) {
+    const where = `${name}, ${detail.replace(/[.\s]+$/, "")}.`;
+    if (turn) return `${where} Uske baad ${turn.direction} mudiye${turn.onto ? `, ${turn.onto} pe` : ""}.`;
+    if (atGate) return `${where} Wahin gate hai, rukiye.`;
+    return `${where} Wahan se seedha aaiye.`;
+  }
   if (turn) return `${name} ke baad ${turn.direction} mudiye${turn.onto ? `, ${turn.onto} pe` : ""}.`;
-  if (route.lengthM - alongM <= 70) return `${name} ke paas hi gate hai, wahin rukiye.`;
+  if (atGate) return `${name} ke paas hi gate hai, wahin rukiye.`;
   return `${name} se seedha aaiye.`;
 }
 
@@ -89,6 +99,7 @@ function merge(into: Draft, other: Draft) {
   into.nameHi ??= other.nameHi;
   into.nameKn ??= other.nameKn;
   into.color ??= other.color;
+  into.detail ??= other.detail;
   into.kind ??= other.kind;
   into.aliases = [...new Set([...into.aliases, ...other.aliases, other.name])].filter((n) => nameKey(n) !== nameKey(into.name));
   if (other.positionTrust > into.positionTrust) {
@@ -141,7 +152,7 @@ export async function suggestLandmarks(input: {
     const pr = near(f.location, PROMINENT_KINDS.has(f.kind) ? NEAR_ROUTE_PROMINENT_M : NEAR_ROUTE_M);
     if (!pr) continue;
     drafts.push({
-      name: f.name, nameHi: null, nameKn: null, aliases: f.altNames, kind: MAP_KIND_TO_PROP[f.kind] ?? "shop", color: null,
+      name: f.name, nameHi: null, nameKn: null, aliases: f.altNames, kind: MAP_KIND_TO_PROP[f.kind] ?? "shop", color: null, detail: null,
       location: f.location, alongM: pr.alongM, sources: ["map"], positionTrust: POSITION_TRUST.map, osmId: f.osmId, proposalId: null, photoUrl: null,
       score: (KIND_RANK[f.kind] ?? 3) + turnBonus(pr.alongM) - pr.offM / 20,
     });
@@ -152,7 +163,7 @@ export async function suggestLandmarks(input: {
     const pr = project(route.line, cum, p.location);
     if (pr.offM > 60) continue;
     drafts.push({
-      name: p.name, nameHi: p.nameHi, nameKn: p.nameKn, aliases: p.aliases, kind: p.kind, color: p.color,
+      name: p.name, nameHi: p.nameHi, nameKn: p.nameKn, aliases: p.aliases, kind: p.kind, color: p.color, detail: p.detail,
       location: p.location, alongM: pr.alongM, sources: ["video"], positionTrust: POSITION_TRUST.video, osmId: p.osmId, proposalId: p.id, photoUrl: p.photoUrl,
       score: 8 + turnBonus(pr.alongM),
     });
@@ -177,6 +188,7 @@ export async function suggestLandmarks(input: {
         drafts.push({
           name: l.name.trim(), nameHi: l.nameHi.trim() || null, nameKn: l.nameKn.trim() || null, aliases: l.aliases, kind: l.kind,
           color: /^#[0-9a-f]{6}$/i.test(l.color.trim()) ? l.color.trim().toLowerCase() : null,
+          detail: l.detail.trim() || null,
           location: side, alongM: look.alongM, sources: ["street"], positionTrust: POSITION_TRUST.street, osmId: null, proposalId: null, photoUrl: null,
           score: 7 + turnBonus(look.alongM),
         });
@@ -209,10 +221,10 @@ export async function suggestLandmarks(input: {
     streetView,
     suggestions: merged.map((d, i) => ({
       id: `sug_${i + 1}`,
-      name: d.name, nameHi: d.nameHi, nameKn: d.nameKn, aliases: d.aliases, kind: d.kind, color: d.color,
+      name: d.name, nameHi: d.nameHi, nameKn: d.nameKn, aliases: d.aliases, kind: d.kind, color: d.color, detail: d.detail,
       location: d.location, alongM: Math.round(d.alongM), sources: d.sources, osmId: d.osmId,
       proposalId: d.proposalId, photoUrl: d.photoUrl,
-      text: draftText(d.name, d.alongM, route),
+      text: draftText(d.name, d.alongM, route, d.detail),
       recommended: chosen.has(d),
     })),
   };
