@@ -19,7 +19,8 @@
     "voice:rider": "tsx src/scripts/voiceRider.ts",
     "suggest:check": "tsx src/scripts/suggestCheck.ts",
     "smoke:photos": "tsx src/scripts/smokePhotos.ts",
-    "state:names": "tsx src/scripts/stateNames.ts"
+    "state:names": "tsx src/scripts/stateNames.ts",
+    "demo:audio": "tsx src/scripts/demoAudio.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.11",
