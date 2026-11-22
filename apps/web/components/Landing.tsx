@@ -2,13 +2,11 @@
 
 import { ArrowRight, Check, Eraser, MicrophoneSlash, PlayCircle, VideoCamera } from "@phosphor-icons/react";
 import Link from "next/link";
-import { useState } from "react";
-import { supabase } from "../lib/api";
+import { usePathname } from "next/navigation";
 import { AppearanceSwitch } from "./AppearanceSwitch";
 import { Cast, type CastMember } from "./Cast";
 import { DELIVERY_APPS, AppTile } from "./DeliveryApps";
 import { DemoCall } from "./DemoCall";
-import { GoogleSignInButton } from "./GoogleSignInButton";
 import { LogoMark } from "./Logo";
 import { TopBar } from "./TopBar";
 import "./landing.css";
@@ -26,22 +24,9 @@ const PRIVACY = [
 ];
 
 export function Landing() {
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  async function signIn() {
-    setError(null);
-    setBusy(true);
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.href },
-    });
-    if (err) {
-      console.error("[auth] Google sign-in failed", err);
-      setError(err.message);
-      setBusy(false);
-    }
-  }
+  // Signed-out visitors to any page land here; sign-in brings them back to it.
+  const path = usePathname();
+  const signInHref = path && path !== "/" ? `/sign-in?next=${encodeURIComponent(path)}` : "/sign-in";
 
   return (
     <main className="landing">
@@ -52,9 +37,9 @@ export function Landing() {
             <a href="#demo">Hear a call</a>
             <a href="#privacy">Privacy</a>
           </nav>
-          <button className="btn compact" type="button" onClick={() => void signIn()} disabled={busy}>
+          <Link className="btn compact" href={signInHref}>
             Sign in
-          </button>
+          </Link>
         </TopBar>
       </div>
 
@@ -68,17 +53,14 @@ export function Landing() {
           landmark by landmark.
         </p>
         <div className="hero-cta">
-          <GoogleSignInButton onClick={() => void signIn()} busy={busy} />
+          <Link className="btn primary" href={signInHref}>
+            Sign in with Google or email
+          </Link>
           <a className="btn" href="#demo">
             <PlayCircle size={18} />
             Hear a call
           </a>
         </div>
-        {error && (
-          <p className="small" role="alert" style={{ color: "var(--danger)" }}>
-            Couldn&rsquo;t start Google sign-in: {error}
-          </p>
-        )}
         <div className="works-with">
           <span className="label">For riders from any app</span>
           <ul className="app-row">
@@ -200,7 +182,9 @@ export function Landing() {
           <Cast who="door" size={52} />
         </div>
         <h2 className="band-title">Ready when your next order is.</h2>
-        <GoogleSignInButton onClick={() => void signIn()} busy={busy} />
+        <Link className="btn primary" href={signInHref} style={{ height: 44 }}>
+          Sign in with Google or email
+        </Link>
       </section>
 
       <footer className="landing-foot">
