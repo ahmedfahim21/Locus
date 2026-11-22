@@ -11,3 +11,4 @@ eval/phrases.jsonl
 eval/voice-run/
 infra/livekit/*.local.json
 infra/.env.production
+.vercel

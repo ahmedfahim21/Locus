@@ -123,7 +123,7 @@ Sign in at `/sign-in` (the landing's "Sign in with Google or email" button goes 
 | `demo@locus.ahmedfahim.dev` | A recipient, Fahim, at Knowledge City, Hyderabad | Route finished: gate pinned, 10 landmarks from the main road to the lift, "Expecting a delivery" on |
 | `setup-xxxxxx@locus.ahmedfahim.dev` | A new recipient | No profile yet. `seed:demo` makes a new one on every run and prints it, so parallel runs never share one |
 
-On the live site, use these new accounts for the setup journey (one each): `setup-1@locus.ahmedfahim.dev` to `setup-5@locus.ahmedfahim.dev`. <!-- filled in when the live accounts are made -->
+On the live site, the setup journey has five new accounts, one per reviewer: `setup-6b3b5e@`, `setup-2ddc8f@`, `setup-f30e1f@`, `setup-e66620@` and `setup-e6a2aa@locus.ahmedfahim.dev`. Running locally, use the one `seed:demo` printed.
 
 There is one other kind of user, the delivery rider. Riders don't sign in: they phone the Locus number. In a test, the recipient plays the rider (section 5, journey B).
 
