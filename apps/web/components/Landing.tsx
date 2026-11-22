@@ -11,6 +11,9 @@ import { LogoMark } from "./Logo";
 import { TopBar } from "./TopBar";
 import "./landing.css";
 
+/** The demo video on YouTube (youtu.be/X9NvQfkdu5g), embedded without YouTube cookies. */
+const DEMO_VIDEO_ID = "X9NvQfkdu5g";
+
 const STEPS: { who: CastMember; title: string; body: string }[] = [
   { who: "door", title: "Pin your gate", body: "Drop the pin where a rider should stop: the gate, not the middle of the building." },
   { who: "landmark", title: "Walk it once", body: "Film the way in from the main road. Locus spots the boards, gates and gullies a rider will pass." },
@@ -130,6 +133,23 @@ export function Landing() {
             ))}
           </ul>
         </Phone>
+      </section>
+
+      <section id="watch" className="demo-band">
+        <div className="band-head">
+          <h2 className="band-title">Watch it work, end to end.</h2>
+          <p className="muted">A real setup and a real call in Knowledge City, Hyderabad. Under three minutes.</p>
+        </div>
+        <div className="video-frame">
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${DEMO_VIDEO_ID}?rel=0`}
+            title="Locus demo: setting up a door and a rider guided to it"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        </div>
       </section>
 
       <section id="how" className="band">

@@ -69,6 +69,8 @@
 .step-n { position: absolute; top: 16px; left: 18px; color: var(--tertiary); font-size: 13px; }
 .privacy-icon { width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: var(--card); color: var(--ink); }
 .demo-band { padding: clamp(56px, 8vw, 96px) clamp(16px, 4vw, 40px); max-width: 1120px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.video-frame { aspect-ratio: 16 / 9; width: 100%; border-radius: 24px; overflow: hidden; background: #000; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.14); }
+.video-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
 
 .closing { display: grid; justify-items: center; gap: 20px; padding: clamp(56px, 8vw, 96px) 16px; text-align: center; }
 .cast-row { display: flex; align-items: center; gap: 6px; }
