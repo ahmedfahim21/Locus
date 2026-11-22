@@ -102,6 +102,8 @@ export type Me = {
   recipient: (Profile & { expectingDeliveryUntil: string | null }) | null;
   home: Home | null;
   number: string | null;
+  /** Whether the server can ring the recipient's phone ("Call me"). */
+  canRingPhone: boolean;
 };
 export type Call = {
   id: string;
