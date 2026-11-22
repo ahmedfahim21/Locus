@@ -5,8 +5,12 @@ import type { TrackPoint } from "./api";
 
 /** The API refuses walks longer than 3 minutes; stop a little before. */
 export const MAX_RECORD_S = 170;
-/** ~2.5 Mbps keeps a one-minute 720p walk near 20 MB, well under the 50 MB storage cap. */
-const VIDEO_BITS_PER_SECOND = 2_500_000;
+/**
+ * 720p at ~1.8 Mbps: the longest walk (MAX_RECORD_S) stays near 38 MB, under the
+ * 50 MB upload cap (2.5 Mbps went over it past ~2:40). Vision reads 768 px frames,
+ * so this is still more detail than it uses.
+ */
+const VIDEO_BITS_PER_SECOND = 1_800_000;
 
 type Format = { recorderType: string; contentType: "video/mp4" | "video/webm" };
 
