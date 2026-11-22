@@ -75,3 +75,20 @@ export const WRONG_PHRASES = [
   "cant find",
   "can not find",
 ];
+
+/** Rider says they've reached the door; only listened for once every landmark is behind them. */
+export const ARRIVED_PHRASES = [
+  "pahunch gaya",
+  "pahunch gayi",
+  "pahuch gaya",
+  "aa gaya",
+  "aa gayi",
+  "gate pe hoon",
+  "gate par hoon",
+  "gate pe hu",
+  "ghar ke saamne",
+  "door pe",
+  "reached",
+  "i am here",
+  "im here",
+];

@@ -221,6 +221,31 @@ describe("guide loop", () => {
     expect(closed).toEqual({ status: 409, body: { error: { code: "SESSION_CLOSED", message: "Session is arrived" } } });
   });
 
+  it("doesn't arrive at a last landmark short of the door: it guides the last stretch until the rider says they're there", async () => {
+    const t = setup();
+    // The last landmark ~110 m before the door.
+    t.store.homes[0]!.cues[2] = { ...t.store.homes[0]!.cues[2]!, location: { lat: 13.0347, lon: 77.5969 } };
+    await guiding(t);
+    await t.say("ses_1", "main petrol pump ke saamne hoon");
+    await t.say("ses_1", "hanuman mandir ke paas aa gaya");
+    const last = await t.say("ses_1", "neele gate ke saamne khada hoon");
+    // Its own line (which leads to the door) instead of "you've arrived".
+    expect(last.body).toEqual({ instruction: cue(3).text, state: "guiding", lostTurns: 0 });
+    expect(t.store.sessions.get("ses_1")).toMatchObject({ state: "guiding", currentCue: 2, endedAt: null });
+    const there = await t.say("ses_1", "haan pahunch gaya");
+    expect(there.body).toEqual({ instruction: say.arrived("hi"), state: "arrived", lostTurns: 0 });
+    expect(t.store.sessions.get("ses_1")).toMatchObject({ state: "arrived", currentCue: 2, endedAt: T0 });
+  });
+
+  it("\"pahunch gaya\" before the last landmark isn't arriving", async () => {
+    const t = setup();
+    await guiding(t);
+    await t.say("ses_1", "main petrol pump ke saamne hoon");
+    const early = await t.say("ses_1", "pahunch gaya");
+    expect(early.body).toMatchObject({ state: "guiding" });
+    expect(t.store.sessions.get("ses_1")!.currentCue).toBe(0);
+  });
+
   it("matches Devanagari speech", async () => {
     const t = setup();
     await guiding(t);
@@ -371,6 +396,27 @@ describe("handoff (P3)", () => {
     const later = await t.startSession();
     expect(later.status).toBe(201);
   });
+
+  it("a bridged call closed by the worker lets the next delivery through after the grace period", async () => {
+    const t = setup();
+    await inHandoff(t);
+    await t.call("POST", "/v1/sessions/ses_1/handoff-result", { answered: true });
+    t.clock.now = new Date(T0.getTime() + 5 * 60_000); // rider and recipient hang up; the worker ends the session
+    expect(await t.call("POST", "/v1/sessions/ses_1/end")).toEqual({ status: 200, body: { state: "ended" } });
+    expect(t.store.sessions.get("ses_1")!.handoff).toEqual({ startedAt: T0, endedAt: t.clock.now, answered: true });
+    t.clock.now = new Date(T0.getTime() + 5 * 60_000 + 61_000);
+    expect((await t.startSession()).status).toBe(201);
+  });
+
+  it("a bridged call whose end was never recorded stops blocking calls after 20 minutes", async () => {
+    const t = setup();
+    await inHandoff(t);
+    await t.call("POST", "/v1/sessions/ses_1/handoff-result", { answered: true });
+    t.clock.now = new Date(T0.getTime() + 10 * 60_000);
+    expect((await t.startSession()).status).toBe(409);
+    t.clock.now = new Date(T0.getTime() + 21 * 60_000 + 1);
+    expect((await t.startSession()).status).toBe(201);
+  });
 });
 
 describe("session ownership and end", () => {
@@ -393,6 +439,16 @@ describe("session ownership and end", () => {
     expect(s.state).toBe("ended");
     expect(s.endedAt).toEqual(new Date(T0.getTime() + 7000));
     expect(s.handoff).toEqual({ startedAt: T0, endedAt: new Date(T0.getTime() + 7000), answered: null });
+  });
+
+  it("ending an arrived call keeps it arrived, with its arrival time", async () => {
+    const t = setup();
+    await guiding(t);
+    for (const text of ["main petrol pump ke saamne hoon", "hanuman mandir ke paas aa gaya", "neele gate ke saamne khada hoon"]) await t.say("ses_1", text);
+    t.clock.now = new Date(T0.getTime() + 5000);
+    const res = await t.call("POST", "/v1/sessions/ses_1/end");
+    expect(res).toEqual({ status: 200, body: { state: "arrived" } });
+    expect(t.store.sessions.get("ses_1")).toMatchObject({ state: "arrived", endedAt: T0 });
   });
 
   it("responses never contain the handoff pin or the full cue list", async () => {

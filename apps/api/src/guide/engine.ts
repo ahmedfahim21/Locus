@@ -2,11 +2,13 @@ import { heardAny, matchUtterance, type Candidate } from "../clues/match.js";
 import type { Cue, HomeProfile, Language, OsmFeature, Recipient, Session, Turn } from "../domain/types.js";
 import { distanceM } from "../geo/distance.js";
 import type { RoadGraph } from "../geo/roadGraph.js";
-import { OBJECTION_PHRASES, PERSON_PHRASES, WRONG_PHRASES, say } from "./phrases.js";
+import { ARRIVED_PHRASES, OBJECTION_PHRASES, PERSON_PHRASES, WRONG_PHRASES, say } from "./phrases.js";
 import type { PositionResolver } from "./resolver.js";
 
 /** An OSM place this close to a landmark is treated as that landmark. */
 const SAME_PLACE_M = 20;
+/** A last landmark this close to the door is the door: reaching it is arriving. */
+export const ARRIVAL_RADIUS_M = 30;
 
 export const SUPPORTED_LANGUAGES: readonly string[] = ["hi", "en"];
 export const MAX_SCREENING_ATTEMPTS = 2;
@@ -123,6 +125,12 @@ async function guidingTurn(session: Session, input: RiderInput, ctx: GuideContex
   if (heardAny(input.text, WRONG_PHRASES)) return lostTurn(session, input, ctx);
 
   const cues = sortedCues(ctx.home);
+  // Final leg: every landmark is behind the rider and the door is further on. They arrive by saying so.
+  if (session.currentCue === cues.length - 1 && heardAny(input.text, ARRIVED_PHRASES)) {
+    const next: Session = { ...session, state: "arrived", lostTurns: 0, endedAt: ctx.now };
+    const instruction = say.arrived(lang);
+    return { session: next, instruction, turn: makeTurn(next, input, instruction, ctx.now) };
+  }
   const candidates: Candidate[] = [
     ...cues.map((c) => ({ id: c.id, kind: "cue" as const, names: [c.landmark, ...c.aliases] })),
     ...ctx.features.map((f) => ({ id: f.osmId, kind: "feature" as const, names: [f.name, ...f.altNames] })),
@@ -139,7 +147,7 @@ async function guidingTurn(session: Session, input: RiderInput, ctx: GuideContex
   if (cueIndex >= 0) {
     const cue = cues[cueIndex]!;
     const extra = { matchedCueId: cue.id, ...(feature ? { matchedOsmId: feature.osmId } : {}) };
-    if (cueIndex === cues.length - 1) {
+    if (cueIndex === cues.length - 1 && distanceM(cue.location, ctx.home.handoffPoint) <= ARRIVAL_RADIUS_M) {
       const next: Session = { ...session, state: "arrived", currentCue: cueIndex, lostTurns: 0, endedAt: ctx.now };
       const instruction = say.arrived(lang);
       return { session: next, instruction, turn: makeTurn(next, input, instruction, ctx.now, extra) };

@@ -298,7 +298,8 @@ export function createApp(deps: Deps) {
     const now = deps.now();
     const ended: Session = {
       ...session,
-      state: "ended",
+      // A rider who reached the door stays "arrived"; the worker hanging up doesn't undo it.
+      state: session.state === "arrived" ? "arrived" : "ended",
       endedAt: session.endedAt ?? now,
       handoff: session.handoff && session.handoff.endedAt === null ? { ...session.handoff, endedAt: now } : session.handoff,
     };
