@@ -132,6 +132,50 @@ describe("recipient routes: profile, home, switch", () => {
     expect(me.body.home).toEqual({ ...expectedHome, cues: [expectedCues[1]] });
   });
 
+  it("names landmarks in the door's state language: Telugu in Hyderabad, Hindi only in Delhi", async () => {
+    const t = setup();
+    await t.call("PUT", "/me/profile", profile, TOKEN);
+    const hyderabad = {
+      handoffPoint: { lat: 17.4313762, lon: 78.3821673 },
+      cues: [{ text: "Loft ka entrance hai", landmark: "Loft Entrance", location: { lat: 17.4313762, lon: 78.3821673 } }],
+    };
+    const res = await t.call("PUT", "/me/home", hyderabad, TOKEN);
+    expect(res.status).toBe(200);
+    expect((res.body.home as { cues: { aliases: string[] }[] }).cues[0]!.aliases).toEqual(["Loft Entrance हिं", "Loft Entrance తెలు"]);
+    expect(t.translator.languages).toEqual(["te"]);
+
+    const delhi = { handoffPoint: { lat: 28.6139, lon: 77.209 }, cues: [{ ...hyderabad.cues[0]!, location: { lat: 28.6139, lon: 77.209 } }] };
+    t.translator.failFor = "Loft Entrance";
+    const failed = await t.call("PUT", "/me/home", delhi, TOKEN);
+    // The Telugu name doesn't fit a Delhi door, so the landmark is translated again (Hindi only), and the warning says so.
+    expect(failed.body.warnings).toEqual(['Couldn\'t add Hindi names for "Loft Entrance". Save again later to retry.']);
+    t.translator.failFor = null;
+    const saved = await t.call("PUT", "/me/home", delhi, TOKEN);
+    expect((saved.body.home as { cues: { aliases: string[] }[] }).cues[0]!.aliases).toEqual(["Loft Entrance हिं"]);
+    expect(t.translator.languages).toEqual(["te", null, null]);
+  });
+
+  it("replaces Kannada names with Telugu when a Bengaluru home's door moves to Hyderabad, and keeps everything else", async () => {
+    const t = setup();
+    await t.call("PUT", "/me/profile", profile, TOKEN);
+    await t.call("PUT", "/me/home", homeBody, TOKEN);
+    const before = t.store.homes.find((h) => h.recipientId === "rcp_1")!;
+    expect(before.cues[1]!.aliases).toEqual(["green gate हिं", "green gate ಕನ್ನ"]);
+
+    const moved = {
+      handoffPoint: { lat: 17.4313762, lon: 78.3821673 },
+      cues: homeBody.cues.map((c, i) => ({ ...c, location: { lat: 17.4313762 + i * 0.0002, lon: 78.3821673 } })),
+    };
+    const res = await t.call("PUT", "/me/home", moved, TOKEN);
+    expect(res.body.warnings).toEqual([]);
+    const after = t.store.homes.find((h) => h.recipientId === "rcp_1")!;
+    expect(after.cues.map((c) => [c.landmark, c.text, c.aliases])).toEqual([
+      ["Iyengar bakery", homeBody.cues[0]!.text, ["Iyengar bakery हिं", "Iyengar bakery తెలు"]],
+      ["green gate", homeBody.cues[1]!.text, ["green gate हिं", "green gate తెలు"]],
+    ]);
+    expect(t.translator.languages).toEqual(["kn", "kn", "te", "te"]);
+  });
+
   it("still saves when translation fails, and says which names are missing", async () => {
     const t = setup();
     await t.call("PUT", "/me/profile", profile, TOKEN);

@@ -1,3 +1,4 @@
+import { localLanguageAt } from "./geo/region.js";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
 import { z } from "zod";
@@ -17,7 +18,7 @@ import {
 } from "./domain/types.js";
 import { processWalk, type WalkDeps } from "./enrich/processWalk.js";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS, processPhotos } from "./enrich/processPhotos.js";
-import type { NameTranslator } from "./enrich/translate.js";
+import { namesFitState, type NameTranslator } from "./enrich/translate.js";
 import type { PhoneCaller, TestCallIssuer } from "./voice/testCall.js";
 import { planRoute } from "./onboarding/routePlan.js";
 import type { StreetImagery } from "./onboarding/streetView.js";
@@ -146,7 +147,7 @@ function publicProposal(p: WalkProposal, photos: Map<string, string>) {
     ordinal: p.ordinal,
     name: p.name,
     nameHi: p.nameHi,
-    nameKn: p.nameKn,
+    nameLocal: p.nameLocal,
     aliases: p.aliases,
     kind: p.kind,
     color: p.color,
@@ -314,8 +315,12 @@ export function recipientRoutes(deps: {
     const [proposals, previous] = await Promise.all([store.listRecipientProposals(recipient.id), store.getHomeProfile(recipient.id)]);
     const byId = new Map(proposals.map((p) => [p.id, p]));
 
-    // Typed landmarks get Hindi and Kannada names. An unchanged name keeps the ones it already has;
-    // if translation fails the home still saves, and the response says which names are missing.
+    // Typed landmarks get Hindi names, plus the door's state language (Telugu, Kannada) where there is one.
+    // An unchanged name keeps the ones it already has, unless they're in another state's script (the door
+    // moved, or names from before the state was used); if translation fails the home still saves, and the
+    // response says which names are missing.
+    const local = localLanguageAt(parsed.data.handoffPoint);
+    const languages = local ? `Hindi and ${local.name}` : "Hindi";
     const isScript = (n: string) => /[^\x00-\x7f]/.test(n);
     const knownScripts = new Map(
       (previous?.cues ?? []).filter((c) => c.source === "typed").map((c) => [nameKey(c.landmark), c.aliases.filter(isScript)] as const),
@@ -328,13 +333,13 @@ export function recipientRoutes(deps: {
         .map(async (cue) => {
           const key = nameKey(cue.landmark);
           const known = knownScripts.get(key);
-          if (known && known.length > 0) return scriptNames.set(key, known);
+          if (known && namesFitState(known, local)) return scriptNames.set(key, known);
           try {
-            const { hi, kn } = await deps.translator.translate(cue.landmark);
-            scriptNames.set(key, [hi, kn]);
+            const names = await deps.translator.translate(cue.landmark, local);
+            scriptNames.set(key, names.local ? [names.hi, names.local] : [names.hi]);
           } catch (err) {
             deps.log({ event: "translate.failed", landmark: cue.landmark, message: (err as Error).message });
-            warnings.push(`Couldn't add Hindi and Kannada names for "${cue.landmark}". Save again later to retry.`);
+            warnings.push(`Couldn't add ${languages} names for "${cue.landmark}". Save again later to retry.`);
           }
         }),
     );
@@ -354,7 +359,7 @@ export function recipientRoutes(deps: {
         aliases: distinctNames(
           [
           ...(input.aliases ?? []),
-          ...(proposal ? [proposal.name, proposal.nameHi, proposal.nameKn, ...proposal.aliases] : (scriptNames.get(nameKey(input.landmark)) ?? [])),
+          ...(proposal ? [proposal.name, proposal.nameHi, proposal.nameLocal, ...proposal.aliases] : (scriptNames.get(nameKey(input.landmark)) ?? [])),
           ],
           input.landmark,
         ),

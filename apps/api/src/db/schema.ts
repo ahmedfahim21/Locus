@@ -108,7 +108,7 @@ export const walkProposals = locus.table(
     ordinal: integer("ordinal").notNull(),
     name: text("name").notNull(),
     nameHi: text("nameHi"),
-    nameKn: text("nameKn"),
+    nameLocal: text("nameLocal"),
     aliases: text("aliases").array().notNull(),
     kind: text("kind").notNull(),
     color: text("color"),

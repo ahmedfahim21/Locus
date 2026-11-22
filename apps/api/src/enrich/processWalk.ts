@@ -8,10 +8,10 @@ import { distanceM } from "../geo/distance.js";
 import type { ObjectStorage } from "../storage/storage.js";
 import type { Store } from "../store/store.js";
 import { candidateTimes, sampleAlongTrack, sharpestIndex, WalkError } from "./track.js";
+import { localLanguageAt } from "../geo/region.js";
 import { MAX_PROPOSALS, type LandmarkVision, type VisionLandmark } from "./vision.js";
 
 export const DEVANAGARI = /[\u0900-\u097F]/;
-export const KANNADA = /[\u0C80-\u0CFF]/;
 
 /** The name if every letter is in the expected script (the model sometimes mixes scripts), else null. */
 export function inScript(name: string, script: RegExp): string | null {
@@ -117,7 +117,8 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
     if (samples.length !== spots.length) deps.log({ event: "walk.spots_skipped", walkId, skipped: spots.length - samples.length });
     if (samples.length === 0) throw new Error("No frame of the video could be read");
 
-    const found = await deps.vision.find(jpegs.map((jpeg, index) => ({ index, jpeg, distanceM: samples[index]!.distanceM })));
+    const local = localLanguageAt(samples[0]!.location);
+    const found = await deps.vision.find(jpegs.map((jpeg, index) => ({ index, jpeg, distanceM: samples[index]!.distanceM })), local);
     const valid = found.filter((l) => Number.isInteger(l.frame) && l.frame >= 0 && l.frame < samples.length && l.name.trim());
     if (valid.length !== found.length) {
       deps.log({ event: "walk.vision_dropped", walkId, dropped: found.length - valid.length });
@@ -149,7 +150,7 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
         ordinal: i + 1,
         name: l.name.trim(),
         nameHi: inScript(l.nameHi, DEVANAGARI),
-        nameKn: inScript(l.nameKn, KANNADA),
+        nameLocal: local ? inScript(l.nameLocal, local.script) : null,
         aliases: distinctNames([...l.aliases, ...(osm ? [osm.name, ...osm.altNames] : [])], l.name),
         kind: l.kind,
         color: /^#[0-9a-f]{6}$/i.test(l.color.trim()) ? l.color.trim().toLowerCase() : null,

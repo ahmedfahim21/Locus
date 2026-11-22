@@ -62,12 +62,12 @@ class FakeStreet implements StreetImagery {
 
 describe("GET /me/suggestions", () => {
   const TOKEN = "tok:owner";
-  const temple: VisionLandmark = { frame: 0, name: "Sri Anjaneya Temple", nameHi: "श्री अंजनेय मंदिर", nameKn: "", aliases: ["Hanuman temple"], kind: "temple", color: "#E08A00", detail: "", box: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } };
-  const gate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: [], kind: "gate", color: "#1F5FBF", detail: "neem ke ped ke saamne", box: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } };
+  const temple: VisionLandmark = { frame: 0, name: "Sri Anjaneya Temple", nameHi: "श्री अंजनेय मंदिर", nameLocal: "", aliases: ["Hanuman temple"], kind: "temple", color: "#E08A00", detail: "", box: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } };
+  const gate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameLocal: "ನೀಲಿ ಗೇಟ್", aliases: [], kind: "gate", color: "#1F5FBF", detail: "neem ke ped ke saamne", box: { x: 0.2, y: 0.2, w: 0.5, h: 0.5 } };
 
   function withProposal(t: ReturnType<typeof setup>) {
     const p: WalkProposal = {
-      id: "prp_v", walkId: "walk_1", recipientId: recipient.id, ordinal: 1, name: "Green pharmacy", nameHi: null, nameKn: null,
+      id: "prp_v", walkId: "walk_1", recipientId: recipient.id, ordinal: 1, name: "Green pharmacy", nameHi: null, nameLocal: null,
       aliases: [], kind: "pharmacy", color: "#2fa56a", detail: "laal building ke bagal mein", location: { lat: 13.0352, lon: 77.5963 }, osmId: null,
       framePath: "frames/rcp_seed/walk_1/1.jpg", atS: 2, status: "proposed",
     };
@@ -96,7 +96,7 @@ describe("GET /me/suggestions", () => {
       id: expect.stringMatching(/^sug_/),
       name: "Sri Anjaneya Temple",
       nameHi: "श्री अंजनेय मंदिर",
-      nameKn: null,
+      nameLocal: null,
       aliases: ["Hanuman Mandir", "Hanuman temple"],
       kind: "temple",
       color: "#e08a00",
@@ -113,7 +113,7 @@ describe("GET /me/suggestions", () => {
     expect(byName["Green pharmacy"]).toMatchObject({ sources: ["video"], proposalId: "prp_v", photoUrl: "https://storage.test/frames/rcp_seed/walk_1/1.jpg?exp=3600", color: "#2fa56a", detail: "laal building ke bagal mein" });
     // The walk's detail goes into the drafted line: where it is first, then what to do.
     expect(byName["Green pharmacy"]!.text).toMatch(/^Green pharmacy, laal building ke bagal mein\. /);
-    expect(byName["Blue gate"]).toMatchObject({ sources: ["street"], kind: "gate", color: "#1f5fbf", nameKn: "ನೀಲಿ ಗೇಟ್", detail: "neem ke ped ke saamne" });
+    expect(byName["Blue gate"]).toMatchObject({ sources: ["street"], kind: "gate", color: "#1f5fbf", nameLocal: "ನೀಲಿ ಗೇಟ್", detail: "neem ke ped ke saamne" });
     // The bakery and the far mall aren't on the way.
     expect(Object.keys(byName).sort()).toEqual(["Blue gate", "Green pharmacy", "Sri Anjaneya Temple"]);
     // Route order.

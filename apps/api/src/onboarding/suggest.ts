@@ -1,3 +1,5 @@
+import { DEVANAGARI, inScript } from "../enrich/processWalk.js";
+import { localLanguageAt } from "../geo/region.js";
 import { nameKey, similarity } from "../clues/normalize.js";
 import type { LatLon, OsmFeature, WalkProposal } from "../domain/types.js";
 import { distanceM } from "../geo/distance.js";
@@ -11,7 +13,7 @@ export type Suggestion = {
   id: string;
   name: string;
   nameHi: string | null;
-  nameKn: string | null;
+  nameLocal: string | null;
   aliases: string[];
   kind: string | null;
   color: string | null;
@@ -97,7 +99,7 @@ function merge(into: Draft, other: Draft) {
   into.proposalId ??= other.proposalId;
   into.photoUrl ??= other.photoUrl;
   into.nameHi ??= other.nameHi;
-  into.nameKn ??= other.nameKn;
+  into.nameLocal ??= other.nameLocal;
   into.color ??= other.color;
   into.detail ??= other.detail;
   into.kind ??= other.kind;
@@ -152,7 +154,7 @@ export async function suggestLandmarks(input: {
     const pr = near(f.location, PROMINENT_KINDS.has(f.kind) ? NEAR_ROUTE_PROMINENT_M : NEAR_ROUTE_M);
     if (!pr) continue;
     drafts.push({
-      name: f.name, nameHi: null, nameKn: null, aliases: f.altNames, kind: MAP_KIND_TO_PROP[f.kind] ?? "shop", color: null, detail: null,
+      name: f.name, nameHi: null, nameLocal: null, aliases: f.altNames, kind: MAP_KIND_TO_PROP[f.kind] ?? "shop", color: null, detail: null,
       location: f.location, alongM: pr.alongM, sources: ["map"], positionTrust: POSITION_TRUST.map, osmId: f.osmId, proposalId: null, photoUrl: null,
       score: (KIND_RANK[f.kind] ?? 3) + turnBonus(pr.alongM) - pr.offM / 20,
     });
@@ -163,7 +165,7 @@ export async function suggestLandmarks(input: {
     const pr = project(route.line, cum, p.location);
     if (pr.offM > 60) continue;
     drafts.push({
-      name: p.name, nameHi: p.nameHi, nameKn: p.nameKn, aliases: p.aliases, kind: p.kind, color: p.color, detail: p.detail,
+      name: p.name, nameHi: p.nameHi, nameLocal: p.nameLocal, aliases: p.aliases, kind: p.kind, color: p.color, detail: p.detail,
       location: p.location, alongM: pr.alongM, sources: ["video"], positionTrust: POSITION_TRUST.video, osmId: p.osmId, proposalId: p.id, photoUrl: p.photoUrl,
       score: 8 + turnBonus(pr.alongM),
     });
@@ -176,8 +178,9 @@ export async function suggestLandmarks(input: {
       const images = await input.street.imagery.images(looks);
       // The imagery returns the same look objects it was given.
       const lookOf = (im: StreetImage) => looks.find((x) => x === im.look)!;
+      const local = localLanguageAt(route.line[route.line.length - 1]!);
       const found = images.length
-        ? await input.street.vision.find(images.map((im, index) => ({ index, jpeg: im.jpeg, distanceM: lookOf(im).alongM })))
+        ? await input.street.vision.find(images.map((im, index) => ({ index, jpeg: im.jpeg, distanceM: lookOf(im).alongM })), local)
         : [];
       for (const l of found) {
         const im = images[l.frame];
@@ -186,7 +189,7 @@ export async function suggestLandmarks(input: {
         // The landmark stands beside the road, on the side the camera faced.
         const side = { lat: look.location.lat + (Math.cos(toRad(look.heading)) * 10) / 111_320, lon: look.location.lon + (Math.sin(toRad(look.heading)) * 10) / (111_320 * Math.cos(toRad(look.location.lat))) };
         drafts.push({
-          name: l.name.trim(), nameHi: l.nameHi.trim() || null, nameKn: l.nameKn.trim() || null, aliases: l.aliases, kind: l.kind,
+          name: l.name.trim(), nameHi: inScript(l.nameHi, DEVANAGARI), nameLocal: local ? inScript(l.nameLocal, local.script) : null, aliases: l.aliases, kind: l.kind,
           color: /^#[0-9a-f]{6}$/i.test(l.color.trim()) ? l.color.trim().toLowerCase() : null,
           detail: l.detail.trim() || null,
           location: side, alongM: look.alongM, sources: ["street"], positionTrust: POSITION_TRUST.street, osmId: null, proposalId: null, photoUrl: null,
@@ -221,7 +224,7 @@ export async function suggestLandmarks(input: {
     streetView,
     suggestions: merged.map((d, i) => ({
       id: `sug_${i + 1}`,
-      name: d.name, nameHi: d.nameHi, nameKn: d.nameKn, aliases: d.aliases, kind: d.kind, color: d.color, detail: d.detail,
+      name: d.name, nameHi: d.nameHi, nameLocal: d.nameLocal, aliases: d.aliases, kind: d.kind, color: d.color, detail: d.detail,
       location: d.location, alongM: Math.round(d.alongM), sources: d.sources, osmId: d.osmId,
       proposalId: d.proposalId, photoUrl: d.photoUrl,
       text: draftText(d.name, d.alongM, route, d.detail),

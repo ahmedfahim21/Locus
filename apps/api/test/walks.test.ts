@@ -28,7 +28,7 @@ const bakery: VisionLandmark = {
   frame: 2,
   name: "Iyengar bakery",
   nameHi: "अयंगर बेकरी",
-  nameKn: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
+  nameLocal: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
   aliases: ["Iyengar Bakery & Sweets"],
   kind: "food",
   color: "#B8401C",
@@ -39,7 +39,7 @@ const temple: VisionLandmark = {
   frame: 13,
   name: "Hanuman temple",
   nameHi: "हनुमान मंदिर",
-  nameKn: "ಹನುಮಾನ್ ದೇವಸ್ಥಾನ",
+  nameLocal: "ಹನುಮಾನ್ ದೇವಸ್ಥಾನ",
   aliases: ["Anjaneya temple"],
   kind: "temple",
   color: "",
@@ -162,7 +162,7 @@ describe("walks: processing", () => {
         ordinal: 1,
         name: "Iyengar bakery",
         nameHi: "अयंगर बेकरी",
-        nameKn: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
+        nameLocal: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
         // The OSM name ("Iyengar Bakery") is the same as the proposal's, so it isn't repeated.
         aliases: ["Iyengar Bakery & Sweets"],
         kind: "food",
@@ -181,7 +181,7 @@ describe("walks: processing", () => {
         ordinal: 2,
         name: "Hanuman temple",
         nameHi: "हनुमान मंदिर",
-        nameKn: "ಹನುಮಾನ್ ದೇವಸ್ಥಾನ",
+        nameLocal: "ಹನುಮಾನ್ ದೇವಸ್ಥಾನ",
         // "Hanuman Mandir" normalises to the proposal's own name, so only the new names are added.
         aliases: ["Anjaneya temple", "Sri Anjaneya Temple"],
         kind: "temple",
@@ -209,9 +209,9 @@ describe("walks: processing", () => {
 
   it("drops a Hindi or Kannada name written in the wrong script", async () => {
     const t = await signedUp();
-    const { walkId } = await processedWalk(t, [{ ...bakery, nameHi: "ಐಯಂಗಾರ್ बेकरी", nameKn: "Iyengar" }]);
-    const [p] = (await t.call("GET", `/me/walks/${walkId}`, undefined, TOKEN)).body.proposals as { nameHi: string | null; nameKn: string | null }[];
-    expect([p!.nameHi, p!.nameKn]).toEqual([null, null]);
+    const { walkId } = await processedWalk(t, [{ ...bakery, nameHi: "ಐಯಂಗಾರ್ बेकरी", nameLocal: "Iyengar" }]);
+    const [p] = (await t.call("GET", `/me/walks/${walkId}`, undefined, TOKEN)).body.proposals as { nameHi: string | null; nameLocal: string | null }[];
+    expect([p!.nameHi, p!.nameLocal]).toEqual([null, null]);
   });
 
   it("lists a big place once when the model names its parts, but keeps neighbouring shops and a later stop", async () => {
@@ -538,7 +538,7 @@ describe("photos instead of a walk", () => {
     const res = await t.app.request("/me/photos", { method: "POST", headers: { authorization: `Bearer ${token}` }, body: form });
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   }
-  const blueGate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್", aliases: ["neela gate"], kind: "gate", color: "#1F5FBF", detail: "", box: { x: 0, y: 0, w: 1, h: 1 } };
+  const blueGate: VisionLandmark = { frame: 1, name: "Blue gate", nameHi: "नीला गेट", nameLocal: "ನೀಲಿ ಗೇಟ್", aliases: ["neela gate"], kind: "gate", color: "#1F5FBF", detail: "", box: { x: 0, y: 0, w: 1, h: 1 } };
 
   it("turns photos into proposals, placing known places from the map and the rest at the gate", async () => {
     const t = await signedUp();
@@ -559,14 +559,14 @@ describe("photos instead of a walk", () => {
       walk: { id: "walk_2", status: "ready", error: null, createdAt: T0.toISOString(), processedAt: T0.toISOString() },
       proposals: [
         {
-          id: "prp_3", ordinal: 1, name: "Iyengar bakery", nameHi: "अयंगर बेकरी", nameKn: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
+          id: "prp_3", ordinal: 1, name: "Iyengar bakery", nameHi: "अयंगर बेकरी", nameLocal: "ಅಯ್ಯಂಗಾರ್ ಬೇಕರಿ",
           aliases: ["Iyengar Bakery & Sweets"], kind: "food", color: "#b8401c", detail: null,
           // Found by name on the map: placed at the mapped bakery.
           location: { lat: 13.0345, lon: 77.5975 }, osmId: "node/102", atS: 0, status: "proposed",
           photoUrl: "https://storage.test/frames/rcp_1/walk_2/1.jpg?exp=3600",
         },
         {
-          id: "prp_4", ordinal: 2, name: "Blue gate", nameHi: "नीला गेट", nameKn: "ನೀಲಿ ಗೇಟ್",
+          id: "prp_4", ordinal: 2, name: "Blue gate", nameHi: "नीला गेट", nameLocal: "ನೀಲಿ ಗೇಟ್",
           // "neela gate" is the matcher's synonym for the name itself, so it adds nothing.
           aliases: [], kind: "gate", color: "#1f5fbf", detail: null,
           // Not on the map: starts at the gate for the recipient to move.
@@ -580,6 +580,28 @@ describe("photos instead of a walk", () => {
     expect(t.store.walks[0]).toMatchObject({ contentType: "image/jpeg", track: [], videoDeletedAt: T0 });
     const saved = await t.call("PUT", "/me/home", { handoffPoint: GATE, cues: [{ landmark: "Blue gate", text: "Neela gate pe rukiye.", location: GATE, proposalId: "prp_4" }] }, TOKEN);
     expect((saved.body.home as { cues: Record<string, unknown>[] }).cues[0]).toMatchObject({ source: "walkVideo", kind: "gate", color: "#1f5fbf", proposalId: "prp_4" });
+  });
+
+  it("asks for Telugu names for photos taken in Hyderabad, and drops a name in another script", async () => {
+    const t = await signedUp();
+    t.vision.answer = [
+      { ...blueGate, frame: 0, nameLocal: "నీలి గేట్" },
+      { ...blueGate, frame: 1, name: "Red gate", nameHi: "लाल गेट", nameLocal: "ಕೆಂಪು ಗೇಟ್" },
+    ];
+    const form = new FormData();
+    form.set("lat", "17.4313762");
+    form.set("lon", "78.3821673");
+    [jpeg(0), jpeg(1)].forEach((p, i) => form.append("photo", new Blob([new Uint8Array(p)], { type: "image/jpeg" }), `p${i}.jpg`));
+    expect((await upload(t, form)).status).toBe(202);
+    await t.settle();
+
+    expect(t.vision.languages).toEqual(["te"]);
+    const proposals = (await t.call("GET", "/me/walks/walk_2", undefined, TOKEN)).body.proposals as { name: string; nameHi: string | null; nameLocal: string | null }[];
+    expect(proposals.map((p) => [p.name, p.nameHi, p.nameLocal])).toEqual([
+      ["Blue gate", "नीला गेट", "నీలి గేట్"],
+      // A Kannada name for a Hyderabad landmark is the model's mistake: dropped, not shown.
+      ["Red gate", "लाल गेट", null],
+    ]);
   });
 
   it("records a failed read on the walk, keeps no frames, and asks for the photos again", async () => {

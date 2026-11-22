@@ -26,7 +26,7 @@ export type Cue = {
   /** Landmark name the rider is likely to say when standing at this cue. */
   landmark: string;
   location: LatLon;
-  /** Other names a rider might say: sign text, Hindi/Kannada names, the OSM name. */
+  /** Other names a rider might say: sign text, Hindi names and the state's language (Telugu, Kannada), the OSM name. */
   aliases: string[];
   source: CueSource;
   /** Storage path of the walk-video frame showing this landmark (walk-video cues only). */
@@ -148,7 +148,7 @@ export type WalkProposal = {
   ordinal: number;
   name: string;
   nameHi: string | null;
-  nameKn: string | null;
+  nameLocal: string | null;
   aliases: string[];
   kind: string;
   /** Most recognisable colour as "#rrggbb", or null when the model saw none. */

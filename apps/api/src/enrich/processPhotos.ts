@@ -2,7 +2,8 @@ import { matchUtterance } from "../clues/match.js";
 import { distinctNames, nameKey } from "../clues/normalize.js";
 import type { LatLon, OsmFeature, Walk, WalkProposal } from "../domain/types.js";
 import { distanceM } from "../geo/distance.js";
-import { inScript, DEVANAGARI, KANNADA, type WalkDeps } from "./processWalk.js";
+import { localLanguageAt } from "../geo/region.js";
+import { inScript, DEVANAGARI, type WalkDeps } from "./processWalk.js";
 import { MAX_PROPOSALS, type VisionLandmark } from "./vision.js";
 
 /** Photos go to the vision model in one request; more than this adds little for one route. */
@@ -33,7 +34,8 @@ export async function processPhotos(deps: Omit<WalkDeps, "frames"> & { frames: P
   if (!walk) throw new Error(`walk ${walkId} not found`);
   const uploaded: string[] = [];
   try {
-    const found = await deps.vision.find(photos.map((jpeg, index) => ({ index, jpeg, distanceM: 0, label: `Photo ${index}` })));
+    const local = localLanguageAt(door);
+    const found = await deps.vision.find(photos.map((jpeg, index) => ({ index, jpeg, distanceM: 0, label: `Photo ${index}` })), local);
     const valid = found.filter((l) => Number.isInteger(l.frame) && l.frame >= 0 && l.frame < photos.length && l.name.trim());
     if (valid.length !== found.length) deps.log({ event: "photos.vision_dropped", walkId, dropped: found.length - valid.length });
 
@@ -56,7 +58,7 @@ export async function processPhotos(deps: Omit<WalkDeps, "frames"> & { frames: P
         ordinal: i + 1,
         name: l.name.trim(),
         nameHi: inScript(l.nameHi, DEVANAGARI),
-        nameKn: inScript(l.nameKn, KANNADA),
+        nameLocal: local ? inScript(l.nameLocal, local.script) : null,
         aliases: distinctNames([...l.aliases, ...(osm ? [osm.name, ...osm.altNames] : [])], l.name),
         kind: l.kind,
         color: /^#[0-9a-f]{6}$/i.test(l.color.trim()) ? l.color.trim().toLowerCase() : null,

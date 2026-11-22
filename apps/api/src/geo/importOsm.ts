@@ -56,7 +56,7 @@ for (const e of elements) {
   if (tags.name && !tags.highway) {
     const loc = e.type === "node" ? { lat: e.lat, lon: e.lon } : e.center;
     if (!loc) continue;
-    const altNames = ["name:en", "name:hi", "name:kn", "alt_name", "old_name", "brand"]
+    const altNames = ["name:en", "name:hi", "name:te", "name:kn", "alt_name", "old_name", "brand"]
       .map((k) => tags[k])
       .filter((v): v is string => Boolean(v) && v !== tags.name);
     const kind = tags.amenity ?? tags.shop ?? tags.tourism ?? tags.leisure ?? tags.building ?? tags.office ?? "place";

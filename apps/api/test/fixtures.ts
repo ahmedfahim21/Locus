@@ -1,3 +1,4 @@
+import type { LocalLanguage } from "../src/geo/region.js";
 import { createApp, sha256 } from "../src/app.js";
 import type { Candidate } from "../src/clues/match.js";
 import type { HomeProfile, Recipient } from "../src/domain/types.js";
@@ -115,10 +116,13 @@ export class MemoryStorage implements ObjectStorage {
 /** Returns canned landmarks and records the frames it was shown. */
 export class FakeVision implements LandmarkVision {
   seen: VisionFrame[][] = [];
+  /** The local language each call asked for ("te", "kn", or null). */
+  languages: (string | null)[] = [];
   answer: VisionLandmark[] = [];
   error: Error | null = null;
-  async find(frames: VisionFrame[]) {
+  async find(frames: VisionFrame[], local: LocalLanguage | null) {
     this.seen.push(frames);
+    this.languages.push(local?.code ?? null);
     if (this.error) throw this.error;
     return structuredClone(this.answer);
   }
@@ -127,11 +131,15 @@ export class FakeVision implements LandmarkVision {
 /** Deterministic "translations" that are easy to assert; `failFor` simulates a Sarvam outage for one name. */
 export class FakeTranslator implements NameTranslator {
   calls: string[] = [];
+  /** The local language each call asked for. */
+  languages: (string | null)[] = [];
   failFor: string | null = null;
-  async translate(name: string) {
+  async translate(name: string, local: LocalLanguage | null) {
     this.calls.push(name);
+    this.languages.push(local?.code ?? null);
     if (name === this.failFor) throw new Error("Sarvam translate returned 503: busy");
-    return { hi: `${name} हिं`, kn: `${name} ಕನ್ನ` };
+    const sample = { te: "తెలు", kn: "ಕನ್ನ" } as const;
+    return { hi: `${name} हिं`, local: local ? `${name} ${sample[local.code]}` : null };
   }
 }
 
