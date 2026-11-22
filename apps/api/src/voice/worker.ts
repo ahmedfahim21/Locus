@@ -207,13 +207,13 @@ export default defineAgent({
 
     await ctx.connect();
     const caller = await ctx.waitForParticipant();
-    // A call Locus placed ("Call me") joins the room while still ringing: speak only once it's picked up.
+    // A call Locus placed ("Call the rider") joins the room while still ringing: speak only once it's picked up.
     if (!(await answered(ctx, caller))) {
       log({ event: "worker.notAnswered", room: ctx.room.name });
       await ctx.deleteRoom();
       return;
     }
-    // Four ways in: a phone call over SIP, "Call me" (Locus rings the recipient), a browser test call,
+    // Four ways in: a phone call over SIP, "Call the rider" (Locus phones the rider), a browser test call,
     // or a dev call to LOCUS_DEV_DID. A recipient tag, set only by the API, wins over the trunk number.
     const sipDid = caller.attributes["sip.trunkPhoneNumber"];
     const testRecipient = caller.attributes[TEST_CALL_RECIPIENT_ATTR];

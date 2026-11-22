@@ -34,7 +34,7 @@ export type Deps = {
   vision: LandmarkVision;
   translator: NameTranslator;
   testCalls: TestCallIssuer | null;
-  /** Rings the recipient's phone for "Call me"; null without an outbound SIP trunk. */
+  /** Phones a rider for "Call the rider"; null without an outbound SIP trunk. */
   phoneCalls: PhoneCaller | null;
   /** Street-level imagery for landmark suggestions; null when no key is configured. */
   streetImagery: StreetImagery | null;

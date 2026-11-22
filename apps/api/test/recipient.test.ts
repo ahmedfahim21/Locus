@@ -59,11 +59,11 @@ describe("recipient routes: profile, home, switch", () => {
         recipient: null,
         home: null,
         number: null,
-        canRingPhone: true,
+        canCallRider: true,
       },
     });
     const off = setup({ phoneCalls: false });
-    expect((await off.call("GET", "/me", undefined, TOKEN)).body).toMatchObject({ canRingPhone: false });
+    expect((await off.call("GET", "/me", undefined, TOKEN)).body).toMatchObject({ canCallRider: false });
   });
 
   it("home and switch need a profile first", async () => {
@@ -345,41 +345,58 @@ describe("createSupabaseVerifier", () => {
   });
 });
 
-describe("recipient routes: call me", () => {
-  it("rings the phone on the recipient's profile, tagged with the recipient", async () => {
+describe("recipient routes: call the rider", () => {
+  it("calls the rider's number, tagged with the recipient", async () => {
     const t = setup();
     t.store.authSubjects.set("owner", recipient.id);
     const before = structuredClone(t.store.recipients);
-    const res = await t.call("POST", "/me/call-me", undefined, "tok:owner");
-    expect(res).toEqual({ status: 200, body: { ringing: true, phone: recipient.phone } });
-    expect(t.phoneCalls.rung).toEqual([{ recipientId: "rcp_seed", phone: recipient.phone }]);
-    expect(t.logs).toContainEqual({ event: "callMe.ringing", recipientId: "rcp_seed", room: "callme-1" });
-    // Ringing changes nothing stored, and issues no browser call.
+    const res = await t.call("POST", "/me/call-rider", { phone: "+919811112222" }, "tok:owner");
+    expect(res).toEqual({ status: 200, body: { ringing: true, phone: "+919811112222" } });
+    expect(t.phoneCalls.rung).toEqual([{ recipientId: "rcp_seed", phone: "+919811112222" }]);
+    expect(t.logs).toContainEqual({ event: "callRider.ringing", recipientId: "rcp_seed", room: "rider-1", ownPhone: false });
+    // Calling changes nothing stored, and issues no browser call.
     expect(t.store.recipients).toEqual(before);
     expect(t.testCalls.issued).toEqual([]);
   });
 
-  it("rings at most once a minute", async () => {
+  it("calls the profile phone when no number is given, so the recipient can play the rider", async () => {
     const t = setup();
     t.store.authSubjects.set("owner", recipient.id);
-    await t.call("POST", "/me/call-me", undefined, "tok:owner");
-    expect(await t.call("POST", "/me/call-me", undefined, "tok:owner")).toEqual({
+    expect(await t.call("POST", "/me/call-rider", undefined, "tok:owner")).toEqual({ status: 200, body: { ringing: true, phone: recipient.phone } });
+    expect(t.phoneCalls.rung).toEqual([{ recipientId: "rcp_seed", phone: recipient.phone }]);
+  });
+
+  it("only dials Indian numbers", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    expect(await t.call("POST", "/me/call-rider", { phone: "+14155550100" }, "tok:owner")).toEqual({
+      status: 400,
+      body: { error: { code: "INVALID_BODY", message: "Rider's phone must be an Indian number, e.g. +919800000000" } },
+    });
+    expect(t.phoneCalls.rung).toEqual([]);
+  });
+
+  it("calls at most once a minute", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    await t.call("POST", "/me/call-rider", undefined, "tok:owner");
+    expect(await t.call("POST", "/me/call-rider", undefined, "tok:owner")).toEqual({
       status: 429,
-      body: { error: { code: "CALL_ME_TOO_SOON", message: "Your phone was just rung. Try again in a minute" } },
+      body: { error: { code: "CALL_RIDER_TOO_SOON", message: "Locus just called a rider. Try again in a minute" } },
     });
     t.clock.now = new Date(t.clock.now.getTime() + 60_000);
-    expect((await t.call("POST", "/me/call-me", undefined, "tok:owner")).status).toBe(200);
+    expect((await t.call("POST", "/me/call-rider", undefined, "tok:owner")).status).toBe(200);
     expect(t.phoneCalls.rung).toHaveLength(2);
   });
 
-  it("explains what's missing, and rings nothing", async () => {
+  it("explains what's missing, and calls no one", async () => {
     const t = setup();
-    expect((await t.call("POST", "/me/call-me", undefined, "tok:nobody")).body).toEqual({
+    expect((await t.call("POST", "/me/call-rider", undefined, "tok:nobody")).body).toEqual({
       error: { code: "PROFILE_NOT_SET_UP", message: "Save your profile first" },
     });
     t.store.authSubjects.set("owner", recipient.id);
     t.store.recipients[0]!.expectingDeliveryUntil = null;
-    expect(await t.call("POST", "/me/call-me", undefined, "tok:owner")).toEqual({
+    expect(await t.call("POST", "/me/call-rider", undefined, "tok:owner")).toEqual({
       status: 409,
       body: { error: { code: "DELIVERY_NOT_EXPECTED", message: 'Turn on "Expecting a delivery" to try a call' } },
     });
@@ -389,7 +406,7 @@ describe("recipient routes: call me", () => {
   it("answers 503 when the server has no outbound trunk", async () => {
     const t = setup({ phoneCalls: false });
     t.store.authSubjects.set("owner", recipient.id);
-    expect(await t.call("POST", "/me/call-me", undefined, "tok:owner")).toEqual({
+    expect(await t.call("POST", "/me/call-rider", undefined, "tok:owner")).toEqual({
       status: 503,
       body: { error: { code: "PHONE_CALL_UNAVAILABLE", message: "Phone calls aren't set up on this server yet" } },
     });

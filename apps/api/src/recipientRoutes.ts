@@ -31,8 +31,10 @@ export const MAX_CUES = 8;
 export const RECENT_CALLS = 10;
 /** A last landmark this close to the door is the door itself; the route doesn't add a leg. */
 const DOOR_SAME_AS_CUE_M = 15;
-/** "Call me" rings a recipient's phone at most this often. */
-const CALL_ME_EVERY_MS = 60_000;
+/** "Call the rider" places a call at most this often per recipient. */
+const CALL_RIDER_EVERY_MS = 60_000;
+/** Riders are called on Indian numbers only: the trunk is Indian, and it keeps the button from dialling anywhere. */
+const callRiderBody = z.object({ phone: z.string().regex(/^\+91\d{10}$/, "Rider's phone must be an Indian number, e.g. +919800000000").optional() }).strict();
 /** Signed photo URLs stay valid this long; the app reloads /me well within it. */
 const PHOTO_URL_TTL_S = 3600;
 export const MAX_WALK_S = 180;
@@ -200,7 +202,7 @@ export function recipientRoutes(deps: {
   translator: NameTranslator;
   /** Null when LiveKit isn't configured; test calls then answer 503. */
   testCalls: TestCallIssuer | null;
-  /** Null without an outbound SIP trunk; "Call me" then answers 503. */
+  /** Null without an outbound SIP trunk; "Call the rider" then answers 503. */
   phoneCalls: PhoneCaller | null;
   log: (event: Record<string, unknown>) => void;
   walk: Omit<WalkDeps, "store" | "storage" | "now" | "newId">;
@@ -211,7 +213,7 @@ export function recipientRoutes(deps: {
   const walkDeps: WalkDeps = { ...deps.walk, store, storage, now: deps.now, newId: deps.newId };
   /** Street View and vision are slow and paid: suggestions are cached per door and walk-proposal set. */
   const suggestionCache = new Map<string, { at: number; body: unknown }>();
-  /** When each recipient's phone was last rung by "Call me". */
+  /** When each recipient last had Locus call a rider. */
   const lastRing = new Map<string, number>();
   const app = new Hono<Env>();
 
@@ -265,10 +267,10 @@ export function recipientRoutes(deps: {
   app.get("/", async (c) => {
     const identity = c.get("identity");
     const recipient = await me(c);
-    // Whether this server can place "Call me" calls; the app hides the button otherwise.
-    const canRingPhone = deps.phoneCalls !== null;
+    // Whether this server can call a rider; the app hides the button otherwise.
+    const canCallRider = deps.phoneCalls !== null;
     if (!recipient) {
-      return c.json({ identity: { email: identity.email, name: identity.name }, recipient: null, home: null, number: null, canRingPhone });
+      return c.json({ identity: { email: identity.email, name: identity.name }, recipient: null, home: null, number: null, canCallRider });
     }
     const [home, number] = await Promise.all([
       store.getHomeProfile(recipient.id),
@@ -285,7 +287,7 @@ export function recipientRoutes(deps: {
       },
       home: await homeView(recipient.id, home),
       number: number?.did ?? null,
-      canRingPhone,
+      canCallRider,
     });
   });
 
@@ -532,23 +534,27 @@ export function recipientRoutes(deps: {
   });
 
   /**
-   * "Call me": Locus rings the phone on the recipient's profile and answers as it
-   * would a rider, so they hear the real phone call. Once a minute at most.
+   * "Call the rider": Locus phones the delivery rider and guides them to the door,
+   * exactly as when a rider calls the Locus number. The number defaults to the
+   * profile phone, so a recipient can try it by playing the rider. Once a minute.
    */
-  app.post("/call-me", async (c) => {
+  app.post("/call-rider", async (c) => {
+    const parsed = callRiderBody.safeParse((await c.req.json().catch(() => null)) ?? {});
+    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
     const ready = await callable(c);
     if (!ready.ok) return ready.res;
     const { recipient } = ready;
     if (!deps.phoneCalls) return fail(c, 503, "PHONE_CALL_UNAVAILABLE", "Phone calls aren't set up on this server yet");
     const now = deps.now().getTime();
     const last = lastRing.get(recipient.id);
-    if (last !== undefined && now - last < CALL_ME_EVERY_MS) {
-      return fail(c, 429, "CALL_ME_TOO_SOON", "Your phone was just rung. Try again in a minute");
+    if (last !== undefined && now - last < CALL_RIDER_EVERY_MS) {
+      return fail(c, 429, "CALL_RIDER_TOO_SOON", "Locus just called a rider. Try again in a minute");
     }
     lastRing.set(recipient.id, now);
-    const { room } = await deps.phoneCalls.ring(recipient.id, recipient.phone);
-    deps.log({ event: "callMe.ringing", recipientId: recipient.id, room });
-    return c.json({ ringing: true, phone: recipient.phone });
+    const phone = parsed.data.phone ?? recipient.phone;
+    const { room } = await deps.phoneCalls.ring(recipient.id, phone);
+    deps.log({ event: "callRider.ringing", recipientId: recipient.id, room, ownPhone: phone === recipient.phone });
+    return c.json({ ringing: true, phone });
   });
 
   /**

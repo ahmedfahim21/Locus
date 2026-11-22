@@ -148,7 +148,7 @@ export class FakePhoneCalls implements PhoneCaller {
   rung: { recipientId: string; phone: string }[] = [];
   async ring(recipientId: string, phone: string) {
     this.rung.push({ recipientId, phone });
-    return { room: `callme-${this.rung.length}` };
+    return { room: `rider-${this.rung.length}` };
   }
 }
 

@@ -4,7 +4,7 @@ import { AccessToken, AgentDispatchClient, SipClient } from "livekit-server-sdk"
 
 /**
  * Participant attribute naming the recipient a call is for: set by the API in a
- * browser test call's token, or on the phone leg of a "Call me" call. Callers can't change it.
+ * browser test call's token, or on the rider's leg of a call Locus places ("Call the rider"). Callers can't change it.
  */
 export const TEST_CALL_RECIPIENT_ATTR = "locus.recipientId";
 
@@ -36,10 +36,10 @@ export class LiveKitTestCalls implements TestCallIssuer {
   }
 }
 
-/** "Call me": Locus rings the recipient's own phone, as a rider calling them would hear it. */
+/** "Call the rider": Locus phones a delivery rider on the recipient's behalf. */
 export interface PhoneCaller {
-  /** Places the call and returns once it is ringing; the room is the call's id in logs. */
-  ring(recipientId: string, phone: string): Promise<{ room: string }>;
+  /** Places the call to the rider's phone and returns once it is ringing; the room is the call's id in logs. */
+  ring(recipientId: string, riderPhone: string): Promise<{ room: string }>;
 }
 
 export class LiveKitPhoneCalls implements PhoneCaller {
@@ -51,11 +51,11 @@ export class LiveKitPhoneCalls implements PhoneCaller {
     private readonly fromNumber: string,
   ) {}
 
-  async ring(recipientId: string, phone: string): Promise<{ room: string }> {
-    const room = `callme-${randomUUID()}`;
+  async ring(recipientId: string, riderPhone: string): Promise<{ room: string }> {
+    const room = `rider-${randomUUID()}`;
     await new AgentDispatchClient(this.url, this.apiKey, this.apiSecret).createDispatch(room, "locus-guide");
     // Tagged with the recipient, so the call doesn't depend on which recipient owns the Locus number.
-    await new SipClient(this.url, this.apiKey, this.apiSecret).createSipParticipant(this.trunkId, phone, room, {
+    await new SipClient(this.url, this.apiKey, this.apiSecret).createSipParticipant(this.trunkId, riderPhone, room, {
       participantIdentity: "rider",
       fromNumber: this.fromNumber,
       ringingTimeout: 40,
