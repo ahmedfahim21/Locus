@@ -1,6 +1,6 @@
 "use client";
 
-import { Microphone, MicrophoneSlash, Phone, PhoneDisconnect, PhoneIncoming, Warning } from "@phosphor-icons/react";
+import { Microphone, MicrophoneSlash, Phone, PhoneDisconnect, PhoneOutgoing, Warning } from "@phosphor-icons/react";
 import { Room, RoomEvent, Track, type RemoteTrack } from "livekit-client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, ApiError, type Call, type Me } from "../lib/api";
@@ -11,7 +11,7 @@ type Phase =
   | { kind: "idle" }
   | { kind: "starting" }
   | { kind: "live"; since: number }
-  | { kind: "ringing"; since: number; phone: string }
+  | { kind: "ringing"; since: number; phone: string; own: boolean }
   | { kind: "ended" }
   | { kind: "error"; message: string; code: string | null };
 
@@ -25,15 +25,22 @@ export function TestCall() {
   const [speaking, setSpeaking] = useState<"locus" | "you" | null>(null);
   const room = useRef<Room | null>(null);
   const audio = useRef<HTMLDivElement>(null);
-  /** The profile phone, when this server can ring it; null hides "Ring my phone". */
-  const [ringable, setRingable] = useState<string | null>(null);
+  /** The profile phone, when this server can call riders; null hides "Call the rider". */
+  const [ownPhone, setOwnPhone] = useState<string | null>(null);
+  /** The rider's number; starts as your own, so you can play the rider. */
+  const [riderPhone, setRiderPhone] = useState("");
+  const riderPhoneOk = /^\+91\d{10}$/.test(riderPhone);
   /** Which way the last attempt went, so "Try again" repeats it. */
   const via = useRef<"browser" | "phone">("browser");
 
   useEffect(() => {
     api<Me>("/me").then(
-      (me) => setRingable(me.canRingPhone && me.recipient ? me.recipient.phone : null),
-      (err) => console.error("[test-call] couldn't load /me for Call me", err),
+      (me) => {
+        const phone = me.canCallRider && me.recipient ? me.recipient.phone : null;
+        setOwnPhone(phone);
+        setRiderPhone(phone ?? "");
+      },
+      (err) => console.error("[test-call] couldn't load /me for Call the rider", err),
     );
   }, []);
 
@@ -89,14 +96,14 @@ export function TestCall() {
     }
   }
 
-  /** Locus rings the profile phone instead, so the call sounds exactly as a rider's would. */
-  async function ringPhone(turnOnFirst = false) {
+  /** Locus phones the rider and guides them in, as when a rider calls the Locus number. */
+  async function callRider(turnOnFirst = false) {
     via.current = "phone";
     setPhase({ kind: "starting" });
     try {
       if (turnOnFirst) await api("/me/expecting", { method: "PUT", body: { on: true } });
-      const { phone } = await api<{ ringing: true; phone: string }>("/me/call-me", { method: "POST" });
-      setPhase({ kind: "ringing", since: Date.now(), phone });
+      const { phone } = await api<{ ringing: true; phone: string }>("/me/call-rider", { method: "POST", body: { phone: riderPhone } });
+      setPhase({ kind: "ringing", since: Date.now(), phone, own: phone === ownPhone });
     } catch (err) {
       console.error("[test-call] failed to ring the phone", err);
       setPhase({ kind: "error", code: err instanceof ApiError ? err.code : null, message: (err as Error).message });
@@ -150,7 +157,10 @@ export function TestCall() {
       )}
       {phase.kind === "ringing" && (
         <>
-          <p className="small muted">Ringing {phase.phone}. Pick up and play the rider; the call shows here as it happens.</p>
+          <p className="small muted">
+            Calling the rider on <span className="mono">{phase.phone}</span>.{" "}
+            {phase.own ? "Pick up and play the rider; the call shows here as it happens." : "The call shows here as it happens."}
+          </p>
           <button className="btn block" type="button" onClick={() => setPhase({ kind: "ended" })}>
             Done
           </button>
@@ -167,11 +177,25 @@ export function TestCall() {
             <Phone size={18} />
             {phase.kind === "starting" ? "Connecting…" : phase.kind === "ended" ? "Call again" : "Start call"}
           </button>
-          {ringable && (
-            <button className="btn block" type="button" onClick={() => void ringPhone()} disabled={phase.kind === "starting"}>
-              <PhoneIncoming size={18} />
-              Ring my phone instead
-            </button>
+          {ownPhone && (
+            <div className="stack" style={{ gap: 10, marginTop: 8 }}>
+              <label className="field">
+                <span>Or Locus calls the rider and guides them to your door. Leave your own number to play the rider.</span>
+                <input
+                  className="mono"
+                  value={riderPhone}
+                  onChange={(e) => setRiderPhone(e.target.value.replace(/[\s-]/g, ""))}
+                  inputMode="tel"
+                  placeholder="+919800000000"
+                  aria-invalid={riderPhone.length > 3 && !riderPhoneOk}
+                />
+                {riderPhone.length > 3 && !riderPhoneOk && <span style={{ color: "var(--danger)" }}>Use the full number with +91, e.g. +919800000000</span>}
+              </label>
+              <button className="btn block" type="button" onClick={() => void callRider()} disabled={phase.kind === "starting" || !riderPhoneOk}>
+                <PhoneOutgoing size={18} />
+                Call the rider
+              </button>
+            </div>
           )}
         </>
       )}
@@ -182,11 +206,11 @@ export function TestCall() {
             <span>{phase.message}</span>
           </div>
           {phase.code === "DELIVERY_NOT_EXPECTED" ? (
-            <button className="btn primary block" type="button" onClick={() => void (via.current === "phone" ? ringPhone(true) : start(true))}>
+            <button className="btn primary block" type="button" onClick={() => void (via.current === "phone" ? callRider(true) : start(true))}>
               Turn it on and call
             </button>
           ) : (
-            <button className="btn block" type="button" onClick={() => void (via.current === "phone" ? ringPhone() : start())}>
+            <button className="btn block" type="button" onClick={() => void (via.current === "phone" ? callRider() : start())}>
               Try again
             </button>
           )}
@@ -202,7 +226,7 @@ export function TestCall() {
       <CallView
         pick={pick}
         controls={controls}
-        waiting={phase.kind === "live" ? "Locus is picking up…" : phase.kind === "ringing" ? "Waiting for you to pick up…" : "Ready when you are"}
+        waiting={phase.kind === "live" ? "Locus is picking up…" : phase.kind === "ringing" ? "Waiting for the rider to pick up…" : "Ready when you are"}
       />
     </>
   );
