@@ -29,6 +29,8 @@ export const say = {
       ? "Main unhe call kar raha hoon, line par rahiye."
       : "I'm calling them now, please stay on the line.",
   connected: (l: Language) => (l === "hi" ? "Aapko jod raha hoon." : "Connecting you now."),
+  notRecording: (l: Language) =>
+    l === "hi" ? "Theek hai, ab se kuch record nahi hoga, aur ab tak ka bhi mita diya." : "Okay, nothing more is recorded, and what was is deleted.",
   fallback: (l: Language, note: string) =>
     l === "hi" ? `Woh abhi phone nahi utha paaye. Unhone yeh kaha hai: ${note}` : `They couldn't pick up. They left this note: ${note}`,
   arrived: (l: Language) =>

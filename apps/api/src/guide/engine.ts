@@ -91,9 +91,21 @@ function screeningTurn(session: Session, input: RiderInput, ctx: GuideContext): 
   return { session: next, instruction, turn: makeTurn(next, input, instruction, ctx.now) };
 }
 
+/** The rider objected to being recorded just now (any time in the call, not only while screening). */
+function objectsNow(session: Session, input: RiderInput): boolean {
+  return session.mode === "normal" && input.kind === "speech" && heardAny(input.text, OBJECTION_PHRASES);
+}
+
+function noTranscript(session: Session): Session {
+  return { ...session, mode: "noTranscript", screening: { ...session.screening, objected: true } };
+}
+
 function messageTurn(session: Session, input: RiderInput, ctx: GuideContext): TurnOutcome {
-  const message = input.kind === "speech" ? input.text : null;
-  const next: Session = { ...session, state: "ended", message, endedAt: ctx.now };
+  // A rider who doesn't want to be recorded isn't written down as a message either.
+  const objecting = objectsNow(session, input);
+  const base = objecting ? noTranscript(session) : session;
+  const message = input.kind === "speech" && base.mode === "normal" ? input.text : null;
+  const next: Session = { ...base, state: "ended", message, endedAt: ctx.now };
   const instruction = say.messageThanks(session.language);
   return { session: next, instruction, turn: makeTurn(next, input, instruction, ctx.now) };
 }
@@ -116,6 +128,11 @@ async function guidingTurn(session: Session, input: RiderInput, ctx: GuideContex
   if (input.kind === "silence") return lostTurn(session, input, ctx);
   if (input.language !== undefined && !SUPPORTED_LANGUAGES.includes(input.language)) {
     return lostTurn(session, input, ctx);
+  }
+  if (objectsNow(session, input)) {
+    const next = noTranscript(session);
+    const instruction = `${say.notRecording(lang)} ${say.whereAreYou(lang)}`;
+    return { session: next, instruction, turn: makeTurn(next, input, instruction, ctx.now) };
   }
   if (heardAny(input.text, PERSON_PHRASES)) {
     const next = startHandoff(session, ctx.now);

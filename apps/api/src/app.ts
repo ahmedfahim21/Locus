@@ -254,10 +254,11 @@ export function createApp(deps: Deps) {
       resolver: deps.resolver,
       now: deps.now(),
     });
-    // No-transcript mode (rider objected) writes no turn rows at all.
+    // No-transcript mode (rider objected) writes no turn rows at all, and blanks the ones already written.
     await Promise.all([
       store.updateSession(outcome.session),
       outcome.session.mode === "normal" ? store.addTurn(outcome.turn) : Promise.resolve(),
+      session.mode === "normal" && outcome.session.mode === "noTranscript" ? store.redactTurns(session.id) : Promise.resolve(),
     ]);
     remember(outcome.session, recipient, home);
     log({

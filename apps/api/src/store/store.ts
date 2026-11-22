@@ -46,6 +46,8 @@ export interface Store {
   listRecentSessions(recipientId: string, limit: number): Promise<Session[]>;
 
   addTurn(turn: Turn): Promise<void>;
+  /** Blanks what the rider said in every stored turn of a call (they objected to being recorded). */
+  redactTurns(sessionId: string): Promise<void>;
   listTurns(sessionId: string): Promise<Turn[]>;
 
   createWalk(walk: Walk): Promise<void>;

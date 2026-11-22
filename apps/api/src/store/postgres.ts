@@ -361,6 +361,10 @@ export class PostgresStore implements Store {
     return rows.map(toWalk);
   }
 
+  async redactTurns(sessionId: string) {
+    await this.db.update(schema.turns).set({ utterance: null }).where(eq(schema.turns.sessionId, sessionId));
+  }
+
   async listUnreviewedProposals(before: Date) {
     const rows = await this.db
       .select({ p: schema.walkProposals })

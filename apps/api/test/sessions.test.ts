@@ -419,6 +419,44 @@ describe("handoff (P3)", () => {
   });
 });
 
+describe("recording objections, any time in the call", () => {
+  it("mid-guidance: says so, blanks what was already stored, and stores nothing after", async () => {
+    const t = setup();
+    await guiding(t);
+    await t.say("ses_1", "main petrol pump ke saamne hoon");
+    expect(t.store.turns.some((x) => x.utterance !== null)).toBe(true);
+    const res = await t.say("ses_1", "record mat karo");
+    expect(res.body).toEqual({ instruction: `${say.notRecording("hi")} ${say.whereAreYou("hi")}`, state: "guiding", lostTurns: 0 });
+    expect(t.store.sessions.get("ses_1")).toMatchObject({ mode: "noTranscript", state: "guiding" });
+    const stored = t.store.turns.length;
+    expect(t.store.turns.every((x) => x.utterance === null)).toBe(true);
+    // Guidance carries on; nothing new is written.
+    const next = await t.say("ses_1", "hanuman mandir ke paas aa gaya");
+    expect(next.body).toMatchObject({ instruction: cue(2).text, state: "guiding" });
+    expect(t.store.turns.length).toBe(stored);
+  });
+
+  it("while screening: the turns before the objection are blanked too", async () => {
+    const t = setup();
+    await t.startSession();
+    await t.say("ses_1", "Swiggy se");
+    await t.say("ses_1", "Ahmed, par record mat karo");
+    expect(t.store.sessions.get("ses_1")!.mode).toBe("noTranscript");
+    expect(t.store.turns.every((x) => x.utterance === null)).toBe(true);
+  });
+
+  it("leaving a message: an objecting rider isn't written down", async () => {
+    const t = setup();
+    await t.startSession();
+    await t.say("ses_1", "hello");
+    await t.say("ses_1", "pata nahi");
+    expect(t.store.sessions.get("ses_1")!.state).toBe("message");
+    await t.say("ses_1", "recording nahi chahiye, bas bol dena main aaya tha");
+    expect(t.store.sessions.get("ses_1")).toMatchObject({ state: "ended", mode: "noTranscript", message: null });
+    expect(t.store.turns.every((x) => x.utterance === null)).toBe(true);
+  });
+});
+
 describe("session ownership and end", () => {
   it("another client can't see or drive the session", async () => {
     const t = setup();

@@ -130,6 +130,9 @@ export class MemoryStore implements Store {
   async listProcessingWalks() {
     return structuredClone(this.walks.filter((w) => w.status === "processing"));
   }
+  async redactTurns(sessionId: string) {
+    for (const t of this.turns) if (t.sessionId === sessionId) t.utterance = null;
+  }
   async listUnreviewedProposals(before: Date) {
     const old = new Set(this.walks.filter((w) => w.processedAt !== null && w.processedAt < before).map((w) => w.id));
     return structuredClone(this.proposals.filter((p) => p.status === "proposed" && p.framePath !== null && old.has(p.walkId)));
