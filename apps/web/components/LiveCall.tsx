@@ -54,7 +54,13 @@ export function LiveCall({
     const el = transcript.current;
     if (!el) return;
     const active = activeTurn !== undefined ? el.children[activeTurn] : el.lastElementChild;
-    active?.scrollIntoView({ block: "nearest", behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth" });
+    if (!active) return;
+    // Scroll the transcript only: scrollIntoView would also scroll the page (jumping a landing visitor to the demo).
+    const box = el.getBoundingClientRect();
+    const line = active.getBoundingClientRect();
+    const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    if (line.bottom > box.bottom) el.scrollBy({ top: line.bottom - box.bottom + 8, behavior });
+    else if (line.top < box.top) el.scrollBy({ top: line.top - box.top - 8, behavior });
   }, [turns.length, activeTurn]);
 
   const steps = stops.length + (arrivedIsSeparateStop(stops, door) ? 1 : 0);
