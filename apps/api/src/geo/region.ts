@@ -7,7 +7,7 @@ import type { LatLon } from "../domain/types.js";
 export type LocalLanguage = {
   code: "te" | "kn";
   name: "Telugu" | "Kannada";
-  /** Sarvam translate target. */
+  /** Sarvam transliterate target. */
   sarvam: "te-IN" | "kn-IN";
   /** Every letter of a name in this language is in this Unicode block. */
   script: RegExp;

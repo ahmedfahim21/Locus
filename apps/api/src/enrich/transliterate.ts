@@ -16,37 +16,38 @@ export function namesFitState(names: string[], local: LocalLanguage | null): boo
 }
 
 /**
- * Names for a landmark the recipient typed in English, for riders and for the stamps:
- * Hindi always, plus the home state's language (Telugu, Kannada) where there is one.
+ * A landmark the recipient typed, spelled in Hindi (Devanagari) and the home state's
+ * script (Telugu, Kannada), for riders and for the stamps. Spelled as it sounds, not
+ * translated: riders say "Knowledge City", so it's "नॉलेज सिटी", not "ज्ञान नगरी".
  */
-export interface NameTranslator {
-  translate(name: string, local: LocalLanguage | null): Promise<{ hi: string; local: string | null }>;
+export interface NameTransliterator {
+  transliterate(name: string, local: LocalLanguage | null): Promise<{ hi: string; local: string | null }>;
 }
 
-/** Sarvam's translate API (sarvam-translate:v1). */
-export class SarvamTranslator implements NameTranslator {
+/** Sarvam's transliterate API (Roman to Indic scripts). */
+export class SarvamTransliterator implements NameTransliterator {
   constructor(
     private readonly apiKey: string,
     private readonly log: (event: Record<string, unknown>) => void,
   ) {}
 
   private async one(input: string, target: string): Promise<string> {
-    const res = await fetch("https://api.sarvam.ai/translate", {
+    const res = await fetch("https://api.sarvam.ai/transliterate", {
       method: "POST",
       headers: { "api-subscription-key": this.apiKey, "content-type": "application/json" },
-      body: JSON.stringify({ input, source_language_code: "en-IN", target_language_code: target, model: "sarvam-translate:v1" }),
+      body: JSON.stringify({ input, source_language_code: "en-IN", target_language_code: target }),
     });
-    if (!res.ok) throw new Error(`Sarvam translate returned ${res.status}: ${await res.text()}`);
-    const body = (await res.json()) as { translated_text?: string };
-    const text = body.translated_text?.trim();
-    if (!text) throw new Error("Sarvam translate returned no text");
+    if (!res.ok) throw new Error(`Sarvam transliterate returned ${res.status}: ${await res.text()}`);
+    const body = (await res.json()) as { transliterated_text?: string };
+    const text = body.transliterated_text?.trim();
+    if (!text) throw new Error("Sarvam transliterate returned no text");
     return text;
   }
 
-  async translate(name: string, local: LocalLanguage | null) {
+  async transliterate(name: string, local: LocalLanguage | null) {
     const started = Date.now();
     const [hi, localName] = await Promise.all([this.one(name, "hi-IN"), local ? this.one(name, local.sarvam) : Promise.resolve(null)]);
-    this.log({ event: "translate.call", provider: "sarvam", local: local?.code ?? null, ms: Date.now() - started });
+    this.log({ event: "transliterate.call", provider: "sarvam", local: local?.code ?? null, ms: Date.now() - started });
     return { hi, local: localName };
   }
 }

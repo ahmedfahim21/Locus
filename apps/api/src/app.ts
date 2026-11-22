@@ -1,7 +1,7 @@
 import type { StreetImagery } from "./onboarding/streetView.js";
 import { keytermsFor } from "./voice/keyterms.js";
 import type { PhoneCaller, TestCallIssuer } from "./voice/testCall.js";
-import type { NameTranslator } from "./enrich/translate.js";
+import type { NameTransliterator } from "./enrich/transliterate.js";
 import type { LandmarkVision } from "./enrich/vision.js";
 import type { WalkDeps } from "./enrich/processWalk.js";
 import type { ObjectStorage } from "./storage/storage.js";
@@ -32,7 +32,7 @@ export type Deps = {
   /** Walk videos and landmark frames. */
   storage: ObjectStorage;
   vision: LandmarkVision;
-  translator: NameTranslator;
+  transliterator: NameTransliterator;
   testCalls: TestCallIssuer | null;
   /** Phones a rider for "Call the rider"; null without an outbound SIP trunk. */
   phoneCalls: PhoneCaller | null;
@@ -327,7 +327,7 @@ export function createApp(deps: Deps) {
       },
       streetImagery: deps.streetImagery,
       storage: deps.storage,
-      translator: deps.translator,
+      transliterator: deps.transliterator,
       testCalls: deps.testCalls,
       phoneCalls: deps.phoneCalls,
       log,

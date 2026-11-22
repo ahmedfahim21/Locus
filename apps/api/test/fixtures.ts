@@ -5,7 +5,7 @@ import type { HomeProfile, Recipient } from "../src/domain/types.js";
 import type { PositionResolver } from "../src/guide/resolver.js";
 import { extractFrames, probeDurationS, type Box } from "../src/enrich/frames.js";
 import type { LandmarkVision, VisionFrame, VisionLandmark } from "../src/enrich/vision.js";
-import type { NameTranslator } from "../src/enrich/translate.js";
+import type { NameTransliterator } from "../src/enrich/transliterate.js";
 import type { PhoneCaller, TestCallIssuer } from "../src/voice/testCall.js";
 import type { StreetImagery } from "../src/onboarding/streetView.js";
 import type { ObjectStorage } from "../src/storage/storage.js";
@@ -128,16 +128,16 @@ export class FakeVision implements LandmarkVision {
   }
 }
 
-/** Deterministic "translations" that are easy to assert; `failFor` simulates a Sarvam outage for one name. */
-export class FakeTranslator implements NameTranslator {
+/** Deterministic spellings that are easy to assert; `failFor` simulates a Sarvam outage for one name. */
+export class FakeTransliterator implements NameTransliterator {
   calls: string[] = [];
   /** The local language each call asked for. */
   languages: (string | null)[] = [];
   failFor: string | null = null;
-  async translate(name: string, local: LocalLanguage | null) {
+  async transliterate(name: string, local: LocalLanguage | null) {
     this.calls.push(name);
     this.languages.push(local?.code ?? null);
-    if (name === this.failFor) throw new Error("Sarvam translate returned 503: busy");
+    if (name === this.failFor) throw new Error("Sarvam transliterate returned 503: busy");
     const sample = { te: "తెలు", kn: "ಕನ್ನ" } as const;
     return { hi: `${name} हिं`, local: local ? `${name} ${sample[local.code]}` : null };
   }
@@ -205,7 +205,7 @@ export function setup(options: { testCalls?: boolean; phoneCalls?: boolean; stre
   const resolver = new FakeResolver();
   const storage = new MemoryStorage();
   const vision = new FakeVision();
-  const translator = new FakeTranslator();
+  const transliterator = new FakeTransliterator();
   const testCalls = new FakeTestCalls();
   const phoneCalls = new FakePhoneCalls();
   const pending: Promise<void>[] = [];
@@ -225,7 +225,7 @@ export function setup(options: { testCalls?: boolean; phoneCalls?: boolean; stre
     webOrigin: WEB_ORIGIN,
     storage,
     vision,
-    translator,
+    transliterator,
     testCalls: options.testCalls === false ? null : testCalls,
     phoneCalls: options.phoneCalls === false ? null : phoneCalls,
     streetImagery: options.streetImagery ?? null,
@@ -263,5 +263,5 @@ export function setup(options: { testCalls?: boolean; phoneCalls?: boolean; stre
   const say = (id: string, text: string, language?: string) =>
     call("POST", `/v1/sessions/${id}/utterances`, language ? { kind: "speech", text, language } : { kind: "speech", text });
 
-  return { store, resolver, storage, vision, translator, testCalls, phoneCalls, clock, logs, crops, app, call, startSession, say, settle };
+  return { store, resolver, storage, vision, transliterator, testCalls, phoneCalls, clock, logs, crops, app, call, startSession, say, settle };
 }

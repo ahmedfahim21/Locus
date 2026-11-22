@@ -6,7 +6,7 @@ import { createSupabaseVerifier } from "./auth/supabaseJwt.js";
 import { createResolver } from "./guide/createResolver.js";
 import { extractFrames, probeDurationS, cropJpeg } from "./enrich/frames.js";
 import { recoverWalks, sweepUnreviewedFrames, sweepWalkVideos } from "./enrich/sweep.js";
-import { SarvamTranslator } from "./enrich/translate.js";
+import { SarvamTransliterator } from "./enrich/transliterate.js";
 import { OpenAIVision } from "./enrich/vision.js";
 import { LiveKitPhoneCalls, LiveKitTestCalls } from "./voice/testCall.js";
 import { GoogleStreetView } from "./onboarding/streetView.js";
@@ -41,7 +41,7 @@ const app = createApp({
   webOrigin: env("LOCUS_WEB_ORIGIN").split(",").map((o) => o.trim()).filter(Boolean),
   storage,
   vision,
-  translator: new SarvamTranslator(env("SARVAM_API_KEY"), log),
+  transliterator: new SarvamTransliterator(env("SARVAM_API_KEY"), log),
   streetImagery: optionalEnv("GOOGLE_MAPS_API_KEY") ? new GoogleStreetView(env("GOOGLE_MAPS_API_KEY"), log) : null,
   testCalls: optionalEnv("LIVEKIT_URL")
     ? new LiveKitTestCalls(env("LIVEKIT_URL"), env("LIVEKIT_API_KEY"), env("LIVEKIT_API_SECRET"))

@@ -18,7 +18,7 @@ import {
 } from "./domain/types.js";
 import { processWalk, type WalkDeps } from "./enrich/processWalk.js";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS, processPhotos } from "./enrich/processPhotos.js";
-import { namesFitState, type NameTranslator } from "./enrich/translate.js";
+import { namesFitState, type NameTransliterator } from "./enrich/transliterate.js";
 import type { PhoneCaller, TestCallIssuer } from "./voice/testCall.js";
 import { planRoute } from "./onboarding/routePlan.js";
 import type { StreetImagery } from "./onboarding/streetView.js";
@@ -200,7 +200,7 @@ export function recipientRoutes(deps: {
   geoAt: (point: LatLon) => Promise<{ graph: RoadGraph; features: OsmFeature[] }>;
   streetImagery: StreetImagery | null;
   storage: ObjectStorage;
-  translator: NameTranslator;
+  transliterator: NameTransliterator;
   /** Null when LiveKit isn't configured; test calls then answer 503. */
   testCalls: TestCallIssuer | null;
   /** Null without an outbound SIP trunk; "Call the rider" then answers 503. */
@@ -317,7 +317,7 @@ export function recipientRoutes(deps: {
 
     // Typed landmarks get Hindi names, plus the door's state language (Telugu, Kannada) where there is one.
     // An unchanged name keeps the ones it already has, unless they're in another state's script (the door
-    // moved, or names from before the state was used); if translation fails the home still saves, and the
+    // moved, or names from before the state was used); if spelling fails the home still saves, and the
     // response says which names are missing.
     const local = localLanguageAt(parsed.data.handoffPoint);
     const languages = local ? `Hindi and ${local.name}` : "Hindi";
@@ -335,10 +335,10 @@ export function recipientRoutes(deps: {
           const known = knownScripts.get(key);
           if (known && namesFitState(known, local)) return scriptNames.set(key, known);
           try {
-            const names = await deps.translator.translate(cue.landmark, local);
+            const names = await deps.transliterator.transliterate(cue.landmark, local);
             scriptNames.set(key, names.local ? [names.hi, names.local] : [names.hi]);
           } catch (err) {
-            deps.log({ event: "translate.failed", landmark: cue.landmark, message: (err as Error).message });
+            deps.log({ event: "transliterate.failed", landmark: cue.landmark, message: (err as Error).message });
             warnings.push(`Couldn't add ${languages} names for "${cue.landmark}". Save again later to retry.`);
           }
         }),

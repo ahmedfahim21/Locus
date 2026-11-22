@@ -114,7 +114,7 @@ describe("recipient routes: profile, home, switch", () => {
       cues: expectedCues,
     };
     expect(res).toEqual({ status: 200, body: { home: expectedHome, warnings: [] } });
-    expect(t.translator.calls.sort()).toEqual(["Iyengar bakery", "green gate"]);
+    expect(t.transliterator.calls.sort()).toEqual(["Iyengar bakery", "green gate"]);
     const stored = t.store.homes.find((h) => h.recipientId === "rcp_1")!;
     expect(stored.cues.map((c) => [c.id, c.ordinal, c.landmark])).toEqual([
       ["home_rcp_1_cue_1", 1, "Iyengar bakery"],
@@ -122,8 +122,8 @@ describe("recipient routes: profile, home, switch", () => {
     ]);
 
     await t.call("PUT", "/me/home", { ...homeBody, cues: [homeBody.cues[1]!] }, TOKEN);
-    // "green gate" kept its name, so its translations are reused rather than fetched again.
-    expect(t.translator.calls).toHaveLength(2);
+    // "green gate" kept its name, so its spellings are reused rather than fetched again.
+    expect(t.transliterator.calls).toHaveLength(2);
     expect(t.store.homes.filter((h) => h.recipientId === "rcp_1")).toHaveLength(1);
     expect(t.store.homes.find((h) => h.recipientId === "rcp_1")!.cues).toHaveLength(1);
     expect(t.store.homes.find((h) => h.recipientId === recipient.id)).toBeDefined();
@@ -142,17 +142,17 @@ describe("recipient routes: profile, home, switch", () => {
     const res = await t.call("PUT", "/me/home", hyderabad, TOKEN);
     expect(res.status).toBe(200);
     expect((res.body.home as { cues: { aliases: string[] }[] }).cues[0]!.aliases).toEqual(["Loft Entrance हिं", "Loft Entrance తెలు"]);
-    expect(t.translator.languages).toEqual(["te"]);
+    expect(t.transliterator.languages).toEqual(["te"]);
 
     const delhi = { handoffPoint: { lat: 28.6139, lon: 77.209 }, cues: [{ ...hyderabad.cues[0]!, location: { lat: 28.6139, lon: 77.209 } }] };
-    t.translator.failFor = "Loft Entrance";
+    t.transliterator.failFor = "Loft Entrance";
     const failed = await t.call("PUT", "/me/home", delhi, TOKEN);
-    // The Telugu name doesn't fit a Delhi door, so the landmark is translated again (Hindi only), and the warning says so.
+    // The Telugu name doesn't fit a Delhi door, so the landmark is spelled again (Hindi only), and the warning says so.
     expect(failed.body.warnings).toEqual(['Couldn\'t add Hindi names for "Loft Entrance". Save again later to retry.']);
-    t.translator.failFor = null;
+    t.transliterator.failFor = null;
     const saved = await t.call("PUT", "/me/home", delhi, TOKEN);
     expect((saved.body.home as { cues: { aliases: string[] }[] }).cues[0]!.aliases).toEqual(["Loft Entrance हिं"]);
-    expect(t.translator.languages).toEqual(["te", null, null]);
+    expect(t.transliterator.languages).toEqual(["te", null, null]);
   });
 
   it("replaces Kannada names with Telugu when a Bengaluru home's door moves to Hyderabad, and keeps everything else", async () => {
@@ -173,13 +173,13 @@ describe("recipient routes: profile, home, switch", () => {
       ["Iyengar bakery", homeBody.cues[0]!.text, ["Iyengar bakery हिं", "Iyengar bakery తెలు"]],
       ["green gate", homeBody.cues[1]!.text, ["green gate हिं", "green gate తెలు"]],
     ]);
-    expect(t.translator.languages).toEqual(["kn", "kn", "te", "te"]);
+    expect(t.transliterator.languages).toEqual(["kn", "kn", "te", "te"]);
   });
 
-  it("still saves when translation fails, and says which names are missing", async () => {
+  it("still saves when spelling fails, and says which names are missing", async () => {
     const t = setup();
     await t.call("PUT", "/me/profile", profile, TOKEN);
-    t.translator.failFor = "green gate";
+    t.transliterator.failFor = "green gate";
     const res = await t.call("PUT", "/me/home", homeBody, TOKEN);
     expect(res.status).toBe(200);
     expect(res.body.warnings).toEqual(['Couldn\'t add Hindi and Kannada names for "green gate". Save again later to retry.']);
@@ -188,14 +188,14 @@ describe("recipient routes: profile, home, switch", () => {
       ["Iyengar bakery", ["Iyengar bakery हिं", "Iyengar bakery ಕನ್ನ"]],
       ["green gate", []],
     ]);
-    expect(t.logs).toContainEqual(expect.objectContaining({ event: "translate.failed", landmark: "green gate" }));
+    expect(t.logs).toContainEqual(expect.objectContaining({ event: "transliterate.failed", landmark: "green gate" }));
 
     // Saving again retries only the landmark that has no names yet.
-    t.translator.failFor = null;
-    t.translator.calls = [];
+    t.transliterator.failFor = null;
+    t.transliterator.calls = [];
     const again = await t.call("PUT", "/me/home", homeBody, TOKEN);
     expect(again.body.warnings).toEqual([]);
-    expect(t.translator.calls).toEqual(["green gate"]);
+    expect(t.transliterator.calls).toEqual(["green gate"]);
   });
 
   it("rejects a handoff point outside India", async () => {
