@@ -122,16 +122,11 @@ export function Setup() {
       <SuggestStep
         door={door ?? data.home!.handoffPoint}
         skippedProposals={skippedProposals}
+        renames={walkRenames}
         progress={progress}
-        onBack={() => setStep("suggest")}
+        onBack={() => setStep("walk")}
         onDone={(kept) => {
-          // A walk landmark the recipient renamed keeps their name, in the drafted words too.
-          setFromSuggestions(
-            kept.map((s) => {
-              const renamed = s.proposalId ? walkRenames.get(s.proposalId) : undefined;
-              return renamed ? { ...s, name: renamed, text: s.text.split(s.name).join(renamed) } : s;
-            }),
-          );
+          setFromSuggestions(kept);
           setStep("landmarks");
         }}
       />
