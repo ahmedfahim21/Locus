@@ -8,7 +8,7 @@ import { extractFrames, probeDurationS, cropJpeg } from "./enrich/frames.js";
 import { recoverWalks, sweepUnreviewedFrames, sweepWalkVideos } from "./enrich/sweep.js";
 import { SarvamTranslator } from "./enrich/translate.js";
 import { OpenAIVision } from "./enrich/vision.js";
-import { LiveKitTestCalls } from "./voice/testCall.js";
+import { LiveKitPhoneCalls, LiveKitTestCalls } from "./voice/testCall.js";
 import { GoogleStreetView } from "./onboarding/streetView.js";
 import { WALK_BUCKET, SignedUrlCache } from "./storage/storage.js";
 import { SupabaseStorage } from "./storage/supabaseStorage.js";
@@ -45,6 +45,15 @@ const app = createApp({
   streetImagery: optionalEnv("GOOGLE_MAPS_API_KEY") ? new GoogleStreetView(env("GOOGLE_MAPS_API_KEY"), log) : null,
   testCalls: optionalEnv("LIVEKIT_URL")
     ? new LiveKitTestCalls(env("LIVEKIT_URL"), env("LIVEKIT_API_KEY"), env("LIVEKIT_API_SECRET"))
+    : null,
+  phoneCalls: optionalEnv("LIVEKIT_SIP_OUTBOUND_TRUNK_ID")
+    ? new LiveKitPhoneCalls(
+        env("LIVEKIT_URL"),
+        env("LIVEKIT_API_KEY"),
+        env("LIVEKIT_API_SECRET"),
+        env("LIVEKIT_SIP_OUTBOUND_TRUNK_ID"),
+        env("LOCUS_OUTBOUND_NUMBER"),
+      )
     : null,
   frames,
   background: (task) => {

@@ -5,7 +5,7 @@ import type { PositionResolver } from "../src/guide/resolver.js";
 import { extractFrames, probeDurationS, type Box } from "../src/enrich/frames.js";
 import type { LandmarkVision, VisionFrame, VisionLandmark } from "../src/enrich/vision.js";
 import type { NameTranslator } from "../src/enrich/translate.js";
-import type { TestCallIssuer } from "../src/voice/testCall.js";
+import type { PhoneCaller, TestCallIssuer } from "../src/voice/testCall.js";
 import type { StreetImagery } from "../src/onboarding/streetView.js";
 import type { ObjectStorage } from "../src/storage/storage.js";
 import { MemoryStore } from "../src/store/memory.js";
@@ -144,7 +144,15 @@ export class FakeTestCalls implements TestCallIssuer {
   }
 }
 
-export function setup(options: { testCalls?: boolean; streetImagery?: StreetImagery } = {}) {
+export class FakePhoneCalls implements PhoneCaller {
+  rung: { recipientId: string; phone: string }[] = [];
+  async ring(recipientId: string, phone: string) {
+    this.rung.push({ recipientId, phone });
+    return { room: `callme-${this.rung.length}` };
+  }
+}
+
+export function setup(options: { testCalls?: boolean; phoneCalls?: boolean; streetImagery?: StreetImagery } = {}) {
   const store = new MemoryStore();
   store.clients = [
     { id: "client_worker", name: "locus-worker", keyHash: sha256(API_KEY), firstParty: true },
@@ -191,6 +199,7 @@ export function setup(options: { testCalls?: boolean; streetImagery?: StreetImag
   const vision = new FakeVision();
   const translator = new FakeTranslator();
   const testCalls = new FakeTestCalls();
+  const phoneCalls = new FakePhoneCalls();
   const pending: Promise<void>[] = [];
   const clock = { now: new Date(T0) };
   const logs: Record<string, unknown>[] = [];
@@ -210,6 +219,7 @@ export function setup(options: { testCalls?: boolean; streetImagery?: StreetImag
     vision,
     translator,
     testCalls: options.testCalls === false ? null : testCalls,
+    phoneCalls: options.phoneCalls === false ? null : phoneCalls,
     streetImagery: options.streetImagery ?? null,
     // Crops are recorded and passed through, so tests can check what box each stored image came from.
     frames: {
@@ -245,5 +255,5 @@ export function setup(options: { testCalls?: boolean; streetImagery?: StreetImag
   const say = (id: string, text: string, language?: string) =>
     call("POST", `/v1/sessions/${id}/utterances`, language ? { kind: "speech", text, language } : { kind: "speech", text });
 
-  return { store, resolver, storage, vision, translator, testCalls, clock, logs, crops, app, call, startSession, say, settle };
+  return { store, resolver, storage, vision, translator, testCalls, phoneCalls, clock, logs, crops, app, call, startSession, say, settle };
 }

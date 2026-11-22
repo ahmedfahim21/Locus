@@ -18,7 +18,7 @@ import {
 import { processWalk, type WalkDeps } from "./enrich/processWalk.js";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS, processPhotos } from "./enrich/processPhotos.js";
 import type { NameTranslator } from "./enrich/translate.js";
-import type { TestCallIssuer } from "./voice/testCall.js";
+import type { PhoneCaller, TestCallIssuer } from "./voice/testCall.js";
 import { planRoute } from "./onboarding/routePlan.js";
 import type { StreetImagery } from "./onboarding/streetView.js";
 import { suggestLandmarks, type Suggestion } from "./onboarding/suggest.js";
@@ -31,6 +31,8 @@ export const MAX_CUES = 8;
 export const RECENT_CALLS = 10;
 /** A last landmark this close to the door is the door itself; the route doesn't add a leg. */
 const DOOR_SAME_AS_CUE_M = 15;
+/** "Call me" rings a recipient's phone at most this often. */
+const CALL_ME_EVERY_MS = 60_000;
 /** Signed photo URLs stay valid this long; the app reloads /me well within it. */
 const PHOTO_URL_TTL_S = 3600;
 export const MAX_WALK_S = 180;
@@ -102,7 +104,7 @@ const walkBody = z
 
 const VIDEO_EXT: Record<(typeof VIDEO_TYPES)[number], string> = { "video/webm": "webm", "video/mp4": "mp4", "video/quicktime": "mov" };
 
-function fail(c: Context, status: 400 | 401 | 404 | 409 | 503, code: string, message: string) {
+function fail(c: Context, status: 400 | 401 | 404 | 409 | 429 | 503, code: string, message: string) {
   return c.json({ error: { code, message } }, status);
 }
 
@@ -198,6 +200,8 @@ export function recipientRoutes(deps: {
   translator: NameTranslator;
   /** Null when LiveKit isn't configured; test calls then answer 503. */
   testCalls: TestCallIssuer | null;
+  /** Null without an outbound SIP trunk; "Call me" then answers 503. */
+  phoneCalls: PhoneCaller | null;
   log: (event: Record<string, unknown>) => void;
   walk: Omit<WalkDeps, "store" | "storage" | "now" | "newId">;
   /** Runs work after the response is sent (walk processing). */
@@ -207,6 +211,8 @@ export function recipientRoutes(deps: {
   const walkDeps: WalkDeps = { ...deps.walk, store, storage, now: deps.now, newId: deps.newId };
   /** Street View and vision are slow and paid: suggestions are cached per door and walk-proposal set. */
   const suggestionCache = new Map<string, { at: number; body: unknown }>();
+  /** When each recipient's phone was last rung by "Call me". */
+  const lastRing = new Map<string, number>();
   const app = new Hono<Env>();
 
   app.use("*", cors({ origin: deps.webOrigin, allowHeaders: ["authorization", "content-type"], allowMethods: ["GET", "PUT", "POST"] }));
@@ -243,11 +249,26 @@ export function recipientRoutes(deps: {
     return walk && walk.recipientId === recipient!.id ? walk : null;
   }
 
+  /** A call (browser or phone) needs a profile, a home and the "Expecting a delivery" switch on. */
+  async function callable(c: Context<Env>) {
+    const recipient = await me(c);
+    if (!recipient) return { ok: false as const, res: fail(c, 404, "PROFILE_NOT_SET_UP", "Save your profile first") };
+    if (!(await store.getHomeProfile(recipient.id))) {
+      return { ok: false as const, res: fail(c, 404, "HOME_NOT_SET_UP", "Save your door and landmarks first") };
+    }
+    if (!recipient.expectingDeliveryUntil || recipient.expectingDeliveryUntil <= deps.now()) {
+      return { ok: false as const, res: fail(c, 409, "DELIVERY_NOT_EXPECTED", "Turn on \"Expecting a delivery\" to try a call") };
+    }
+    return { ok: true as const, recipient };
+  }
+
   app.get("/", async (c) => {
     const identity = c.get("identity");
     const recipient = await me(c);
+    // Whether this server can place "Call me" calls; the app hides the button otherwise.
+    const canRingPhone = deps.phoneCalls !== null;
     if (!recipient) {
-      return c.json({ identity: { email: identity.email, name: identity.name }, recipient: null, home: null, number: null });
+      return c.json({ identity: { email: identity.email, name: identity.name }, recipient: null, home: null, number: null, canRingPhone });
     }
     const [home, number] = await Promise.all([
       store.getHomeProfile(recipient.id),
@@ -264,6 +285,7 @@ export function recipientRoutes(deps: {
       },
       home: await homeView(recipient.id, home),
       number: number?.did ?? null,
+      canRingPhone,
     });
   });
 
@@ -503,14 +525,30 @@ export function recipientRoutes(deps: {
 
   /** A browser call to the recipient's own Locus, for trying it out. Same screening and guide loop as a phone call. */
   app.post("/test-call", async (c) => {
-    const recipient = await me(c);
-    if (!recipient) return fail(c, 404, "PROFILE_NOT_SET_UP", "Save your profile first");
-    if (!(await store.getHomeProfile(recipient.id))) return fail(c, 404, "HOME_NOT_SET_UP", "Save your door and landmarks first");
-    if (!recipient.expectingDeliveryUntil || recipient.expectingDeliveryUntil <= deps.now()) {
-      return fail(c, 409, "DELIVERY_NOT_EXPECTED", "Turn on \"Expecting a delivery\" to try a call");
-    }
+    const ready = await callable(c);
+    if (!ready.ok) return ready.res;
     if (!deps.testCalls) return fail(c, 503, "TEST_CALL_UNAVAILABLE", "Calls aren't set up on this server yet");
-    return c.json(await deps.testCalls.issue(recipient.id));
+    return c.json(await deps.testCalls.issue(ready.recipient.id));
+  });
+
+  /**
+   * "Call me": Locus rings the phone on the recipient's profile and answers as it
+   * would a rider, so they hear the real phone call. Once a minute at most.
+   */
+  app.post("/call-me", async (c) => {
+    const ready = await callable(c);
+    if (!ready.ok) return ready.res;
+    const { recipient } = ready;
+    if (!deps.phoneCalls) return fail(c, 503, "PHONE_CALL_UNAVAILABLE", "Phone calls aren't set up on this server yet");
+    const now = deps.now().getTime();
+    const last = lastRing.get(recipient.id);
+    if (last !== undefined && now - last < CALL_ME_EVERY_MS) {
+      return fail(c, 429, "CALL_ME_TOO_SOON", "Your phone was just rung. Try again in a minute");
+    }
+    lastRing.set(recipient.id, now);
+    const { room } = await deps.phoneCalls.ring(recipient.id, recipient.phone);
+    deps.log({ event: "callMe.ringing", recipientId: recipient.id, room });
+    return c.json({ ringing: true, phone: recipient.phone });
   });
 
   /**

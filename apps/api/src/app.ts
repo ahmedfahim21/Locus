@@ -1,6 +1,6 @@
 import type { StreetImagery } from "./onboarding/streetView.js";
 import { keytermsFor } from "./voice/keyterms.js";
-import type { TestCallIssuer } from "./voice/testCall.js";
+import type { PhoneCaller, TestCallIssuer } from "./voice/testCall.js";
 import type { NameTranslator } from "./enrich/translate.js";
 import type { LandmarkVision } from "./enrich/vision.js";
 import type { WalkDeps } from "./enrich/processWalk.js";
@@ -34,6 +34,8 @@ export type Deps = {
   vision: LandmarkVision;
   translator: NameTranslator;
   testCalls: TestCallIssuer | null;
+  /** Rings the recipient's phone for "Call me"; null without an outbound SIP trunk. */
+  phoneCalls: PhoneCaller | null;
   /** Street-level imagery for landmark suggestions; null when no key is configured. */
   streetImagery: StreetImagery | null;
   frames: WalkDeps["frames"];
@@ -327,6 +329,7 @@ export function createApp(deps: Deps) {
       storage: deps.storage,
       translator: deps.translator,
       testCalls: deps.testCalls,
+      phoneCalls: deps.phoneCalls,
       log,
       walk: { vision: deps.vision, frames: deps.frames, log },
       background: deps.background,

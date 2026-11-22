@@ -59,8 +59,11 @@ describe("recipient routes: profile, home, switch", () => {
         recipient: null,
         home: null,
         number: null,
+        canRingPhone: true,
       },
     });
+    const off = setup({ phoneCalls: false });
+    expect((await off.call("GET", "/me", undefined, TOKEN)).body).toMatchObject({ canRingPhone: false });
   });
 
   it("home and switch need a profile first", async () => {
@@ -339,6 +342,57 @@ describe("createSupabaseVerifier", () => {
     expect(await v.verify(await sign(other.pair.privateKey, valid))).toBeNull();
     expect(await v.verify("not.a.jwt")).toBeNull();
     expect(await v.verify("abc")).toBeNull();
+  });
+});
+
+describe("recipient routes: call me", () => {
+  it("rings the phone on the recipient's profile, tagged with the recipient", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    const before = structuredClone(t.store.recipients);
+    const res = await t.call("POST", "/me/call-me", undefined, "tok:owner");
+    expect(res).toEqual({ status: 200, body: { ringing: true, phone: recipient.phone } });
+    expect(t.phoneCalls.rung).toEqual([{ recipientId: "rcp_seed", phone: recipient.phone }]);
+    expect(t.logs).toContainEqual({ event: "callMe.ringing", recipientId: "rcp_seed", room: "callme-1" });
+    // Ringing changes nothing stored, and issues no browser call.
+    expect(t.store.recipients).toEqual(before);
+    expect(t.testCalls.issued).toEqual([]);
+  });
+
+  it("rings at most once a minute", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    await t.call("POST", "/me/call-me", undefined, "tok:owner");
+    expect(await t.call("POST", "/me/call-me", undefined, "tok:owner")).toEqual({
+      status: 429,
+      body: { error: { code: "CALL_ME_TOO_SOON", message: "Your phone was just rung. Try again in a minute" } },
+    });
+    t.clock.now = new Date(t.clock.now.getTime() + 60_000);
+    expect((await t.call("POST", "/me/call-me", undefined, "tok:owner")).status).toBe(200);
+    expect(t.phoneCalls.rung).toHaveLength(2);
+  });
+
+  it("explains what's missing, and rings nothing", async () => {
+    const t = setup();
+    expect((await t.call("POST", "/me/call-me", undefined, "tok:nobody")).body).toEqual({
+      error: { code: "PROFILE_NOT_SET_UP", message: "Save your profile first" },
+    });
+    t.store.authSubjects.set("owner", recipient.id);
+    t.store.recipients[0]!.expectingDeliveryUntil = null;
+    expect(await t.call("POST", "/me/call-me", undefined, "tok:owner")).toEqual({
+      status: 409,
+      body: { error: { code: "DELIVERY_NOT_EXPECTED", message: 'Turn on "Expecting a delivery" to try a call' } },
+    });
+    expect(t.phoneCalls.rung).toEqual([]);
+  });
+
+  it("answers 503 when the server has no outbound trunk", async () => {
+    const t = setup({ phoneCalls: false });
+    t.store.authSubjects.set("owner", recipient.id);
+    expect(await t.call("POST", "/me/call-me", undefined, "tok:owner")).toEqual({
+      status: 503,
+      body: { error: { code: "PHONE_CALL_UNAVAILABLE", message: "Phone calls aren't set up on this server yet" } },
+    });
   });
 });
 

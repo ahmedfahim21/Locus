@@ -174,6 +174,29 @@ class GuideAgent extends voice.Agent {
   }
 }
 
+/** Resolves true once a SIP call is answered (at once for inbound and browser calls), false if it never is. */
+function answered(ctx: JobContext, caller: { identity: string; attributes: Record<string, string> }): Promise<boolean> {
+  const status = () => caller.attributes["sip.callStatus"];
+  if (status() === undefined || status() === "active") return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const onChange = (_changed: Record<string, string>, p: { identity: string }) => {
+      if (p.identity !== caller.identity) return;
+      if (status() === "active") done(true);
+      else if (status() === "hangup") done(false);
+    };
+    const onLeave = (p: { identity: string }) => {
+      if (p.identity === caller.identity) done(false);
+    };
+    const done = (ok: boolean) => {
+      ctx.room.off(RoomEvent.ParticipantAttributesChanged, onChange);
+      ctx.room.off(RoomEvent.ParticipantDisconnected, onLeave);
+      resolve(ok);
+    };
+    ctx.room.on(RoomEvent.ParticipantAttributesChanged, onChange);
+    ctx.room.on(RoomEvent.ParticipantDisconnected, onLeave);
+  });
+}
+
 export default defineAgent({
   prewarm: async (proc: JobProcess) => {
     proc.userData.vad = await silero.VAD.load(VAD_OPTIONS);
@@ -184,13 +207,20 @@ export default defineAgent({
 
     await ctx.connect();
     const caller = await ctx.waitForParticipant();
-    // Three ways in: a phone call over SIP, a browser test call from the web app, or a dev call to LOCUS_DEV_DID.
+    // A call Locus placed ("Call me") joins the room while still ringing: speak only once it's picked up.
+    if (!(await answered(ctx, caller))) {
+      log({ event: "worker.notAnswered", room: ctx.room.name });
+      await ctx.deleteRoom();
+      return;
+    }
+    // Four ways in: a phone call over SIP, "Call me" (Locus rings the recipient), a browser test call,
+    // or a dev call to LOCUS_DEV_DID. A recipient tag, set only by the API, wins over the trunk number.
     const sipDid = caller.attributes["sip.trunkPhoneNumber"];
     const testRecipient = caller.attributes[TEST_CALL_RECIPIENT_ATTR];
     const devDid = optionalEnv("LOCUS_DEV_DID");
     let target: { did: string } | { recipientId: string };
-    if (sipDid) target = { did: sipDid };
-    else if (testRecipient) target = { recipientId: testRecipient };
+    if (testRecipient) target = { recipientId: testRecipient };
+    else if (sipDid) target = { did: sipDid };
     else if (devDid) target = { did: devDid };
     else throw new Error(`Participant ${caller.identity} has no SIP number or test-call recipient, and LOCUS_DEV_DID is unset`);
     const callerId = caller.attributes["sip.phoneNumber"] ?? (sipDid ? undefined : `browser:${caller.identity}`);
