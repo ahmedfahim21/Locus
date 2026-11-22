@@ -1,0 +1,162 @@
+{
+  "profile": {
+    "firstName": "Fahim",
+    "platforms": [
+      "swiggy",
+      "zomato",
+      "blinkit",
+      "zepto",
+      "instamart",
+      "amazon",
+      "flipkart",
+      "bigbasket"
+    ],
+    "fallbackNote": "Leave at the door, near the shoe rack"
+  },
+  "home": {
+    "handoffPoint": {
+      "lat": 17.4313761962616,
+      "lon": 78.3821673452433
+    },
+    "cues": [
+      {
+        "text": "Knowledge City Road se andar aaiye, seedha 100 meter, phir left lijiye.",
+        "landmark": "Knowledge City road",
+        "location": {
+          "lat": 17.4314337,
+          "lon": 78.381278
+        },
+        "aliases": [
+          "नॉलेज सिटी रोड",
+          "నాలెడ్జ్ సిటీ రోడ్"
+        ],
+        "kind": "gate"
+      },
+      {
+        "text": "Sadak ke paar, pedon ke peeche gold glass building dikhegi. Uski taraf seedha aaiye.",
+        "landmark": "Satvaa gold glass building",
+        "location": {
+          "lat": 17.4313767902871,
+          "lon": 78.3813247595255
+        },
+        "aliases": [
+          "सत्वा गोल्ड ग्लास बिल्डिंग",
+          "సత్వ గోల్డ్ గ్లాస్ బిల్డింగ్"
+        ],
+        "kind": "building",
+        "color": "#b8ad70"
+      },
+      {
+        "text": "Gold building ke bagal mein blue striped glass building hai. Aage badhte rahiye.",
+        "landmark": "blue striped glass building",
+        "location": {
+          "lat": 17.4311364705246,
+          "lon": 78.381631819678
+        },
+        "aliases": [
+          "ब्लू स्ट्राइप्ड ग्लास बिल्डिंग",
+          "బ్లూ స్ట్రైప్డ్ గ్లాస్ బిల్డింగ్"
+        ],
+        "kind": "building",
+        "color": "#274f68"
+      },
+      {
+        "text": "Laal building ke paas grey ramp wala entry gate hai. Ramp se neeche aaiye.",
+        "landmark": "grey ramp entry gate",
+        "location": {
+          "lat": 17.4314265150265,
+          "lon": 78.38168025705
+        },
+        "aliases": [
+          "ग्रे रैंप एंट्री गेट",
+          "గ్రే రాంప్ ఎంట్రీ గేట్"
+        ],
+        "kind": "gate",
+        "color": "#42484a"
+      },
+      {
+        "text": "Grey gate ke bagal mein laal eenton wali Loft building hai. Wahi jaana hai.",
+        "landmark": "red brick building Loft",
+        "location": {
+          "lat": 17.4313631429663,
+          "lon": 78.3819660436576
+        },
+        "aliases": [
+          "रेड ब्रिक बिल्डिंग लॉफ्ट",
+          "రెడ్ బ్రిక్ బిల్డింగ్ లాఫ్ట్"
+        ],
+        "kind": "building",
+        "color": "#a85650"
+      },
+      {
+        "text": "Laal building par neele aksharon mein HOSA ka board hai. Uske neeche entrance hai.",
+        "landmark": "HOSA sign board",
+        "location": {
+          "lat": 17.4314851969147,
+          "lon": 78.3822138231287
+        },
+        "aliases": [
+          "होसा साइन बोर्ड",
+          "హోసా సైన్ బోర్డ్"
+        ],
+        "kind": "food",
+        "color": "#80c9d2"
+      },
+      {
+        "text": "Peeli-kaali patti wali seedhiyan glass darwaze tak jaati hain. Upar aa jaiye.",
+        "landmark": "glass entrance stairs",
+        "location": {
+          "lat": 17.4314139865619,
+          "lon": 78.3820376057951
+        },
+        "aliases": [
+          "ग्लास एंट्रेंस स्टेर्स",
+          "గ్లాస్ ఎంట్రన్స్ స్టెయిర్స్"
+        ],
+        "kind": "stairs",
+        "color": "#55585a"
+      },
+      {
+        "text": "Loft ka entrance hai",
+        "landmark": "Loft Entrance",
+        "location": {
+          "lat": 17.4314263694783,
+          "lon": 78.3820490871881
+        },
+        "aliases": [
+          "लॉफ्ट एंट्रेंस",
+          "లఫ్ట్ ఎంట్రన్స్"
+        ],
+        "kind": "entrance"
+      },
+      {
+        "text": "HOSA ke darwaze ke bagal mein kaali deewar par LoFt likha hai. Wahi reception hai.",
+        "landmark": "LoFt wall reception",
+        "location": {
+          "lat": 17.4314271025893,
+          "lon": 78.3821581961205
+        },
+        "aliases": [
+          "एल ओ एफ टी वॉल रिसेप्शन",
+          "ఎల్ ఓ ఎఫ్ టీ వాల్ రిసెప్షన్"
+        ],
+        "kind": "other",
+        "color": "#20201b"
+      },
+      {
+        "text": "Lobby mein A,B,C likhe lift ke paas aa jaiye. Seeda 3rd floor pe aajayey",
+        "landmark": "Lift",
+        "location": {
+          "lat": 17.4315640103194,
+          "lon": 78.3821109869295
+        },
+        "aliases": [
+          "लिफ्ट",
+          "లిఫ్ట్"
+        ],
+        "kind": "lift",
+        "color": "#777d78"
+      }
+    ]
+  }
+}
