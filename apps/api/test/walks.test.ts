@@ -164,7 +164,8 @@ describe("walks: processing", () => {
         color: "#b8401c",
         location: { lat: 13.0345, lon: 77.5975 },
         osmId: "node/102",
-        atS: expect.closeTo(0.67, 1),
+        // The sharpest frame within a second of the 0.67 s spot (at the video start, 0 s or later).
+        atS: expect.toSatisfy((t: number) => [0, 0.67, 1.67].some((c) => Math.abs(t - c) < 0.02)),
         status: "proposed",
         photoUrl: `https://storage.test/frames/rcp_1/${walkId}/1.jpg?exp=3600`,
       },
@@ -180,7 +181,8 @@ describe("walks: processing", () => {
         color: null,
         location: TEMPLE,
         osmId: "node/101",
-        atS: expect.closeTo(4.33, 1),
+        // The sharpest frame within a second of the 4.33 s spot.
+        atS: expect.toSatisfy((t: number) => [3.33, 4.33, 5.33].some((c) => Math.abs(t - c) < 0.02)),
         status: "proposed",
         photoUrl: `https://storage.test/frames/rcp_1/${walkId}/2.jpg?exp=3600`,
       },

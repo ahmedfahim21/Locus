@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { candidatesFor, passesGate, scoreArm } from "../src/eval/ablation.js";
 import { home as fixtureHome } from "./fixtures.js";
-import { cleanTrack, MAX_FRAMES, sampleAlongTrack, WalkError } from "../src/enrich/track.js";
+import { candidateTimes, cleanTrack, MAX_FRAMES, sampleAlongTrack, sharpestIndex, WalkError } from "../src/enrich/track.js";
 import { heardAny, matchUtterance } from "../src/clues/match.js";
 import { romanize, tokens } from "../src/clues/normalize.js";
 import { decodeDigipin, encodeDigipin } from "../src/digipin/digipin.js";
@@ -149,6 +149,22 @@ describe("walk track sampling", () => {
     expect(() => sampleAlongTrack([fix(0, 13.0, 77.5), fix(5000, 13.00001, 77.5)], 5)).toThrow(
       "The GPS track only moved 1 m. Start at the main road and walk to your door while recording.",
     );
+  });
+});
+
+describe("sharpest frame per spot", () => {
+  it("looks a second either side, inside the video, without repeats", () => {
+    expect(candidateTimes(10, 60)).toEqual([9, 10, 11]);
+    expect(candidateTimes(0, 60)).toEqual([0, 1]);
+    expect(candidateTimes(59.9, 60)).toEqual([58.9, 59.9]);
+    expect(candidateTimes(0, 0.05)).toEqual([0]);
+  });
+
+  it("picks the frame that encodes largest, the first on a tie", () => {
+    const jpeg = (n: number) => Buffer.alloc(n);
+    expect(sharpestIndex([jpeg(30_000), jpeg(52_000), jpeg(41_000)])).toBe(1);
+    expect(sharpestIndex([jpeg(5), jpeg(5)])).toBe(0);
+    expect(sharpestIndex([jpeg(1)])).toBe(0);
   });
 });
 

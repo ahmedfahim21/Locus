@@ -7,7 +7,7 @@ import type { LatLon, OsmFeature, Walk, WalkProposal } from "../domain/types.js"
 import { distanceM } from "../geo/distance.js";
 import type { ObjectStorage } from "../storage/storage.js";
 import type { Store } from "../store/store.js";
-import { sampleAlongTrack, WalkError } from "./track.js";
+import { candidateTimes, sampleAlongTrack, sharpestIndex, WalkError } from "./track.js";
 import { MAX_PROPOSALS, type LandmarkVision, type VisionLandmark } from "./vision.js";
 
 export const DEVANAGARI = /[\u0900-\u097F]/;
@@ -93,8 +93,21 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
     const video = join(dir, "video");
     await writeFile(video, await deps.storage.download(walk.videoPath));
     const durationS = await deps.frames.probeDurationS(video);
-    const samples = sampleAlongTrack(walk.track, Math.min(durationS, walk.durationS));
-    const jpegs = await deps.frames.extractFrames(video, samples.map((s) => s.atS));
+    const videoS = Math.min(durationS, walk.durationS);
+    const spots = sampleAlongTrack(walk.track, videoS);
+    // Each ~10 m spot gets the sharpest of a few frames around it, so one blurred or
+    // blank instant doesn't waste the spot (the chosen time is kept on the proposal).
+    const groups = spots.map((s) => candidateTimes(s.atS, videoS));
+    const candidates = await deps.frames.extractFrames(video, groups.flat());
+    const samples = [...spots];
+    const jpegs: Buffer[] = [];
+    let offset = 0;
+    for (const [i, times] of groups.entries()) {
+      const pick = sharpestIndex(candidates.slice(offset, offset + times.length));
+      jpegs.push(candidates[offset + pick]!);
+      samples[i] = { ...spots[i]!, atS: times[pick]! };
+      offset += times.length;
+    }
 
     const found = await deps.vision.find(jpegs.map((jpeg, index) => ({ index, jpeg, distanceM: samples[index]!.distanceM })));
     const valid = found.filter((l) => Number.isInteger(l.frame) && l.frame >= 0 && l.frame < samples.length && l.name.trim());

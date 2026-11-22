@@ -59,3 +59,23 @@ export function sampleAlongTrack(track: TrackPoint[], videoDurationS: number): F
   }
   return samples;
 }
+
+/** Seconds either side of a sample to look for a sharper frame of the same spot. */
+export const CANDIDATE_OFFSETS_S = [-1, 0, 1];
+
+/** Candidate times around a sample, inside the video, without duplicates. */
+export function candidateTimes(atS: number, videoDurationS: number): number[] {
+  const lastS = Math.max(0, videoDurationS - 0.1);
+  const times = CANDIDATE_OFFSETS_S.map((o) => Math.min(lastS, Math.max(0, atS + o)));
+  return [...new Set(times.map((t) => Math.round(t * 100) / 100))];
+}
+
+/**
+ * Index of the most detailed frame. At the same JPEG quality, a blurred, shaky or
+ * blank frame (ground, sky, a hand over the lens) encodes much smaller than a sharp one.
+ */
+export function sharpestIndex(jpegs: Buffer[]): number {
+  let best = 0;
+  for (let i = 1; i < jpegs.length; i++) if (jpegs[i]!.length > jpegs[best]!.length) best = i;
+  return best;
+}
