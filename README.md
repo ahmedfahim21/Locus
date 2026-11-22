@@ -92,3 +92,7 @@ pnpm typecheck
 ```
 
 The API tests drive the HTTP routes against an in-memory store, so they need no database or keys.
+
+## License
+
+MIT, see [LICENSE](LICENSE).
