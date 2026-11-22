@@ -4,6 +4,7 @@ import { ArrowRight } from "@phosphor-icons/react";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { api, type Me, type Profile } from "../../lib/api";
 import { AccountMenu } from "../AccountMenu";
+import { AppTile, appById } from "../DeliveryApps";
 import { TopBar } from "../TopBar";
 
 const COMMON_APPS = ["swiggy", "zomato", "blinkit", "zepto", "instamart", "amazon", "flipkart", "bigbasket"];
@@ -82,6 +83,7 @@ export function AboutStep({ me, progress, onDone }: { me: Me; progress: ReactNod
                 onClick={() => toggleApp(app)}
                 disabled={!apps.includes(app) && apps.length >= MAX_APPS}
               >
+                {appById(app) && <AppTile app={appById(app)!} size={22} />}
                 {titleCase(app)}
               </button>
             ))}
