@@ -1,8 +1,11 @@
 /**
  * Imports named places and roads around a point from the public Overpass API.
- * Usage: pnpm --filter @locus/api osm:import <lat> <lon> [radiusM=700]
+ * Usage: pnpm --filter @locus/api osm:import <lat> <lon> [radiusM=700] [--save file.json] [--from file.json]
+ * --save keeps the Overpass response; --from imports a saved response instead of calling Overpass
+ * (the demo seed uses seed/osm-knowledge-city.json, so it works offline and when Overpass is busy).
  * OSM data © OpenStreetMap contributors, ODbL.
  */
+import { readFileSync, writeFileSync } from "node:fs";
 import { env, optionalEnv } from "../config.js";
 import * as schema from "../db/schema.js";
 import { PostgresStore } from "../store/postgres.js";
@@ -11,7 +14,18 @@ type OverpassElement =
   | { type: "node"; id: number; lat: number; lon: number; tags?: Record<string, string> }
   | { type: "way"; id: number; nodes?: number[]; tags?: Record<string, string>; center?: { lat: number; lon: number } };
 
-const [latArg, lonArg, radiusArg] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const flag = (name: string) => {
+  const i = argv.indexOf(name);
+  if (i === -1) return null;
+  const value = argv[i + 1];
+  if (!value || value.startsWith("--")) throw new Error(`${name} needs a file path`);
+  argv.splice(i, 2);
+  return value;
+};
+const fromFile = flag("--from");
+const saveFile = flag("--save");
+const [latArg, lonArg, radiusArg] = argv;
 const lat = Number(latArg);
 const lon = Number(lonArg);
 const radius = Number(radiusArg ?? "700");
@@ -29,13 +43,19 @@ way(around:${radius},${lat},${lon})["highway"]->.roads;
 .roads >;
 out skel qt;`;
 
-const res = await fetch(endpoint, {
-  method: "POST",
-  headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "locus-osm-import/0.1" },
-  body: `data=${encodeURIComponent(query)}`,
-});
-if (!res.ok) throw new Error(`Overpass returned ${res.status}: ${await res.text()}`);
-const { elements } = (await res.json()) as { elements: OverpassElement[] };
+async function overpass(): Promise<{ elements: OverpassElement[] }> {
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded", "user-agent": "locus-osm-import/0.1" },
+    body: `data=${encodeURIComponent(query)}`,
+  });
+  if (!res.ok) throw new Error(`Overpass returned ${res.status}: ${await res.text()}`);
+  return (await res.json()) as { elements: OverpassElement[] };
+}
+const response = fromFile ? (JSON.parse(readFileSync(fromFile, "utf8")) as { elements: OverpassElement[] }) : await overpass();
+if (!Array.isArray(response.elements)) throw new Error(`${fromFile ?? "Overpass"} has no elements array`);
+if (saveFile) writeFileSync(saveFile, JSON.stringify(response));
+const { elements } = response;
 
 const nodes = new Map<number, { lat: number; lon: number }>();
 for (const e of elements) if (e.type === "node") nodes.set(e.id, { lat: e.lat, lon: e.lon });
