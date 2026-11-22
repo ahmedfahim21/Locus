@@ -71,7 +71,7 @@ typography:
     fontSize: 0.8125rem
     letterSpacing: 0.04em
   scripts:
-    fontFamily: Anek Devanagari, Anek Kannada
+    fontFamily: Anek Devanagari, Anek Telugu, Anek Kannada
     fontWeight: 400
   mono:
     fontFamily: ui-monospace, SF Mono, Menlo
@@ -168,7 +168,7 @@ Appearance: Auto (follows the system), Light or Dark, chosen in Home → Account
 
 ## Typography
 
-The system font (SF Pro on Apple devices, Inter or Helvetica elsewhere) carries the UI. Weight stays 400 everywhere, as the user's rules require; hierarchy comes from size and negative tracking on large text (display −0.035em, title −0.025em). Section labels are small uppercase muted text above each group. Anek Devanagari and Anek Kannada render Hindi and Kannada landmark names. Mono (SF Mono) is for phone numbers, DIGIPIN and timers.
+The system font (SF Pro on Apple devices, Inter or Helvetica elsewhere) carries the UI. Weight stays 400 everywhere, as the user's rules require; hierarchy comes from size and negative tracking on large text (display −0.035em, title −0.025em). Section labels are small uppercase muted text above each group. Anek Devanagari, Anek Telugu and Anek Kannada render landmark names in Hindi and the home state's language (Telugu in Telangana and Andhra Pradesh, Kannada in Karnataka, none elsewhere). Mono (SF Mono) is for phone numbers, DIGIPIN and timers.
 
 ## Layout
 
@@ -196,7 +196,7 @@ Flat surfaces separated by background tone, not borders: white groups on grey. O
 - Switch: iOS style, green when on.
 - Inputs: white on grey (grey on white inside a card), 12px corners, a 2px ink focus ring.
 - Chat bubbles: Locus's lines are grey on the left, the rider's black on the right; the speaker label shows only when the speaker changes; the active line is ringed in route blue.
-- Map pins: a dark pill with a gold numbered pip, the name, and the Hindi and Kannada names in small grey text. When there is a walk photo, a 40px rounded photo replaces the pip and the number moves onto its corner. Reached pins turn their pip green; draft pins are translucent with a dashed gold outline.
+- Map pins: a dark pill with a gold numbered pip, the name, and the Hindi and state-language (Telugu or Kannada) names in small grey text. When there is a walk photo, a 40px rounded photo replaces the pip and the number moves onto its corner. Reached pins turn their pip green; draft pins are translucent with a dashed gold outline.
 - Door: a white dot with a dark ring and a small "Door" pill (left off when the last landmark is the door).
 - Rider: a blue dot with a white border and a soft blue halo.
 - Callout: a white rounded bubble on the map showing Locus's latest line, rising in.
@@ -214,7 +214,7 @@ Flat surfaces separated by background tone, not borders: white groups on grey. O
 - Do credit OpenStreetMap and OpenFreeMap on every map.
 - Don't use bold or semibold; use size and tracking.
 - Don't add a brand colour to buttons or headings.
-- Don't add base-map labels in Devanagari or Kannada (the fonts can't render them); show those names on Locus's own pins.
+- Don't add base-map labels in Devanagari, Telugu or Kannada (the fonts can't render them); show those names on Locus's own pins.
 - Don't use heavy borders, hard offset shadows or handwritten fonts (the earlier "wedding card" look is retired).
 
 ## Motion
