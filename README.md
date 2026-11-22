@@ -60,43 +60,7 @@ The API and call worker run on AWS EC2. Vercel hosts the web app, and Supabase p
 
 ## Run locally
 
-You need Node.js 22+, pnpm 10 and a Supabase project with Google sign-in. Copy [.env.example](.env.example) to `.env` at the repo root.
-
-The demo call needs only the web app, with `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` set:
-
-```bash
-pnpm install
-pnpm --filter @locus/web dev
-```
-
-Then open `http://localhost:3000/replay`.
-
-For the full app, add `http://localhost:3000` to Supabase's redirect URLs, fill in the database, API, Supabase, Sarvam and OpenAI settings in `.env`, and install FFmpeg with `ffprobe` on your `PATH`. Import the streets around your gate using its coordinates and a radius in metres:
-
-```bash
-pnpm --filter @locus/api db:migrate
-pnpm --filter @locus/api osm:import 13.038 77.594 700
-pnpm --filter @locus/api dev
-```
-
-Browser test calls also need LiveKit credentials and a worker key. Create the key, save it as `LOCUS_WORKER_API_KEY`, then start the worker in another terminal:
-
-```bash
-pnpm --filter @locus/api admin client locus-worker --first-party
-```
-
-```bash
-pnpm --filter @locus/api worker dev
-```
-
-For phone calls, point your Vobiz number at LiveKit's inbound SIP trunk and configure a dispatch rule for `locus-guide`. Assign the number to the recipient and register it for outbound loop protection, substituting your E.164 number and recipient ID:
-
-```bash
-pnpm --filter @locus/api admin number +91XXXXXXXXXX YOUR_RECIPIENT_ID vobiz
-pnpm --filter @locus/api admin outbound +91XXXXXXXXXX
-```
-
-For outbound calls and handoffs, set the `VOBIZ_SIP_*` credentials from [.env.example](.env.example), then run `pnpm --filter @locus/api admin trunk +91XXXXXXXXXX`. Set `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and `LOCUS_OUTBOUND_NUMBER` from the command output. To check inbound routing, turn on “Expecting a delivery” and call the Vobiz number from another phone. [Vobiz’s LiveKit setup guide](https://www.vobiz.ai/integrations/livekit/)
+For the local setup, follow the runbook in [AGENTS.md](AGENTS.md#2-configure-the-local-environment). It covers where to get each environment variable, Google sign-in, PostGIS migrations and map import, the LiveKit worker, and Vobiz SIP setup. The [credential-free checks](AGENTS.md#1-install-and-run-credential-free-checks) run without provider accounts.
 
 ## Test
 
