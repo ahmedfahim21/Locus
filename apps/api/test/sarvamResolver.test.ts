@@ -21,8 +21,8 @@ const chat = (content: string) => ({ choices: [{ message: { content } }] });
 afterEach(() => vi.unstubAllGlobals());
 
 describe("SarvamResolver", () => {
-  it("sends the utterance and candidates, and returns the chosen id", async () => {
-    const calls = stubFetch(200, chat('{"candidateId":"node/102"}'));
+  it("sends candidates under short labels, and maps the chosen label back to its id", async () => {
+    const calls = stubFetch(200, chat('{"candidateId":"p2"}'));
     const logs: Record<string, unknown>[] = [];
     const r = new SarvamResolver("sk-test", "sarvam-105b", (e) => logs.push(e));
     expect(await r.resolve("bakery ke paas", candidates)).toBe("node/102");
@@ -40,8 +40,8 @@ describe("SarvamResolver", () => {
     expect(JSON.parse(body.messages[1].content)).toEqual({
       riderSaid: "bakery ke paas",
       candidates: [
-        { id: "cue_1", kind: "cue", names: ["Shell petrol pump"] },
-        { id: "node/102", kind: "feature", names: ["Iyengar Bakery"] },
+        { id: "p1", kind: "cue", names: ["Shell petrol pump"] },
+        { id: "p2", kind: "feature", names: ["Iyengar Bakery"] },
       ],
     });
     expect(logs).toEqual([expect.objectContaining({ event: "resolver.call", provider: "sarvam", candidateId: "node/102" })]);
@@ -53,10 +53,12 @@ describe("SarvamResolver", () => {
     expect(await r.resolve("pata nahi", candidates)).toBeNull();
   });
 
-  it("throws when the model invents an id outside the list", async () => {
-    stubFetch(200, chat('{"candidateId":"node/999"}'));
+  it("throws when the model answers a label outside the list, or a raw id", async () => {
+    stubFetch(200, chat('{"candidateId":"p9"}'));
     const r = new SarvamResolver("k", "sarvam-105b", () => {});
-    await expect(r.resolve("mall", candidates)).rejects.toThrow("outside the candidate list: node/999");
+    await expect(r.resolve("mall", candidates)).rejects.toThrow("Sarvam returned a label outside the candidate list: p9");
+    stubFetch(200, chat('{"candidateId":"node/102"}'));
+    await expect(r.resolve("mall", candidates)).rejects.toThrow("outside the candidate list: node/102");
   });
 
   it("throws on API errors and malformed replies instead of guessing", async () => {
