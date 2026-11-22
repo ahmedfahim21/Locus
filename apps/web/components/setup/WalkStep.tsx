@@ -274,7 +274,7 @@ export function WalkStep({
               {[
                 [DeviceMobile, "Hold the phone upright and point it at boards and gates."],
                 [MapPin, "Keep location on: each landmark is placed from your GPS."],
-                [ShieldCheck, "Faces and number plates are skipped. The video is deleted once landmarks are found."],
+                [ShieldCheck, "Used only to find landmarks. The video and your GPS trail are deleted as soon as they're read; Locus keeps a small crop of each landmark you keep."],
               ].map(([Icon, text]) => {
                 const I = Icon as typeof MapPin;
                 return (
@@ -548,7 +548,7 @@ function PhotoPicker({
         <h1 className="title">Add photos</h1>
         <p className="muted">
           Up to {MAX_PHOTOS} photos of what a rider sees on the way in: phone photos, or screenshots of your street. Locus reads the
-          boards and gates in them.
+          boards and gates in them, keeps a small crop of each landmark, and discards the rest.
         </p>
       </div>
       <input ref={input} type="file" accept="image/*" multiple hidden onChange={(e) => add(e.target.files)} />
