@@ -59,6 +59,14 @@ Without that file, copy `.env.example` and fill it in. Every variable:
 | `GOOGLE_MAPS_API_KEY` | API | Optional. Street View landmark suggestions in setup; off without it. |
 | `OVERPASS_URL` | `osm:import` | Optional; defaults to the public Overpass API. |
 
+### Using your own Supabase project instead
+
+1. Create a project. Copy the Session pooler connection string into `DATABASE_URL` (percent-encode special characters in the password), and the project URL, publishable key and secret key into `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY`.
+2. Set `SUPABASE_JWKS_URL` to `SUPABASE_URL` plus `/auth/v1/.well-known/jwks.json`, and check under Project Settings → JWT Keys that the signing key is ECC P-256 (ES256): the API only accepts ES256 tokens.
+3. Keep the Email provider on (Auth → Sign In / Providers) for the test accounts. For Google sign-in too, create a Google OAuth web client whose redirect URI is the callback Supabase shows, then enable Google in Supabase with its client ID and secret.
+4. In Auth → URL Configuration, set the Site URL to `http://localhost:3000` and add `http://localhost:3000/**` to the redirect URLs.
+5. `db:migrate` (below) creates the `locus` schema, PostGIS tables and indexes; the API creates the private `locus-walks` storage bucket on first start.
+
 ## 3. Install, seed and start
 
 From the repository root, in this order:
@@ -106,6 +114,22 @@ pnpm --filter @locus/api admin client locus-worker --first-party
 
 ```bash
 pnpm --filter @locus/api worker dev
+```
+
+Optional, real phone calls. Needs a Vobiz number (or another SIP provider) pointed at LiveKit's inbound SIP trunk, with a dispatch rule for the agent `locus-guide` ([Vobiz's LiveKit guide](https://www.vobiz.ai/integrations/livekit/)). Assign the number to a recipient and register it so Locus never answers its own calls, substituting your E.164 number and the recipient's id:
+
+```bash
+pnpm --filter @locus/api admin number +91XXXXXXXXXX YOUR_RECIPIENT_ID vobiz
+```
+
+```bash
+pnpm --filter @locus/api admin outbound +91XXXXXXXXXX
+```
+
+For handoff calls and "Call the rider", set the `VOBIZ_SIP_*` values, create the outbound trunk, then set `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and `LOCUS_OUTBOUND_NUMBER` from its output:
+
+```bash
+pnpm --filter @locus/api admin trunk +91XXXXXXXXXX
 ```
 
 Checks (no keys or database needed; the API tests drive the HTTP routes against an in-memory store):
