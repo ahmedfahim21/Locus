@@ -53,10 +53,13 @@ const put = await fetch(upload.url, {
 if (!put.ok) throw new Error(`Signed upload returned ${put.status}: ${await put.text()}`);
 log({ step: "uploaded", path: videoPath, bytes: video.length });
 
-// ~120 m walk over the video's length: along a Hebbal lane, or ending at the recipient's door.
+// A walk at 1.3 m/s over the video's length (at least ~130 m), so a longer video gets
+// frames as densely as a real one: along a Hebbal lane, or ending at the recipient's door.
+const WALKING_M_PER_S = 1.3;
 const durationS = await probeDurationS(file);
 const to = home?.handoffPoint ?? { lat: 13.0369, lon: 77.5932 };
-const from = { lat: to.lat - 0.001, lon: to.lon - 0.0007 };
+const scale = Math.max(1, (durationS * WALKING_M_PER_S) / 134); // the base offset below is ~134 m
+const from = { lat: to.lat - 0.001 * scale, lon: to.lon - 0.0007 * scale };
 const walk: Walk = {
   id: walkId,
   recipientId,
