@@ -11,7 +11,7 @@ export type Cue = {
   text: string;
   landmark: string;
   location: LatLon;
-  /** Other names a rider might say, including Hindi and Kannada script. */
+  /** Other names a rider might say, including Hindi and the state's language (Telugu or Kannada). */
   aliases: string[];
   source: "typed" | "walkVideo" | "map" | "streetView";
   /** Short-lived signed URL of the walk-video frame, for walk-video landmarks. */
@@ -40,7 +40,7 @@ export type Suggestion = {
   id: string;
   name: string;
   nameHi: string | null;
-  nameKn: string | null;
+  nameLocal: string | null;
   aliases: string[];
   kind: string | null;
   color: string | null;
@@ -73,7 +73,7 @@ export type Proposal = {
   ordinal: number;
   name: string;
   nameHi: string | null;
-  nameKn: string | null;
+  nameLocal: string | null;
   aliases: string[];
   kind: string;
   color: string | null;
@@ -87,13 +87,29 @@ export type Proposal = {
 };
 export type TrackPoint = { t: number; lat: number; lon: number; accuracyM: number };
 
-/** Hindi (Devanagari) and Kannada names among a landmark's aliases, for the stamps. */
-export function scriptNames(aliases: string[]): { text: string; script: "deva" | "knda" }[] {
-  const out: { text: string; script: "deva" | "knda" }[] = [];
-  const deva = aliases.find((a) => /[\u0900-\u097F]/.test(a));
-  const knda = aliases.find((a) => /[\u0C80-\u0CFF]/.test(a));
-  if (deva) out.push({ text: deva, script: "deva" });
-  if (knda) out.push({ text: knda, script: "knda" });
+/** Indian scripts Locus shows landmark names in; each is also a CSS class that picks its Anek font. */
+export type Script = "deva" | "telu" | "knda";
+const SCRIPTS: [Script, RegExp][] = [
+  ["deva", /[\u0900-\u097F]/],
+  ["telu", /[\u0C00-\u0C7F]/],
+  ["knda", /[\u0C80-\u0CFF]/],
+];
+
+/** The script a name is written in, if it's one of Locus's. */
+export function scriptOf(name: string): Script | null {
+  return SCRIPTS.find(([, re]) => re.test(name))?.[0] ?? null;
+}
+
+/**
+ * Hindi and the home state's language (Telugu or Kannada) among a landmark's
+ * aliases, for the stamps: the first name in each script, Devanagari first.
+ */
+export function scriptNames(aliases: string[]): { text: string; script: Script }[] {
+  const out: { text: string; script: Script }[] = [];
+  for (const [script] of SCRIPTS) {
+    const text = aliases.find((a) => scriptOf(a) === script);
+    if (text) out.push({ text, script });
+  }
   return out;
 }
 export type Home = { handoffPoint: LatLon; digipin: string; confirmedAt: string; cues: Cue[] };

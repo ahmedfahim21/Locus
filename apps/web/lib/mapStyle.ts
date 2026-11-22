@@ -63,7 +63,7 @@ export type MapColors = typeof DARK;
 export const MAP_PALETTES = { dark: DARK, light: LIGHT } as const;
 
 const width = (z14: number, z18: number) => ["interpolate", ["exponential", 1.6], ["zoom"], 12, z14 * 0.35, 14, z14, 18, z18] as never;
-/** Latin-script name first: the map fonts don't cover Devanagari or Kannada. */
+/** Latin-script name first: the map fonts don't cover Devanagari, Telugu or Kannada. */
 const NAME = ["coalesce", ["get", "name:en"], ["get", "name:latin"], ["get", "name"]] as never;
 const FONT = ["Noto Sans Regular"];
 

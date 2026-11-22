@@ -3,7 +3,7 @@
 import { AccountMenu } from "../AccountMenu";
 import { ArrowLeft, ArrowRight, Check, DeviceMobile, Images, MapPin, Plus, Record, ShieldCheck, Stop, VideoCamera, Warning, X } from "@phosphor-icons/react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { api, ApiError, apiForm, scriptNames, supabase, type LatLon, type Proposal, type Walk } from "../../lib/api";
+import { api, ApiError, apiForm, scriptNames, scriptOf, supabase, type LatLon, type Proposal, type Walk } from "../../lib/api";
 import { MAX_PHOTOS, toJpeg } from "../../lib/photos";
 import { MAX_RECORD_S, useWalkRecorder, type Recording } from "../../lib/useWalkRecorder";
 import { FitTo, Map, MapMarker } from "../mapcn/Map";
@@ -437,7 +437,7 @@ function ReviewMap({ door, proposals }: { door: LatLon; proposals: Proposal[] })
       {proposals.map((p, i) => (
         <MapMarker key={p.id} at={p.location} anchor="left" offset={[-14, 0]}>
           {/* Photos are in the list beside the map; the map keeps the stamps small. */}
-          <Stamp stop={{ name: p.name, location: p.location, alt: scriptNames([p.nameHi ?? "", p.nameKn ?? ""]) }} index={i} />
+          <Stamp stop={{ name: p.name, location: p.location, alt: scriptNames([p.nameHi ?? "", p.nameLocal ?? ""]) }} index={i} />
         </MapMarker>
       ))}
     </Map>
@@ -502,11 +502,11 @@ function Review({
                     <input value={names[p.id]} onChange={(e) => setNames((n) => ({ ...n, [p.id]: e.target.value }))} maxLength={60} disabled={!on} />
                   </label>
                   {p.detail && <span className="muted small">&ldquo;{p.detail}&rdquo;</span>}
-                  {(p.nameHi || p.nameKn) && (
+                  {(p.nameHi || p.nameLocal) && (
                     <span className="label">
                       {p.nameHi && <span className="deva">{p.nameHi}</span>}
-                      {p.nameHi && p.nameKn && " · "}
-                      {p.nameKn && <span className="knda">{p.nameKn}</span>}
+                      {p.nameHi && p.nameLocal && " · "}
+                      {p.nameLocal && <span className={scriptOf(p.nameLocal) ?? undefined}>{p.nameLocal}</span>}
                     </span>
                   )}
                   {p.osmId ? (

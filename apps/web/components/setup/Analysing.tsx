@@ -9,14 +9,14 @@ const VIDEO_STEPS = [
   "Picking the sharpest frame every 10 m",
   "Reading shop boards, gates and temples",
   "Matching names to the map",
-  "Writing names in Hindi and Kannada",
+  "Writing names in Hindi and your state\u2019s language",
 ];
 const PHOTO_STEPS = [
   "Uploading your photos",
   "Looking at each photo",
   "Reading shop boards, gates and temples",
   "Matching names to the map",
-  "Writing names in Hindi and Kannada",
+  "Writing names in Hindi and your state\u2019s language",
 ];
 /** Seconds after upload when each later step starts showing; the last one holds until the API says ready. */
 const STEP_AT_S = [0, 4, 10, 16];

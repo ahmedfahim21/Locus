@@ -1,13 +1,14 @@
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
-import { Anek_Devanagari, Anek_Kannada, Google_Sans } from "next/font/google";
+import { Anek_Devanagari, Anek_Kannada, Anek_Telugu, Google_Sans } from "next/font/google";
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { ServiceWorker } from "../components/ServiceWorker";
 import { THEME_BOOT_SCRIPT } from "../lib/theme";
 
-// DESIGN.md: the system font carries the UI; Anek covers Hindi and Kannada landmark names.
+// DESIGN.md: the system font carries the UI; Anek covers Hindi, Telugu and Kannada landmark names.
 const anekDevanagari = Anek_Devanagari({ subsets: ["devanagari"], weight: "400", variable: "--font-anek-devanagari" });
+const anekTelugu = Anek_Telugu({ subsets: ["telugu"], weight: "400", variable: "--font-anek-telugu" });
 const anekKannada = Anek_Kannada({ subsets: ["kannada"], weight: "400", variable: "--font-anek-kannada" });
 // Google's sign-in branding requires Google Sans Medium on the "Continue with Google" button; used nowhere else.
 const googleSans = Google_Sans({
@@ -56,7 +57,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${anekDevanagari.variable} ${anekKannada.variable} ${googleSans.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${anekDevanagari.variable} ${anekTelugu.variable} ${anekKannada.variable} ${googleSans.variable}`} suppressHydrationWarning>
       <head>
         {/* Applies a saved light/dark choice before first paint. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />

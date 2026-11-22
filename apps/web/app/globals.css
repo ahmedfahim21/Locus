@@ -32,7 +32,7 @@
   --radius-sm: 12px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", Arial,
-    var(--font-anek-devanagari), var(--font-anek-kannada), sans-serif;
+    var(--font-anek-devanagari), var(--font-anek-telugu), var(--font-anek-kannada), sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, monospace;
   color-scheme: light;
 }
@@ -110,6 +110,7 @@ a { color: inherit; }
 .small { font-size: 14px; }
 .mono { font-family: var(--mono); font-feature-settings: "tnum"; }
 .deva { font-family: var(--font-anek-devanagari), var(--sans); }
+.telu { font-family: var(--font-anek-telugu), var(--sans); }
 .knda { font-family: var(--font-anek-kannada), var(--sans); }
 
 /* ---------- layout ---------- */

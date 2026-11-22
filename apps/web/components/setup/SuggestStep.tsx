@@ -62,7 +62,7 @@ export function SuggestStep({
             stops={data.suggestions.map((s) => ({
               name: s.name,
               location: s.location,
-              alt: scriptNames([s.nameHi ?? "", s.nameKn ?? ""]),
+              alt: scriptNames([s.nameHi ?? "", s.nameLocal ?? ""]),
               kind: s.kind,
               color: s.color,
             }))}

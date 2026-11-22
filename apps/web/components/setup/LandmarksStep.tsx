@@ -4,7 +4,7 @@ import { AccountMenu } from "../AccountMenu";
 import { ArrowDown, ArrowLeft, ArrowUp, MapPin, Plus, Trash } from "@phosphor-icons/react";
 import type * as MapLibre from "maplibre-gl";
 import { useRef, useState, type ReactNode } from "react";
-import { api, scriptNames, type CueInput, type LatLon, type Me, type Suggestion } from "../../lib/api";
+import { api, scriptNames, type CueInput, type LatLon, type Me, type Script, type Suggestion } from "../../lib/api";
 
 import { Map, MapMarker } from "../mapcn/Map";
 import { DoorPin, Stamp } from "../RouteMap";
@@ -20,7 +20,7 @@ type Draft = {
   /** Set for landmarks from the walk video: keeps the photo and the names the API stored. */
   proposalId: string | null;
   photoUrl: string | null;
-  alt: { text: string; script: "deva" | "knda" }[];
+  alt: { text: string; script: Script }[];
   /** Kept from a map or Street View suggestion (walk-video ones carry proposalId instead). */
   source: "map" | "streetView" | null;
   kind: string | null;
@@ -80,7 +80,7 @@ export function LandmarksStep({
         location: s.location,
         proposalId: s.proposalId,
         photoUrl: s.photoUrl,
-        alt: scriptNames([s.nameHi ?? "", s.nameKn ?? ""]),
+        alt: scriptNames([s.nameHi ?? "", s.nameLocal ?? ""]),
         source: s.proposalId ? null : s.sources.includes("map") ? "map" : "streetView",
         kind: s.kind,
         color: s.color,

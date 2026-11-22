@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import type { LatLon, RouteLeg } from "../lib/api";
+import type { LatLon, RouteLeg, Script } from "../lib/api";
 import { FitTo, Map, Map3D, MapMarker, MapRoute } from "./mapcn/Map";
 
 export type Stop = {
   name: string;
-  /** Other scripts for the same place (Hindi, Kannada). Shown under the name. */
-  alt?: { text: string; script: "deva" | "knda" }[];
+  /** Other scripts for the same place (Hindi, and Telugu or Kannada). Shown under the name. */
+  alt?: { text: string; script: Script }[];
   location: LatLon;
   /** The walk-video frame showing this landmark. */
   photoUrl?: string | null;
