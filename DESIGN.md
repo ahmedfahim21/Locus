@@ -160,7 +160,7 @@ Surfaces:
 Strategy: restrained chrome, committed map.
 - Chrome: grey grouped background, white raised surfaces, black ink. Black is the primary button and the rider's chat bubble. There is no brand hue in the chrome.
 - Status colours are iOS system colours and appear only for status: green for a switch that is on and for reached progress, red for live calls, errors and ending a call, orange for warnings.
-- Map: Sadak's game palette in two themes (`lib/mapStyle.ts`). Dark: charcoal ground and building blocks, gold primary roads, pale secondaries, grey lanes in dark casings, blue water with a lighter shore, green parks. Light: the same structure on a pale ground (white lanes in grey casings, gold primaries in a deeper gold casing, sky-blue water, soft green parks).
+- Map: Sadak's game palette in two themes (`lib/mapStyle.ts`). Dark: charcoal ground and building blocks, gold primary roads, pale secondaries, grey lanes in dark casings, blue water with a lighter shore, green parks. Light: the same structure on a warm paper ground (`#f3efe6`) with sand blocks a clear step darker, white lanes in warm grey casings, saturated gold primaries in a deeper gold casing, sky-blue water, fresh green parks and a strong blue route.
 - Labels: street names along roads, area names in muted spaced capitals, points of interest in amber (dark map) or deep amber (light map), water names in blue italic; all with a halo in the ground colour. Latin-script names (OSM `name:en`/`name:latin` first), because the map fonts don't cover Devanagari or Kannada.
 - Map meanings: blue is the route and the rider; green is the stretch already walked and reached landmarks; gold is a landmark; white is the door.
 
@@ -234,3 +234,4 @@ Flat surfaces separated by background tone, not borders: white groups on grey. O
 | 2026-11-22 | Light and dark map themes, map labels, appearance switch | Asked for: "map doesn't have labels? have a light mode too". |
 | 2026-11-22 | Brand mark: the route "L" | Asked for product branding and a logo; the mark shows rider → landmark → door. |
 | 2026-11-22 | 3D view with coloured landmark props | Asked for a Mapbox-like 3D view using what the walk video sees (colour, kind of thing). |
+| 2026-11-22 | Light map: warm paper ground, darker sand blocks, more saturated water, parks and route | "Light mode seems quite dull compared to dark": grey ground and grey blocks were nearly the same tone. |
