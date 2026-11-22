@@ -44,6 +44,7 @@ export type Suggestion = {
   aliases: string[];
   kind: string | null;
   color: string | null;
+  detail: string | null;
   location: LatLon;
   alongM: number;
   sources: SuggestionSource[];
@@ -76,6 +77,8 @@ export type Proposal = {
   aliases: string[];
   kind: string;
   color: string | null;
+  /** Where it sits relative to its neighbours, in Hinglish ("laal building ke bagal mein"). */
+  detail: string | null;
   location: LatLon;
   osmId: string | null;
   atS: number;

@@ -489,6 +489,7 @@ function Review({
                     <span>What a rider would call it</span>
                     <input value={names[p.id]} onChange={(e) => setNames((n) => ({ ...n, [p.id]: e.target.value }))} maxLength={60} disabled={!on} />
                   </label>
+                  {p.detail && <span className="muted small">&ldquo;{p.detail}&rdquo;</span>}
                   {(p.nameHi || p.nameKn) && (
                     <span className="label">
                       {p.nameHi && <span className="deva">{p.nameHi}</span>}

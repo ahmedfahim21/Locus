@@ -16,6 +16,9 @@ const KINDS: Record<string, { height: number; radius: number; sides: number; col
   petrol_pump: { height: 6, radius: 5, sides: 4, color: "#e03131" },
   bank_atm: { height: 4, radius: 2.5, sides: 4, color: "#1c7ed6" },
   bus_stop: { height: 3.5, radius: 5, sides: 4, color: "#4dabf7" },
+  // A gully opening: a flat marker on the ground; a street-name board: a thin post.
+  lane: { height: 0.6, radius: 3, sides: 4, color: "#e9ecef" },
+  sign: { height: 4, radius: 0.8, sides: 4, color: "#2b8a3e" },
   shop: { height: 5, radius: 3.5, sides: 4, color: "#ff922b" },
   food: { height: 5, radius: 3.5, sides: 4, color: "#ff922b" },
   building: { height: 10, radius: 6, sides: 4, color: "#adb5bd" },
