@@ -22,12 +22,6 @@ Try it at [locus.ahmedfahim.dev](https://locus.ahmedfahim.dev), or [hear the dem
 |:---:|:---:|
 | <img src="screenshots/replay.webp" alt="Demo call: the map and transcript guide the rider from the grey gate toward the medical store" width="480"> | <img src="screenshots/arrival.webp" alt="Demo call: a 3D map shows the completed route and the rider at the blue gate" width="480"> |
 
-The app follows the system theme; here is the demo call in light mode:
-
-<img src="screenshots/replay-light.webp" alt="Demo call page in light mode: From the wrong gate to the right one, with the route map" width="100%">
-
-Screenshots use a demo account and sample landmarks on real streets in Hebbal, Bengaluru.
-
 ## What's inside
 
 | Part | What it does | Built with |
