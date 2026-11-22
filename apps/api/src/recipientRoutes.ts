@@ -51,7 +51,8 @@ const latLon = z.object({ lat: z.number().min(-90).max(90), lon: z.number().min(
 const profileBody = z
   .object({
     firstName: z.string().trim().min(1).max(40),
-    platforms: z.array(z.string().trim().min(1).max(30)).min(1).max(6),
+    // No product cap on apps; 50 only bounds the request.
+    platforms: z.array(z.string().trim().min(1).max(30)).min(1).max(50),
     fallbackNote: z.string().trim().min(1).max(200),
     phone: z.string().regex(/^\+\d{8,15}$/, "Phone must be E.164, e.g. +919800000000"),
   })

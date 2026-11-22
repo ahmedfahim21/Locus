@@ -101,6 +101,13 @@ describe("recipient routes: profile, home, switch", () => {
     expect(t.store.recipients).toHaveLength(1);
   });
 
+  it("saves as many delivery apps as the recipient uses", async () => {
+    const t = setup();
+    const platforms = ["swiggy", "zomato", "blinkit", "zepto", "instamart", "amazon", "flipkart", "bigbasket", "dunzo"];
+    expect(await t.call("PUT", "/me/profile", { ...profile, platforms }, TOKEN)).toEqual({ status: 200, body: { recipient: { ...profile, platforms } } });
+    expect(t.store.recipients.find((r) => r.id === "rcp_1")!.platforms).toEqual(platforms);
+  });
+
   it("saves the home with ordered cues and a DIGIPIN, and replaces it on re-save", async () => {
     const t = setup();
     await t.call("PUT", "/me/profile", profile, TOKEN);
