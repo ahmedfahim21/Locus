@@ -2,7 +2,7 @@ import { and, asc, desc, eq, isNotNull, isNull, lt, sql } from "drizzle-orm";
 import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "../db/schema.js";
-import type { CueSource, HomeProfile, LatLon, OsmWay, ProposalStatus, Recipient, Session, TrackPoint, Turn, Walk, WalkProposal, WalkStatus } from "../domain/types.js";
+import type { ApiClient, CueSource, HomeProfile, LatLon, OsmWay, ProposalStatus, Recipient, Session, TrackPoint, Turn, Walk, WalkProposal, WalkStatus } from "../domain/types.js";
 import type { Store } from "./store.js";
 
 type Db = PostgresJsDatabase<typeof schema>;
@@ -77,6 +77,10 @@ export class PostgresStore implements Store {
 
   async close() {
     await this.sql.end();
+  }
+
+  async ensureClient(client: ApiClient) {
+    await this.db.insert(schema.apiClients).values(client).onConflictDoNothing({ target: schema.apiClients.id });
   }
 
   async getClientByKeyHash(keyHash: string) {

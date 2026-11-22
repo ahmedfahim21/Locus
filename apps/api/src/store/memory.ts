@@ -31,6 +31,9 @@ export class MemoryStore implements Store {
   walks: Walk[] = [];
   proposals: WalkProposal[] = [];
 
+  async ensureClient(client: ApiClient) {
+    if (!this.clients.some((c) => c.id === client.id)) this.clients.push(client);
+  }
   async getClientByKeyHash(keyHash: string) {
     return this.clients.find((c) => c.keyHash === keyHash) ?? null;
   }

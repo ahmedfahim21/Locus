@@ -18,6 +18,8 @@ import type {
  */
 export interface Store {
   getClientByKeyHash(keyHash: string): Promise<ApiClient | null>;
+  /** Creates the client if no client has its id; never changes an existing one. */
+  ensureClient(client: ApiClient): Promise<void>;
 
   getNumberByDid(did: string): Promise<LocusNumber | null>;
   /** True if the E.164 number is one of Locus's own DIDs or outbound numbers. */

@@ -21,6 +21,7 @@ import { processWalk, type WalkDeps } from "./enrich/processWalk.js";
 import { MAX_PHOTO_BYTES, MAX_PHOTOS, processPhotos } from "./enrich/processPhotos.js";
 import { namesFitState, type NameTransliterator } from "./enrich/transliterate.js";
 import type { PhoneCaller, TestCallIssuer } from "./voice/testCall.js";
+import type { TypedCallResult, TypedCalls } from "./app.js";
 import { planRoute } from "./onboarding/routePlan.js";
 import type { StreetImagery } from "./onboarding/streetView.js";
 import { suggestLandmarks, type Suggestion } from "./onboarding/suggest.js";
@@ -37,6 +38,8 @@ const DOOR_SAME_AS_CUE_M = 15;
 const CALL_RIDER_EVERY_MS = 60_000;
 /** Riders are called on Indian numbers only: the trunk is Indian, and it keeps the button from dialling anywhere. */
 const callRiderBody = z.object({ phone: z.string().regex(/^\+91\d{10}$/, "Rider's phone must be an Indian number, e.g. +919800000000").optional() }).strict();
+/** What the recipient types as the rider in a typed test call. */
+const typedLineBody = z.object({ text: z.string().trim().min(1).max(300) }).strict();
 /** Signed photo URLs stay valid this long; the app reloads /me well within it. */
 const PHOTO_URL_TTL_S = 3600;
 export const MAX_WALK_S = 180;
@@ -207,6 +210,8 @@ export function recipientRoutes(deps: {
   transliterator: NameTransliterator;
   /** Null when LiveKit isn't configured; test calls then answer 503. */
   testCalls: TestCallIssuer | null;
+  /** Typed test calls: the recipient types the rider's lines; no microphone, phone or LiveKit needed. */
+  typedCalls: TypedCalls;
   /** Null without an outbound SIP trunk; "Call the rider" then answers 503. */
   phoneCalls: PhoneCaller | null;
   log: (event: Record<string, unknown>) => void;
@@ -541,6 +546,30 @@ export function recipientRoutes(deps: {
     if (!ready.ok) return ready.res;
     if (!deps.testCalls) return fail(c, 503, "TEST_CALL_UNAVAILABLE", "Calls aren't set up on this server yet");
     return c.json(await deps.testCalls.issue(ready.recipient.id));
+  });
+
+  const typedReply = (c: Context<Env>, r: TypedCallResult, status: 200 | 201 = 200) =>
+    r.ok ? c.json({ sessionId: r.sessionId, state: r.state, instruction: r.instruction }, status) : fail(c, r.status, r.code, r.message);
+
+  /** A typed test call: same screening and guide loop as a phone call, with the rider's lines typed in. */
+  app.post("/typed-calls", async (c) => {
+    const ready = await callable(c);
+    if (!ready.ok) return ready.res;
+    return typedReply(c, await deps.typedCalls.start(ready.recipient.id), 201);
+  });
+
+  app.post("/typed-calls/:id/lines", async (c) => {
+    const recipient = await me(c);
+    if (!recipient) return fail(c, 404, "PROFILE_NOT_SET_UP", "Save your profile first");
+    const parsed = typedLineBody.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
+    return typedReply(c, await deps.typedCalls.say(recipient.id, c.req.param("id"), parsed.data.text));
+  });
+
+  app.post("/typed-calls/:id/end", async (c) => {
+    const recipient = await me(c);
+    if (!recipient) return fail(c, 404, "PROFILE_NOT_SET_UP", "Save your profile first");
+    return typedReply(c, await deps.typedCalls.end(recipient.id, c.req.param("id")));
   });
 
   /**

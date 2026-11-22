@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import { createSupabaseVerifier } from "../src/auth/supabaseJwt.js";
 import { EXPECTING_DELIVERY_MS } from "../src/domain/types.js";
 import { LiveKitTestCalls } from "../src/voice/testCall.js";
+import { TYPED_CLIENT } from "../src/app.js";
+import { say } from "../src/guide/phrases.js";
 import { T0, WEB_ORIGIN, recipient, setup } from "./fixtures.js";
 
 const TOKEN = "tok:google-sub-1";
@@ -513,5 +515,86 @@ describe("LiveKitTestCalls", () => {
     expect(claims.attributes).toEqual({ "locus.recipientId": "rcp_7" });
     expect(claims.video).toMatchObject({ room: ticket.room, roomJoin: true, canPublish: true, canUpdateOwnMetadata: false });
     expect(claims.roomConfig.agents).toEqual([expect.objectContaining({ agentName: "locus-guide" })]);
+  });
+});
+
+describe("recipient routes: typed test call", () => {
+  it("screens and guides typed rider lines with the same loop as a phone call, then ends", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    const clientsBefore = structuredClone(t.store.clients);
+
+    const start = await t.call("POST", "/me/typed-calls", undefined, "tok:owner");
+    expect(start).toEqual({ status: 201, body: { sessionId: "ses_1", state: "screening", instruction: say.notice("hi") } });
+    // The typed-call client is added once, and no other client changes.
+    expect(t.store.clients).toEqual([...clientsBefore, TYPED_CLIENT]);
+    expect(t.store.sessions.get("ses_1")).toMatchObject({ clientId: TYPED_CLIENT.id, recipientId: recipient.id, callerIdHash: null, state: "screening" });
+
+    const screened = await t.call("POST", "/me/typed-calls/ses_1/lines", { text: "Ahmed ka Swiggy order hai" }, "tok:owner");
+    expect(screened).toEqual({ status: 200, body: { sessionId: "ses_1", state: "guiding", instruction: say.whereAreYou("hi") } });
+    expect(t.store.turns.map((x) => [x.sessionId, x.utterance, x.instruction])).toEqual([["ses_1", "Ahmed ka Swiggy order hai", say.whereAreYou("hi")]]);
+
+    await t.call("POST", "/me/typed-calls", undefined, "tok:owner");
+    expect(t.store.clients).toEqual([...clientsBefore, TYPED_CLIENT]);
+
+    const ended = await t.call("POST", "/me/typed-calls/ses_1/end", undefined, "tok:owner");
+    expect(ended).toEqual({ status: 200, body: { sessionId: "ses_1", state: "ended", instruction: null } });
+    expect(t.store.sessions.get("ses_1")).toMatchObject({ state: "ended", endedAt: T0 });
+    // The other typed call is untouched.
+    expect(t.store.sessions.get("ses_2")).toMatchObject({ state: "screening", endedAt: null });
+
+    expect(await t.call("POST", "/me/typed-calls/ses_1/lines", { text: "hello" }, "tok:owner")).toEqual({
+      status: 409,
+      body: { error: { code: "SESSION_CLOSED", message: "Call is ended" } },
+    });
+  });
+
+  it("never returns the recipient's phone on handoff", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    await t.call("POST", "/me/typed-calls", undefined, "tok:owner");
+    await t.call("POST", "/me/typed-calls/ses_1/lines", { text: "Ahmed ka Swiggy order hai" }, "tok:owner");
+    const res = await t.call("POST", "/me/typed-calls/ses_1/lines", { text: "unse baat karao" }, "tok:owner");
+    expect(res).toEqual({ status: 200, body: { sessionId: "ses_1", state: "handoff", instruction: say.connecting("hi") } });
+  });
+
+  it("checks the profile, switch and home before starting, and validates lines", async () => {
+    const t = setup();
+    expect(await t.call("POST", "/me/typed-calls", undefined, "tok:nobody")).toEqual({
+      status: 404,
+      body: { error: { code: "PROFILE_NOT_SET_UP", message: "Save your profile first" } },
+    });
+    t.store.authSubjects.set("owner", recipient.id);
+    t.store.recipients[0]!.expectingDeliveryUntil = null;
+    expect(await t.call("POST", "/me/typed-calls", undefined, "tok:owner")).toEqual({
+      status: 409,
+      body: { error: { code: "DELIVERY_NOT_EXPECTED", message: 'Turn on "Expecting a delivery" to try a call' } },
+    });
+    expect(t.store.sessions.size).toBe(0);
+
+    t.store.recipients[0]!.expectingDeliveryUntil = new Date(T0.getTime() + 3600_000);
+    await t.call("POST", "/me/typed-calls", undefined, "tok:owner");
+    for (const body of [{ text: "   " }, { text: "x".repeat(301) }, { words: "hi" }]) {
+      expect((await t.call("POST", "/me/typed-calls/ses_1/lines", body, "tok:owner")).body).toMatchObject({ error: { code: "INVALID_BODY" } });
+    }
+    expect(t.store.turns).toEqual([]);
+  });
+
+  it("only the recipient who started a typed call can use it, and only typed calls are reachable", async () => {
+    const t = setup();
+    t.store.authSubjects.set("owner", recipient.id);
+    await t.call("PUT", "/me/profile", profile, "tok:someone-else");
+    const { sessionId } = (await t.call("POST", "/me/typed-calls", undefined, "tok:owner")).body as { sessionId: string };
+    const notFound = { status: 404, body: { error: { code: "SESSION_NOT_FOUND", message: "Call not found" } } };
+    expect(await t.call("POST", `/me/typed-calls/${sessionId}/lines`, { text: "Ahmed ka Swiggy order hai" }, "tok:someone-else")).toEqual(notFound);
+    expect(await t.call("POST", `/me/typed-calls/${sessionId}/end`, undefined, "tok:someone-else")).toEqual(notFound);
+    expect(t.store.sessions.get(sessionId)).toMatchObject({ state: "screening", endedAt: null });
+    expect(t.store.turns).toEqual([]);
+
+    // A phone call's session (another client) isn't a typed call.
+    const phone = (await t.startSession()).body as { sessionId: string };
+    expect(await t.call("POST", `/me/typed-calls/${phone.sessionId}/lines`, { text: "hello" }, "tok:owner")).toEqual(notFound);
+    // The typed-call client has no usable key.
+    expect((await t.call("POST", "/v1/sessions", { recipientId: recipient.id }, TYPED_CLIENT.keyHash)).status).toBe(401);
   });
 });

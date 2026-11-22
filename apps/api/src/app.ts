@@ -8,7 +8,7 @@ import type { ObjectStorage } from "./storage/storage.js";
 import { createHash, randomUUID } from "node:crypto";
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import type { ApiClient, HomeProfile, Language, LatLon, OsmFeature, Recipient, Session } from "./domain/types.js";
+import type { ApiClient, HomeProfile, LatLon, OsmFeature, Recipient, Session } from "./domain/types.js";
 import { RoadGraph } from "./geo/roadGraph.js";
 import { applyHandoffResult, handleRiderInput, isOpen } from "./guide/engine.js";
 import { say } from "./guide/phrases.js";
@@ -55,6 +55,18 @@ export type ErrorCode =
   | "SESSION_CLOSED"
   | "NOT_IN_HANDOFF"
   | "INTERNAL";
+
+/** The client that owns typed test calls from the web app. Its key hash matches no key, so it can't call /v1. */
+export const TYPED_CLIENT: ApiClient = { id: "locus-web-typed", name: "Typed test calls in the web app", keyHash: "-", firstParty: false };
+
+type LiveCall = { session: Session; recipient: Recipient; home: HomeProfile };
+type Refusal = { ok: false; status: 404 | 409; code: ErrorCode; message: string };
+export type TypedCallResult = Refusal | { ok: true; sessionId: string; state: Session["state"]; instruction: string | null };
+export type TypedCalls = {
+  start(recipientId: string): Promise<TypedCallResult>;
+  say(recipientId: string, sessionId: string, text: string): Promise<TypedCallResult>;
+  end(recipientId: string, sessionId: string): Promise<TypedCallResult>;
+};
 
 export const sha256 = (s: string) => createHash("sha256").update(s).digest("hex");
 
@@ -108,9 +120,8 @@ export function createApp(deps: Deps) {
     else calls.delete(session.id);
   }
 
-  /** The caller's own open-or-closed session with its recipient and home, from memory when the call is live. */
-  async function ownedCall(c: Context<Env>): Promise<{ session: Session; recipient: Recipient; home: HomeProfile } | null> {
-    const id = c.req.param("id")!;
+  /** A client's own open-or-closed session with its recipient and home, from memory when the call is live. */
+  async function callFor(id: string, clientId: string): Promise<LiveCall | null> {
     const hit = calls.get(id);
     const call =
       hit && Date.now() - hit.at <= CALL_CACHE_MS
@@ -122,9 +133,11 @@ export function createApp(deps: Deps) {
             if (!recipient || !home) throw new Error(`recipient or home missing for session ${session.id}`);
             return { session, recipient, home };
           })();
-    if (!call || call.session.clientId !== c.get("client").id) return null;
+    if (!call || call.session.clientId !== clientId) return null;
     return { session: call.session, recipient: call.recipient, home: call.home };
   }
+
+  const ownedCall = (c: Context<Env>) => callFor(c.req.param("id")!, c.get("client").id);
 
   /** Road graph and named places around a point, cached per point so moving the door rebuilds them. */
   function geoAt(point: LatLon) {
@@ -181,46 +194,41 @@ export function createApp(deps: Deps) {
     await next();
   });
 
-  app.post("/v1/sessions", async (c) => {
-    const parsed = createSessionBody.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
-    const body = parsed.data;
+  /** Opens a call for a client: loop guards, the delivery switch and a set-up home are checked first. */
+  async function startSession(client: ApiClient, body: z.infer<typeof createSessionBody>): Promise<Refusal | ({ ok: true } & LiveCall)> {
     const now = deps.now();
-
     // Loop guard part 1 (P3): Locus's own numbers never reach the agent.
     if (body.callerId && (await store.isLocusNumber(body.callerId))) {
-      return fail(c, 409, "LOOP_REJECTED", "Caller is a Locus number");
+      return { ok: false, status: 409, code: "LOOP_REJECTED", message: "Caller is a Locus number" };
     }
-
     let recipientId = body.recipientId;
     if (body.did) {
       const number = await store.getNumberByDid(body.did);
-      if (!number) return fail(c, 404, "NUMBER_NOT_SET_UP", "This number isn't set up");
+      if (!number) return { ok: false, status: 404, code: "NUMBER_NOT_SET_UP", message: "This number isn't set up" };
       recipientId = number.recipientId;
     }
     const recipient = await store.getRecipient(recipientId!);
-    if (!recipient) return fail(c, 404, "RECIPIENT_NOT_FOUND", "Recipient not found");
+    if (!recipient) return { ok: false, status: 404, code: "RECIPIENT_NOT_FOUND", message: "Recipient not found" };
 
     // Loop guard part 2 (P3): during a handoff leg and 60 s after it.
     if (inHandoffWindow(await store.latestHandoff(recipient.id), now)) {
-      return fail(c, 409, "LOOP_REJECTED", "Recipient has an active or recent handoff call");
+      return { ok: false, status: 409, code: "LOOP_REJECTED", message: "Recipient has an active or recent handoff call" };
     }
     // P2/P4: the switch is checked by the server for every client.
     if (!recipient.expectingDeliveryUntil || recipient.expectingDeliveryUntil <= now) {
-      return fail(c, 409, "DELIVERY_NOT_EXPECTED", "Recipient isn't expecting a delivery right now");
+      return { ok: false, status: 409, code: "DELIVERY_NOT_EXPECTED", message: "Recipient isn't expecting a delivery right now" };
     }
     const home = await store.getHomeProfile(recipient.id);
-    if (!home || home.cues.length === 0) return fail(c, 409, "HOME_NOT_SET_UP", "Recipient has no confirmed cues");
+    if (!home || home.cues.length === 0) return { ok: false, status: 409, code: "HOME_NOT_SET_UP", message: "Recipient has no confirmed cues" };
 
-    const language: Language = body.language ?? "hi";
     const session: Session = {
       id: `ses_${deps.newId()}`,
-      clientId: c.get("client").id,
+      clientId: client.id,
       recipientId: recipient.id,
       callerIdHash: body.callerId ? sha256(body.callerId) : null,
       state: "screening",
       mode: "normal",
-      language,
+      language: body.language ?? "hi",
       currentCue: -1,
       lostTurns: 0,
       screening: { nameHeard: false, platformHeard: false, attempts: 0, objected: false },
@@ -232,23 +240,15 @@ export function createApp(deps: Deps) {
     await store.createSession(session);
     remember(session, recipient, home);
     log({ event: "session.created", sessionId: session.id, clientId: session.clientId });
-    // Key terms include the recipient's first name, which screening checks, so only Locus's own worker gets them.
-    const keyterms = c.get("client").firstParty ? keytermsFor(recipient, home, (await contextFor(home)).features) : undefined;
-    return c.json({ sessionId: session.id, state: session.state, instruction: say.notice(language), ...(keyterms ? { keyterms } : {}) }, 201);
-  });
+    return { ok: true, session, recipient, home };
+  }
 
-  app.post("/v1/sessions/:id/utterances", async (c) => {
-    const requestStarted = Date.now();
-    const call = await ownedCall(c);
-    if (!call) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+  /** One thing the rider said (or a silence), and what Locus says back. */
+  async function riderTurn(call: LiveCall, input: z.infer<typeof utteranceBody>) {
     const { session, recipient, home } = call;
-    if (!isOpen(session)) return fail(c, 409, "SESSION_CLOSED", `Session is ${session.state}`);
-    const parsed = utteranceBody.safeParse(await c.req.json().catch(() => null));
-    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
     const { features, graph } = await contextFor(home);
-
     const started = Date.now();
-    const outcome = await handleRiderInput(session, parsed.data, {
+    const outcome = await handleRiderInput(session, input, {
       recipient,
       home,
       features,
@@ -263,21 +263,49 @@ export function createApp(deps: Deps) {
       session.mode === "normal" && outcome.session.mode === "noTranscript" ? store.redactTurns(session.id) : Promise.resolve(),
     ]);
     remember(outcome.session, recipient, home);
-    log({
-      event: "turn",
-      sessionId: session.id,
-      state: outcome.session.state,
-      lost: outcome.turn.lost,
-      ms: Date.now() - started,
-      requestMs: Date.now() - requestStarted,
-    });
-    const enteredHandoff = outcome.session.state === "handoff" && session.state !== "handoff";
+    log({ event: "turn", sessionId: session.id, state: outcome.session.state, lost: outcome.turn.lost, ms: Date.now() - started });
+    return { instruction: outcome.instruction, session: outcome.session, enteredHandoff: outcome.session.state === "handoff" && session.state !== "handoff" };
+  }
+
+  async function endCall(call: LiveCall) {
+    const { session, recipient, home } = call;
+    const now = deps.now();
+    const ended: Session = {
+      ...session,
+      // A rider who reached the door stays "arrived"; the worker hanging up doesn't undo it.
+      state: session.state === "arrived" ? "arrived" : "ended",
+      endedAt: session.endedAt ?? now,
+      handoff: session.handoff && session.handoff.endedAt === null ? { ...session.handoff, endedAt: now } : session.handoff,
+    };
+    await store.updateSession(ended);
+    remember(ended, recipient, home);
+    return ended;
+  }
+
+  app.post("/v1/sessions", async (c) => {
+    const parsed = createSessionBody.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
+    const started = await startSession(c.get("client"), parsed.data);
+    if (!started.ok) return fail(c, started.status, started.code, started.message);
+    const { session, recipient, home } = started;
+    // Key terms include the recipient's first name, which screening checks, so only Locus's own worker gets them.
+    const keyterms = c.get("client").firstParty ? keytermsFor(recipient, home, (await contextFor(home)).features) : undefined;
+    return c.json({ sessionId: session.id, state: session.state, instruction: say.notice(session.language), ...(keyterms ? { keyterms } : {}) }, 201);
+  });
+
+  app.post("/v1/sessions/:id/utterances", async (c) => {
+    const call = await ownedCall(c);
+    if (!call) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
+    if (!isOpen(call.session)) return fail(c, 409, "SESSION_CLOSED", `Session is ${call.session.state}`);
+    const parsed = utteranceBody.safeParse(await c.req.json().catch(() => null));
+    if (!parsed.success) return fail(c, 400, "INVALID_BODY", parsed.error.issues[0]?.message ?? "Invalid body");
+    const turn = await riderTurn(call, parsed.data);
     return c.json({
-      instruction: outcome.instruction,
-      state: outcome.session.state,
-      lostTurns: outcome.session.lostTurns,
+      instruction: turn.instruction,
+      state: turn.session.state,
+      lostTurns: turn.session.lostTurns,
       // Only Locus's own worker places the handoff call; third parties hand off to their own user.
-      ...(enteredHandoff && c.get("client").firstParty ? { handoffPhone: recipient.phone } : {}),
+      ...(turn.enteredHandoff && c.get("client").firstParty ? { handoffPhone: call.recipient.phone } : {}),
     });
   });
 
@@ -297,19 +325,43 @@ export function createApp(deps: Deps) {
   app.post("/v1/sessions/:id/end", async (c) => {
     const call = await ownedCall(c);
     if (!call) return fail(c, 404, "SESSION_NOT_FOUND", "Session not found");
-    const { session, recipient, home } = call;
-    const now = deps.now();
-    const ended: Session = {
-      ...session,
-      // A rider who reached the door stays "arrived"; the worker hanging up doesn't undo it.
-      state: session.state === "arrived" ? "arrived" : "ended",
-      endedAt: session.endedAt ?? now,
-      handoff: session.handoff && session.handoff.endedAt === null ? { ...session.handoff, endedAt: now } : session.handoff,
-    };
-    await store.updateSession(ended);
-    remember(ended, recipient, home);
-    return c.json({ state: ended.state });
+    return c.json({ state: (await endCall(call)).state });
   });
+
+  /**
+   * Typed test calls from the web app: the recipient types the rider's lines and reads Locus's
+   * replies, through the same session code as a phone call. They belong to their own client,
+   * which is not first party, so no handoff call is placed.
+   */
+  let typedClientReady: Promise<void> | null = null;
+  const typedClient = async () => {
+    typedClientReady ??= store.ensureClient(TYPED_CLIENT).catch((err: Error) => {
+      typedClientReady = null;
+      throw err;
+    });
+    await typedClientReady;
+    return TYPED_CLIENT;
+  };
+  const typedCalls: TypedCalls = {
+    async start(recipientId) {
+      const started = await startSession(await typedClient(), { recipientId });
+      if (!started.ok) return started;
+      return { ok: true, sessionId: started.session.id, state: started.session.state, instruction: say.notice(started.session.language) };
+    },
+    async say(recipientId, sessionId, text) {
+      const call = await callFor(sessionId, TYPED_CLIENT.id);
+      if (!call || call.session.recipientId !== recipientId) return { ok: false, status: 404, code: "SESSION_NOT_FOUND", message: "Call not found" };
+      if (!isOpen(call.session)) return { ok: false, status: 409, code: "SESSION_CLOSED", message: `Call is ${call.session.state}` };
+      const turn = await riderTurn(call, { kind: "speech", text });
+      return { ok: true, sessionId, state: turn.session.state, instruction: turn.instruction };
+    },
+    async end(recipientId, sessionId) {
+      const call = await callFor(sessionId, TYPED_CLIENT.id);
+      if (!call || call.session.recipientId !== recipientId) return { ok: false, status: 404, code: "SESSION_NOT_FOUND", message: "Call not found" };
+      const ended = await endCall(call);
+      return { ok: true, sessionId, state: ended.state, instruction: null };
+    },
+  };
 
   app.route(
     "/me",
@@ -329,6 +381,7 @@ export function createApp(deps: Deps) {
       storage: deps.storage,
       transliterator: deps.transliterator,
       testCalls: deps.testCalls,
+      typedCalls,
       phoneCalls: deps.phoneCalls,
       log,
       walk: { vision: deps.vision, frames: deps.frames, log },
