@@ -22,6 +22,7 @@ import {
 } from "@livekit/agents";
 import * as silero from "@livekit/agents-plugin-silero";
 import { BackgroundVoiceCancellation, TelephonyBackgroundVoiceCancellation } from "@livekit/noise-cancellation-node";
+import { RoomEvent } from "@livekit/rtc-node";
 import { SipClient } from "livekit-server-sdk";
 import { env, optionalEnv } from "../config.js";
 import { GuideClient, type GuideReply } from "./guideClient.js";
@@ -151,7 +152,15 @@ class GuideAgent extends voice.Agent {
     const speech = this.session.say(reply.instruction);
     await speech.waitForPlayout();
     if (answered) {
-      // Rider and recipient are now in the same room; Locus leaves the conversation.
+      // Rider and recipient are now in the same room; Locus leaves the conversation. When either
+      // hangs up, the bridged call is over: close the session so the loop guard's clock starts.
+      this.ctx.room.on(RoomEvent.ParticipantDisconnected, (p) => {
+        log({ event: "worker.bridgedEnded", sessionId: this.sessionId, participant: p.identity });
+        void this.guide
+          .end(this.sessionId)
+          .catch((err: Error) => log({ event: "worker.endFailed", sessionId: this.sessionId, message: err.message }))
+          .finally(() => void this.ctx.deleteRoom());
+      });
       await this.session.close();
     } else {
       await this.hangUp();
@@ -212,6 +221,11 @@ export default defineAgent({
     }
 
     log({ event: "worker.session", sessionId: created.sessionId });
+    // However the job ends (hang-up, crash, shutdown), the session is closed so no handoff stays open.
+    // Ending is idempotent and keeps an arrival.
+    ctx.addShutdownCallback(async () => {
+      await guide.end(created.sessionId).catch((err: Error) => log({ event: "worker.endFailed", sessionId: created.sessionId, message: err.message }));
+    });
     // Where a turn's wait goes, next to worker.turn's apiMs: deciding the rider finished, the final transcript, the first audio back.
     session.on(voice.AgentSessionEventTypes.MetricsCollected, ({ metrics: m }) => {
       if (m.type === "eou_metrics") {

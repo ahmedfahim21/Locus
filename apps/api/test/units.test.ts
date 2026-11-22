@@ -7,7 +7,7 @@ import { heardAny, matchUtterance } from "../src/clues/match.js";
 import { romanize, tokens } from "../src/clues/normalize.js";
 import { decodeDigipin, encodeDigipin } from "../src/digipin/digipin.js";
 import { RoadGraph } from "../src/geo/roadGraph.js";
-import { inHandoffWindow } from "../src/handoff/loopGuard.js";
+import { HANDOFF_GRACE_MS, inHandoffWindow, MAX_OPEN_HANDOFF_MS } from "../src/handoff/loopGuard.js";
 
 describe("DIGIPIN (official India Post vectors)", () => {
   it("encodes the README example", () => {
@@ -119,6 +119,14 @@ describe("handoff window", () => {
     const ended = { startedAt: start, endedAt: start, answered: false };
     expect(inHandoffWindow(ended, new Date(start.getTime() + 59_999))).toBe(true);
     expect(inHandoffWindow(ended, new Date(start.getTime() + 60_000))).toBe(false);
+  });
+
+  it("a handoff never recorded as ended stops blocking calls 20 minutes (plus the grace) after it started", () => {
+    const open = { startedAt: start, endedAt: null, answered: true };
+    const at = (ms: number) => new Date(start.getTime() + ms);
+    expect(inHandoffWindow(open, at(MAX_OPEN_HANDOFF_MS))).toBe(true);
+    expect(inHandoffWindow(open, at(MAX_OPEN_HANDOFF_MS + HANDOFF_GRACE_MS - 1))).toBe(true);
+    expect(inHandoffWindow(open, at(MAX_OPEN_HANDOFF_MS + HANDOFF_GRACE_MS))).toBe(false);
   });
 });
 
