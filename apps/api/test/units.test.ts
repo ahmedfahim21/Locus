@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SignedUrlCache, type ObjectStorage } from "../src/storage/storage.js";
 import { candidatesFor, passesGate, scoreArm } from "../src/eval/ablation.js";
 import { home as fixtureHome } from "./fixtures.js";
 import { candidateTimes, cleanTrack, MAX_FRAMES, sampleAlongTrack, sharpestIndex, WalkError } from "../src/enrich/track.js";
@@ -250,5 +251,51 @@ describe("short names heard in Devanagari", () => {
     expect(heardAny("मोहम्मद के लिए", ["Ahmed"])).toBe(false);
     expect(heardAny("फिल्म देख रहा हूं", ["Fahim"])).toBe(false);
     expect(heardAny("रमेश के लिए", ["Fahim"])).toBe(false);
+  });
+});
+
+describe("signed photo URLs", () => {
+  function counting() {
+    const calls: string[][] = [];
+    let n = 0;
+    const inner: ObjectStorage = {
+      createUploadUrl: async () => ({ path: "", token: "", url: "" }),
+      download: async () => Buffer.alloc(0),
+      upload: async () => {},
+      remove: async () => {},
+      signedUrls: async (paths) => {
+        calls.push(paths);
+        n++;
+        return new Map(paths.map((p) => [p, `https://s/${p}?sig=${n}`]));
+      },
+    };
+    return { inner, calls };
+  }
+
+  it("reuses a URL while it has more than 15 minutes left, then signs again", async () => {
+    const { inner, calls } = counting();
+    let now = 0;
+    const cache = new SignedUrlCache(inner, () => now);
+    const first = await cache.signedUrls(["a.jpg", "b.jpg"], 3600);
+    expect([...first]).toEqual([["a.jpg", "https://s/a.jpg?sig=1"], ["b.jpg", "https://s/b.jpg?sig=1"]]);
+    now = 44 * 60_000; // 16 min left: still reused
+    expect([...(await cache.signedUrls(["a.jpg", "b.jpg"], 3600))]).toEqual([...first]);
+    expect(calls).toEqual([["a.jpg", "b.jpg"]]);
+    now = 46 * 60_000; // 14 min left: signed again, only what's needed
+    const later = await cache.signedUrls(["a.jpg"], 3600);
+    expect(later.get("a.jpg")).toBe("https://s/a.jpg?sig=2");
+    expect(calls).toEqual([["a.jpg", "b.jpg"], ["a.jpg"]]);
+  });
+
+  it("signs only new paths, and forgets a path that is replaced or deleted", async () => {
+    const { inner, calls } = counting();
+    const cache = new SignedUrlCache(inner, () => 0);
+    await cache.signedUrls(["a.jpg"], 3600);
+    await cache.signedUrls(["a.jpg", "c.jpg"], 3600);
+    await cache.upload("a.jpg", Buffer.alloc(1), "image/jpeg");
+    await cache.signedUrls(["a.jpg"], 3600);
+    await cache.remove(["c.jpg"]);
+    await cache.signedUrls(["c.jpg"], 3600);
+    expect(calls).toEqual([["a.jpg"], ["c.jpg"], ["a.jpg"], ["c.jpg"]]);
   });
 });

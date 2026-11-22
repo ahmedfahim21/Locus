@@ -10,7 +10,7 @@ import { SarvamTranslator } from "./enrich/translate.js";
 import { OpenAIVision } from "./enrich/vision.js";
 import { LiveKitTestCalls } from "./voice/testCall.js";
 import { GoogleStreetView } from "./onboarding/streetView.js";
-import { WALK_BUCKET } from "./storage/storage.js";
+import { WALK_BUCKET, SignedUrlCache } from "./storage/storage.js";
 import { SupabaseStorage } from "./storage/supabaseStorage.js";
 import { PostgresStore } from "./store/postgres.js";
 
@@ -23,8 +23,10 @@ const verifyRecipient = createSupabaseVerifier({
   issuer: `${env("SUPABASE_URL").replace(/\/$/, "")}/auth/v1`,
   log,
 });
-const storage = new SupabaseStorage(env("SUPABASE_URL"), env("SUPABASE_SECRET_KEY"), WALK_BUCKET);
-await storage.ensureBucket();
+const supabaseStorage = new SupabaseStorage(env("SUPABASE_URL"), env("SUPABASE_SECRET_KEY"), WALK_BUCKET);
+await supabaseStorage.ensureBucket();
+// Photo URLs stay the same across visits, so browsers cache the images.
+const storage = new SignedUrlCache(supabaseStorage);
 const visionModel = optionalEnv("OPENAI_VISION_MODEL") ?? env("OPENAI_MODEL");
 const app = createApp({
   store,
