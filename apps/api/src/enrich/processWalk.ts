@@ -59,7 +59,8 @@ export type WalkDeps = {
   vision: LandmarkVision;
   frames: {
     probeDurationS(file: string): Promise<number>;
-    extractFrames(file: string, timesS: number[]): Promise<Buffer[]>;
+    /** Null where a frame couldn't be read. */
+    extractFrames(file: string, timesS: number[]): Promise<(Buffer | null)[]>;
     /** The landmark's part of a frame, small: the only image kept from a walk. */
     crop(jpeg: Buffer, box: VisionLandmark["box"]): Promise<Buffer>;
   };
@@ -101,15 +102,20 @@ export async function processWalk(deps: WalkDeps, walkId: string): Promise<void>
     // blank instant doesn't waste the spot (the chosen time is kept on the proposal).
     const groups = spots.map((s) => candidateTimes(s.atS, videoS));
     const candidates = await deps.frames.extractFrames(video, groups.flat());
-    const samples = [...spots];
+    // A spot whose frames all failed is skipped; the walk fails only if none could be read.
+    const samples: typeof spots = [];
     const jpegs: Buffer[] = [];
     let offset = 0;
     for (const [i, times] of groups.entries()) {
-      const pick = sharpestIndex(candidates.slice(offset, offset + times.length));
-      jpegs.push(candidates[offset + pick]!);
-      samples[i] = { ...spots[i]!, atS: times[pick]! };
+      const usable = times.map((t, k) => ({ t, jpeg: candidates[offset + k] })).filter((c): c is { t: number; jpeg: Buffer } => c.jpeg != null);
       offset += times.length;
+      if (usable.length === 0) continue;
+      const pick = sharpestIndex(usable.map((c) => c.jpeg));
+      jpegs.push(usable[pick]!.jpeg);
+      samples.push({ ...spots[i]!, atS: usable[pick]!.t });
     }
+    if (samples.length !== spots.length) deps.log({ event: "walk.spots_skipped", walkId, skipped: spots.length - samples.length });
+    if (samples.length === 0) throw new Error("No frame of the video could be read");
 
     const found = await deps.vision.find(jpegs.map((jpeg, index) => ({ index, jpeg, distanceM: samples[index]!.distanceM })));
     const valid = found.filter((l) => Number.isInteger(l.frame) && l.frame >= 0 && l.frame < samples.length && l.name.trim());

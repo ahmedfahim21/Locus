@@ -25,20 +25,29 @@ export async function probeDurationS(file: string): Promise<number> {
   return duration;
 }
 
-/** One JPEG (max 768 px wide) per timestamp. ffmpeg applies the phone's rotation. */
-export async function extractFrames(file: string, timesS: number[]): Promise<Buffer[]> {
-  const frames: Buffer[] = [];
+/**
+ * One JPEG (max 768 px wide) per timestamp, or null where ffmpeg couldn't produce
+ * one (a seek past the last frame of a low-frame-rate clip, a damaged stretch).
+ * ffmpeg applies the phone's rotation.
+ */
+export async function extractFrames(file: string, timesS: number[]): Promise<(Buffer | null)[]> {
+  const frames: (Buffer | null)[] = [];
   for (const t of timesS) {
-    const { stdout } = await run(
+    const got = await run(
       "ffmpeg",
       [
         "-v", "error", "-ss", t.toFixed(2), "-i", file, "-frames:v", "1",
         "-vf", "scale='min(768,iw)':-2", "-q:v", "4", "-f", "image2", "-c:v", "mjpeg", "pipe:1",
       ],
       { encoding: "buffer", maxBuffer: 16 * 1024 * 1024 },
+    ).then(
+      ({ stdout }) => (stdout.length > 0 ? stdout : null),
+      (err: Error) => {
+        console.warn(JSON.stringify({ event: "frames.seek_failed", atS: t, message: err.message.slice(0, 200) }));
+        return null;
+      },
     );
-    if (stdout.length === 0) throw new Error(`ffmpeg produced no frame at ${t.toFixed(2)} s`);
-    frames.push(stdout);
+    frames.push(got);
   }
   return frames;
 }

@@ -59,6 +59,8 @@ export interface Store {
   updateProposals(proposals: WalkProposal[]): Promise<void>;
   /** Walks created before `before` whose video is still in storage. */
   listWalksWithVideo(before: Date): Promise<Walk[]>;
+  /** Walks still marked "processing" (after a restart, their jobs are gone). */
+  listProcessingWalks(): Promise<Walk[]>;
   /** Proposals never reviewed (still "proposed", frame kept) from walks processed before `before`. */
   listUnreviewedProposals(before: Date): Promise<WalkProposal[]>;
 }

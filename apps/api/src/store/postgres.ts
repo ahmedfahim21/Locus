@@ -356,6 +356,11 @@ export class PostgresStore implements Store {
     return rows.map(toWalk);
   }
 
+  async listProcessingWalks() {
+    const rows = await this.db.select().from(schema.walks).where(eq(schema.walks.status, "processing"));
+    return rows.map(toWalk);
+  }
+
   async listUnreviewedProposals(before: Date) {
     const rows = await this.db
       .select({ p: schema.walkProposals })

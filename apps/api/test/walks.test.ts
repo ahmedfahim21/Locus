@@ -3,9 +3,10 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EXPIRED_WALK_ERROR, sweepUnreviewedFrames, sweepWalkVideos, UNREVIEWED_FRAME_TTL_MS } from "../src/enrich/sweep.js";
+import { EXPIRED_WALK_ERROR, PHOTOS_LOST_ERROR, recoverWalks, sweepUnreviewedFrames, sweepWalkVideos, UNREVIEWED_FRAME_TTL_MS } from "../src/enrich/sweep.js";
 import { cropJpeg, cropRegion, extractFrames } from "../src/enrich/frames.js";
 import type { VisionLandmark } from "../src/enrich/vision.js";
+import { processWalk } from "../src/enrich/processWalk.js";
 import { T0, recipient, setup } from "./fixtures.js";
 
 const TOKEN = "tok:walker";
@@ -470,6 +471,56 @@ describe("walks: privacy", () => {
     expect(await sweep(UNREVIEWED_FRAME_TTL_MS + 60_000)).toBe(2);
     expect(frames.some((f) => t.storage.objects.has(f))).toBe(false);
     expect(t.store.proposals.filter((p) => p.walkId === walkId).map((p) => [p.status, p.framePath])).toEqual([["rejected", null], ["rejected", null]]);
+  });
+});
+
+describe("walks: robustness", () => {
+  async function uploadedWalk(t: Awaited<ReturnType<typeof signedUp>>) {
+    const created = await t.call("POST", "/me/walks", walkBody, TOKEN);
+    const walkId = (created.body.walk as { id: string }).id;
+    t.storage.browserUpload((created.body.upload as { token: string }).token, video, "video/mp4");
+    return walkId;
+  }
+  const depsWith = (t: Awaited<ReturnType<typeof signedUp>>, extract: typeof extractFrames) => ({
+    store: t.store, storage: t.storage, vision: t.vision, now: () => T0, newId: () => "x", log: (e: Record<string, unknown>) => t.logs.push(e),
+    frames: { probeDurationS: async () => 6, extractFrames: extract, crop: async (jpeg: Buffer) => jpeg },
+  });
+
+  it("a frame that can't be read skips its spot instead of failing the walk", async () => {
+    const t = await signedUp();
+    const walkId = await uploadedWalk(t);
+    t.vision.answer = [{ ...bakery, frame: 1 }];
+    // Every candidate of the first two spots fails, and one of the third's; the rest are real frames.
+    let call = 0;
+    const flaky: typeof extractFrames = async (file, times) => (await extractFrames(file, times)).map((f) => (call++ < 7 ? null : f));
+    await processWalk(depsWith(t, flaky), walkId);
+    const walk = t.store.walks.find((w) => w.id === walkId)!;
+    expect(walk).toMatchObject({ status: "ready", error: null });
+    // Vision saw only the readable spots.
+    expect(t.vision.seen.at(-1)!.length).toBeGreaterThan(0);
+    expect(t.logs).toContainEqual(expect.objectContaining({ event: "walk.spots_skipped", walkId, skipped: 2 }));
+  });
+
+  it("after a restart, reads a walk left processing again, and fails photos (not kept) with a clear next step", async () => {
+    const t = await signedUp();
+    const walkId = await uploadedWalk(t);
+    t.vision.answer = [bakery];
+    // The job died with the process: the walk is stuck "processing".
+    const stuck = t.store.walks.find((w) => w.id === walkId)!;
+    stuck.status = "processing";
+    t.store.walks.push({ ...stuck, id: "walk_photos", contentType: "image/jpeg", videoPath: "photos/x", videoDeletedAt: T0 });
+    const result = await recoverWalks(depsWith(t, extractFrames));
+    expect(result).toEqual({ rerun: 1, failed: 1 });
+    expect(t.store.walks.find((w) => w.id === walkId)).toMatchObject({ status: "ready" });
+    expect(t.store.proposals.filter((p) => p.walkId === walkId).map((p) => p.name)).toEqual(["Iyengar bakery"]);
+    expect(t.store.walks.find((w) => w.id === "walk_photos")).toMatchObject({ status: "failed", error: PHOTOS_LOST_ERROR });
+  });
+
+  it("fails the walk with a clear error only when no frame at all can be read", async () => {
+    const t = await signedUp();
+    const walkId = await uploadedWalk(t);
+    await processWalk(depsWith(t, async (_file, times) => times.map(() => null)), walkId);
+    expect(t.store.walks.find((w) => w.id === walkId)).toMatchObject({ status: "failed", error: "Processing failed: No frame of the video could be read" });
   });
 });
 

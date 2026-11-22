@@ -5,7 +5,7 @@ import { env, optionalEnv } from "./config.js";
 import { createSupabaseVerifier } from "./auth/supabaseJwt.js";
 import { createResolver } from "./guide/createResolver.js";
 import { extractFrames, probeDurationS, cropJpeg } from "./enrich/frames.js";
-import { sweepUnreviewedFrames, sweepWalkVideos } from "./enrich/sweep.js";
+import { recoverWalks, sweepUnreviewedFrames, sweepWalkVideos } from "./enrich/sweep.js";
 import { SarvamTranslator } from "./enrich/translate.js";
 import { OpenAIVision } from "./enrich/vision.js";
 import { LiveKitTestCalls } from "./voice/testCall.js";
@@ -28,6 +28,8 @@ await supabaseStorage.ensureBucket();
 // Photo URLs stay the same across visits, so browsers cache the images.
 const storage = new SignedUrlCache(supabaseStorage);
 const visionModel = optionalEnv("OPENAI_VISION_MODEL") ?? env("OPENAI_MODEL");
+const vision = new OpenAIVision(env("OPENAI_API_KEY"), visionModel, log);
+const frames = { probeDurationS, extractFrames, crop: cropJpeg };
 const app = createApp({
   store,
   resolver,
@@ -38,13 +40,13 @@ const app = createApp({
   // Comma-separated: the custom domain and the Vercel URL can both use the API.
   webOrigin: env("LOCUS_WEB_ORIGIN").split(",").map((o) => o.trim()).filter(Boolean),
   storage,
-  vision: new OpenAIVision(env("OPENAI_API_KEY"), visionModel, log),
+  vision,
   translator: new SarvamTranslator(env("SARVAM_API_KEY"), log),
   streetImagery: optionalEnv("GOOGLE_MAPS_API_KEY") ? new GoogleStreetView(env("GOOGLE_MAPS_API_KEY"), log) : null,
   testCalls: optionalEnv("LIVEKIT_URL")
     ? new LiveKitTestCalls(env("LIVEKIT_URL"), env("LIVEKIT_API_KEY"), env("LIVEKIT_API_SECRET"))
     : null,
-  frames: { probeDurationS, extractFrames, crop: cropJpeg },
+  frames,
   background: (task) => {
     task().catch((err: Error) => log({ event: "background.failed", message: err.message, stack: err.stack }));
   },
@@ -58,6 +60,11 @@ const sweep = () => {
 };
 void sweep();
 setInterval(sweep, 6 * 3600_000).unref();
+
+// Walk jobs run in this process: after a restart, pick up the ones it was in the middle of.
+recoverWalks({ store, storage, vision, frames, now: () => new Date(), newId: () => randomUUID(), log }).catch((err: Error) =>
+  log({ event: "walk.recover_failed", message: err.message, stack: err.stack }),
+);
 
 const port = Number(optionalEnv("LOCUS_PORT") ?? "8787");
 serve({ fetch: app.fetch, port }, () => log({ event: "listening", port, resolver: provider, model, visionModel, bucket: WALK_BUCKET }));
