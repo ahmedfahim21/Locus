@@ -2,7 +2,7 @@ import OpenAI from "openai";
 
 export const LANDMARK_KINDS = [
   "shop", "food", "temple", "mosque", "church", "school", "hospital", "pharmacy",
-  "petrol_pump", "bank_atm", "gate", "building", "tree", "park", "other",
+  "petrol_pump", "bank_atm", "bus_stop", "gate", "building", "tree", "park", "other",
 ] as const;
 
 /** `label` replaces the default "Frame i (n m from the start)" caption, e.g. for photos with no track. */
@@ -27,10 +27,12 @@ export interface LandmarkVision {
 export const MAX_PROPOSALS = 8;
 
 const INSTRUCTIONS = `You look at frames from a short phone video. Someone in India walked from the main road to their own door so delivery riders can be guided there.
-Find up to ${MAX_PROPOSALS} landmarks a delivery rider on a scooter could spot and name on a phone call: shop boards, petrol bunks, temples, mosques, churches, schools, clinics, pharmacies, ATMs, distinctive gates, big trees, parks.
+Find up to ${MAX_PROPOSALS} landmarks a delivery rider on a scooter could spot and name on a phone call: shop and hotel boards, petrol bunks, bus stops and bus stations, temples, mosques, churches, schools, hospitals and clinics, pharmacies, banks and ATMs, distinctive gates, big trees, parks.
+Only what a rider sees from the road, never inside a building. A board whose name you can read is a good landmark. A few distinct places beat a long list.
 Rules:
-- Skip people, faces, vehicles, number plates, house numbers and anything private. Never transcribe phone numbers.
-- Each landmark once, using the frame where it is clearest. Prefer ones near the walking path.
+- Skip people, faces, number plates, house numbers and anything private. Never transcribe phone numbers.
+- Vehicles are not landmarks, but the place they stand is: buses at a stand mean a bus stop or bus station.
+- Each landmark once, using the frame where it is clearest. The same place seen in several frames is one landmark, and so are its parts: a bus station's platforms, bays and building are one "bus station"; a church's gate and tower are one church. Prefer ones near the walking path.
 - name: short English, the way a rider would say it ("Iyengar bakery", "blue gate", "Shell petrol bunk").
 - nameHi: the same in Devanagari as a Hindi speaker would say it. nameKn: the same in Kannada script.
 - aliases: up to 4 other ways a rider might say it, in Roman letters, including any shop-board text you can read ("neela gate", "Sri Ganesha Medicals").
