@@ -86,6 +86,8 @@ export function draftText(name: string, alongM: number, route: RoutePlan, detail
  * the landmark itself, so it gets more room.
  */
 function samePlace(a: Draft, b: Draft): boolean {
+  // Two landmarks from the recipient's own walk were reviewed and kept as separate things.
+  if (a.sources.includes("video") && b.sources.includes("video")) return false;
   const room = a.sources.includes("street") || b.sources.includes("street") ? 90 : 60;
   if (distanceM(a.location, b.location) > room) return false;
   const ka = nameKey(a.name);
@@ -162,8 +164,9 @@ export async function suggestLandmarks(input: {
 
   for (const p of input.proposals) {
     if (p.status === "rejected" || !p.framePath) continue;
+    // The recipient's own walk, kept in review: always offered, however far the drafted road route is.
+    // Walk GPS between tall buildings can land 100 m off, and a campus path needn't follow a mapped road.
     const pr = project(route.line, cum, p.location);
-    if (pr.offM > 60) continue;
     drafts.push({
       name: p.name, nameHi: p.nameHi, nameLocal: p.nameLocal, aliases: p.aliases, kind: p.kind, color: p.color, detail: p.detail,
       location: p.location, alongM: pr.alongM, sources: ["video"], positionTrust: POSITION_TRUST.video, osmId: p.osmId, proposalId: p.id, photoUrl: p.photoUrl,
@@ -212,12 +215,15 @@ export async function suggestLandmarks(input: {
   }
   merged.sort((a, b) => a.alongM - b.alongM);
 
-  // Pre-select: best per stretch, spread out, at most six.
-  const chosen = new Set<Draft>();
+  // Pre-select: every landmark from the recipient's walk (they already chose to keep it), then the
+  // best of the map and Street View per stretch, spread out, at most six of those.
+  const chosen = new Set<Draft>(merged.filter((d) => d.sources.includes("video")));
+  const others: Draft[] = [];
   for (const d of [...merged].sort((a, b) => b.score - a.score)) {
-    if (chosen.size >= MAX_RECOMMENDED) break;
-    if ([...chosen].some((c) => Math.abs(c.alongM - d.alongM) < MIN_SPACING_M)) continue;
+    if (others.length >= MAX_RECOMMENDED) break;
+    if (chosen.has(d) || others.some((c) => Math.abs(c.alongM - d.alongM) < MIN_SPACING_M)) continue;
     chosen.add(d);
+    others.push(d);
   }
 
   return {
