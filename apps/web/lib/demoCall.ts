@@ -1,9 +1,10 @@
+import dialogue from "./demoDialogue.json";
 import type { LatLon, RouteLeg } from "./api";
 import type { Stop } from "../components/RouteMap";
 
 /**
  * A scripted demo call on a real Hebbal, Bengaluru route (geometry from OSRM over
- * OpenStreetMap). The dialogue matches /replay/wrong-gate.mp3. Landmark names are
+ * OpenStreetMap). The dialogue (demoDialogue.json) matches /replay/wrong-gate.mp3. Landmark names are
  * sample data for the demo, not real businesses.
  */
 const ROUTE: [number, number][] = [
@@ -90,10 +91,15 @@ export type DemoTurn = {
   arrived?: boolean;
 };
 
-export const demoTurns: DemoTurn[] = [
-  { time: 0, speaker: "rider", text: "Main bade grey gate par hoon. Gate band hai.", reached: 1 },
-  { time: 3, speaker: "locus", text: "Kya paas mein koi dukaan ya board dikh raha hai?", reached: 1 },
-  { time: 6, speaker: "rider", text: "Haan, doodh ki dukaan dikh rahi hai.", reached: 2 },
-  { time: 9, speaker: "locus", text: "Medical tak aaiye. Uske bagal wali gali mein neela gate hai.", reached: 2 },
-  { time: 13, speaker: "rider", text: "Haan, neele gate par pahunch gaya.", reached: 3, arrived: true },
-];
+/**
+ * The dialogue and its timings live in demoDialogue.json, written by
+ * `pnpm --filter @locus/api demo:audio`, which also renders /replay/wrong-gate.mp3
+ * with Sarvam Bulbul from the same lines, so the two never drift apart.
+ */
+export const demoTurns: DemoTurn[] = dialogue.turns.map(({ time, speaker, text, reached, ...rest }) => ({
+  time,
+  speaker: speaker as DemoTurn["speaker"],
+  text,
+  reached,
+  ...("arrived" in rest && rest.arrived ? { arrived: true } : {}),
+}));

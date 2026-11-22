@@ -1,0 +1,52 @@
+{
+  "voices": {
+    "rider": "rahul_hi_conversational",
+    "locus": "simran_hi_conversation"
+  },
+  "turns": [
+    {
+      "speaker": "rider",
+      "text": "Haan bhaiya, main ek bade grey gate ke paas hoon. Par gate toh band hai.",
+      "reached": 1,
+      "pauseBefore": 0,
+      "time": 0
+    },
+    {
+      "speaker": "locus",
+      "text": "Koi baat nahi. Wahan se koi dukaan ya board dikh raha hai?",
+      "reached": 1,
+      "pauseBefore": 0.5,
+      "time": 4.98
+    },
+    {
+      "speaker": "rider",
+      "text": "Haan, saamne ek doodh ki dukaan hai.",
+      "reached": 2,
+      "pauseBefore": 0.45,
+      "time": 8.79
+    },
+    {
+      "speaker": "locus",
+      "text": "Badhiya. Doodh ki dukaan se aage medical store tak aaiye. Uske bagal wali gali mein neela gate hai.",
+      "reached": 2,
+      "pauseBefore": 0.5,
+      "time": 11.37
+    },
+    {
+      "speaker": "rider",
+      "text": "Achha... haan, neela gate dikh gaya. Pahunch gaya.",
+      "reached": 3,
+      "arrived": true,
+      "pauseBefore": 0.6,
+      "time": 18.69
+    },
+    {
+      "speaker": "locus",
+      "text": "Bas, aap pahunch gaye. Shukriya!",
+      "reached": 3,
+      "arrived": true,
+      "pauseBefore": 0.4,
+      "time": 22.37
+    }
+  ]
+}
