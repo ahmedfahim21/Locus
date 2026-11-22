@@ -248,7 +248,7 @@ Locus/
 |---|---|---|
 | Call speech-to-text | Sarvam Saaras v3 (`codemix`, language auto) | Default; OpenAI transcription is the comparison arm (`LOCUS_SPEECH_PROVIDER`) |
 | Call text-to-speech | Sarvam Bulbul v3 (speaker `simran`, `hi-IN`/`en-IN`) | Default; OpenAI TTS is the comparison arm |
-| Fallback position matching | Sarvam `sarvam-105b` (JSON mode) | Default; OpenAI `OPENAI_MODEL` with strict structured output is the other arm (`LOCUS_RESOLVER_PROVIDER`). The matching eval (P8) picks the winner: `pnpm eval <id> --resolver=sarvam|openai` |
+| Fallback position matching | Sarvam `sarvam-105b` (JSON mode) | Default; OpenAI `OPENAI_MODEL` with strict structured output is the other arm (`LOCUS_RESOLVER_PROVIDER`). Eval 2026-11-22 (40 phrases on the dev home, local `eval/phrases.jsonl`; 14 reach the fallback): Sarvam 80% overall, ~0.1 s per call from the Mumbai server; OpenAI 90%, ~1.8 s. Most of Sarvam's extra misses are adjacent or same-place picks (Tower 1 for Tower 2, Qualcomm Commerzone for the Qualcomm landmark); both name a landmark for places that aren't there (Mindspace, Infosys). Sarvam stays: same real error rate, a pause a rider won't notice. Neither passes the gate yet |
 | Landmark aliases (Hindi/Kannada spellings) | Sarvam transliteration | Adds script variants of each confirmed landmark name |
 | Walk-video frame vision | OpenAI vision model (pinned) | Strict schema; proposals only |
 | Database, PostGIS, sign-in | Supabase | `locus` schema; Google sign-in |
