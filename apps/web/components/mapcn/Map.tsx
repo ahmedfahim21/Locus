@@ -141,6 +141,9 @@ export function MapMarker({
  * Padding sized for a desktop map, scaled down to the map actually on screen: on a
  * phone, 220 px of label room on a 300 px-wide map would leave no room for the route.
  */
+/** How far FitTo may zoom in; 17.5 left a 100 m route's pins on top of each other. */
+export const FIT_MAX_ZOOM = 19;
+
 export function fitPadding(padding: MapLibre.PaddingOptions | number, width: number, height: number): MapLibre.PaddingOptions {
   const p = typeof padding === "number" ? { top: padding, bottom: padding, left: padding, right: padding } : padding;
   const cap = (v: number | undefined, max: number) => Math.round(Math.max(0, Math.min(v ?? 0, max)));
@@ -157,7 +160,8 @@ export function FitTo({ points, padding }: { points: LatLon[]; padding: MapLibre
     for (const p of points) bounds.extend([p.lon, p.lat]);
     const fit = () => {
       const el = map.getContainer();
-      map.fitBounds(bounds, { padding: fitPadding(JSON.parse(paddingKey), el.clientWidth, el.clientHeight), maxZoom: 17.5, duration: 0 });
+      // Up to zoom 19: a route of a hundred metres (a campus, a lane) still spreads its pins apart.
+      map.fitBounds(bounds, { padding: fitPadding(JSON.parse(paddingKey), el.clientWidth, el.clientHeight), maxZoom: FIT_MAX_ZOOM, duration: 0 });
     };
     fit();
     // Phones rotate and panels change height: fit again to the new size.
