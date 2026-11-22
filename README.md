@@ -32,6 +32,7 @@ Screenshots use a demo account and sample landmarks on real streets in Hebbal, B
 
 | Part | What it does | Built with |
 |---|---|---|
+| Phone calls | Receives calls to the Locus number and dials out for rider calls and handoffs | Vobiz phone numbers and SIP trunks, LiveKit Cloud |
 | `apps/api` guide API | Screening, placing the rider on the route, the next instruction, handoff to the recipient, loop guards | Hono, Drizzle, Postgres with PostGIS |
 | `apps/api` call worker | Answers the call, transcribes the rider, speaks Locus's reply | LiveKit Agents, Sarvam Saaras v4 (speech to text) and Bulbul v4 (voice), LiveKit noise cancellation |
 | Geography | Road graph and named places around each home, route from the nearest main road | OpenStreetMap via Overpass, DIGIPIN |
@@ -40,7 +41,9 @@ Screenshots use a demo account and sample landmarks on real streets in Hebbal, B
 
 The guide API decides every word Locus says; the call worker has no language model of its own. Any voice agent can use the same API.
 
-[![Architecture: the call path through LiveKit and the voice worker, the Hono guide API, and the recipient web app and its data services](diagrams/architecture.webp)](diagrams/architecture.html)
+The API and call worker run on AWS EC2. Vercel hosts the web app, and Supabase provides Postgres with PostGIS, Google sign-in and media storage.
+
+[![Architecture: calls pass through Vobiz SIP and LiveKit to the Locus worker and guide API on AWS EC2. The Vercel web app uses the API, with Supabase for data, sign-in and media, Sarvam for speech, and OpenAI for vision.](diagrams/architecture.webp)](diagrams/architecture.html)
 
 [Open the diagram as HTML](diagrams/architecture.html).
 
@@ -75,7 +78,14 @@ pnpm --filter @locus/api admin client locus-worker --first-party
 pnpm --filter @locus/api worker dev
 ```
 
-Phone calls also need a SIP trunk (Plivo or Vobiz) and a Locus number assigned to the recipient with `admin number`.
+For phone calls, point your Vobiz number at LiveKit's inbound SIP trunk and configure a dispatch rule for `locus-guide`. Assign the number to the recipient and register it for outbound loop protection, substituting your E.164 number and recipient ID:
+
+```bash
+pnpm --filter @locus/api admin number +91XXXXXXXXXX YOUR_RECIPIENT_ID vobiz
+pnpm --filter @locus/api admin outbound +91XXXXXXXXXX
+```
+
+For outbound calls and handoffs, set the `VOBIZ_SIP_*` credentials from [.env.example](.env.example), then run `pnpm --filter @locus/api admin trunk +91XXXXXXXXXX`. Set `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and `LOCUS_OUTBOUND_NUMBER` from the command output. To check inbound routing, turn on “Expecting a delivery” and call the Vobiz number from another phone. [Vobiz’s LiveKit setup guide](https://www.vobiz.ai/integrations/livekit/)
 
 ## Test
 

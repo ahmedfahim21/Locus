@@ -166,7 +166,7 @@ SOFTWARE.
   <main aria-label="Locus architecture. Scroll horizontally on narrow screens." tabindex="0">
     <svg class="board" viewBox="0 0 1344 768" role="img" aria-labelledby="diagram-title diagram-description" xmlns="http://www.w3.org/2000/svg">
       <title id="diagram-title">Locus architecture</title>
-      <desc id="diagram-description">One: the rider dials a Locus number. Two: Plivo SIP carries the call into a LiveKit room. Three: a LiveKit Agents worker transcribes the rider's audio through Sarvam or OpenAI. Four: the Hono guide API screens the call, matches landmarks using its OSM road graph in PostGIS, and calls a model for ambiguous clues. Five: the API returns directions or requests a handoff, and the worker speaks the directions into the call. Separately, the recipient signs in with Supabase Auth and sets their gate and landmarks in the web app. The API processes walk media with FFmpeg, OpenAI vision and Sarvam translation. Supabase Storage holds the video and photos.</desc>
+      <desc id="diagram-description">One: the rider dials a Locus number. Two: Vobiz carries calls over SIP to LiveKit and routes outbound calls and handoffs. Three: a LiveKit Agents worker transcribes the rider's audio through Sarvam by default, with OpenAI as an option. The worker and the guide API run on AWS EC2 in Mumbai. Four: the Hono guide API screens the call, matches landmarks using its OSM road graph in PostGIS, and calls a model for ambiguous clues. Five: the API returns directions or requests a handoff, and the worker speaks the directions into the call. Separately, the recipient signs in with Supabase Auth and sets their gate and landmarks in the web app. The API processes walk media with FFmpeg, OpenAI vision and Sarvam translation. Supabase Storage holds the video and photos.</desc>
       <defs>
         <filter id="roughen" x="-8%" y="-12%" width="116%" height="124%" color-interpolation-filters="sRGB">
           <feTurbulence type="fractalNoise" baseFrequency=".023" numOctaves="2" seed="16" result="noise"/>
@@ -189,6 +189,30 @@ SOFTWARE.
         <symbol id="database" viewBox="0 0 256 256"><path d="M128,24C74.17,24,32,48.6,32,80v96c0,31.4,42.17,56,96,56s96-24.6,96-56V80C224,48.6,181.83,24,128,24Zm80,104c0,9.62-7.88,19.43-21.61,26.92C170.93,163.35,150.19,168,128,168s-42.93-4.65-58.39-13.08C55.88,147.43,48,137.62,48,128V111.36c17.06,15,46.23,24.64,80,24.64s62.94-9.68,80-24.64ZM69.61,53.08C85.07,44.65,105.81,40,128,40s42.93,4.65,58.39,13.08C200.12,60.57,208,70.38,208,80s-7.88,19.43-21.61,26.92C170.93,115.35,150.19,120,128,120s-42.93-4.65-58.39-13.08C55.88,99.43,48,89.62,48,80S55.88,60.57,69.61,53.08ZM186.39,202.92C170.93,211.35,150.19,216,128,216s-42.93-4.65-58.39-13.08C55.88,195.43,48,185.62,48,176V159.36c17.06,15,46.23,24.64,80,24.64s62.94-9.68,80-24.64V176C208,185.62,200.12,195.43,186.39,202.92Z"></path></symbol>
         <symbol id="brain" viewBox="0 0 256 256"><path d="M248,124a56.11,56.11,0,0,0-32-50.61V72a48,48,0,0,0-88-26.49A48,48,0,0,0,40,72v1.39a56,56,0,0,0,0,101.2V176a48,48,0,0,0,88,26.49A48,48,0,0,0,216,176v-1.41A56.09,56.09,0,0,0,248,124ZM88,208a32,32,0,0,1-31.81-28.56A55.87,55.87,0,0,0,64,180h8a8,8,0,0,0,0-16H64A40,40,0,0,1,50.67,86.27,8,8,0,0,0,56,78.73V72a32,32,0,0,1,64,0v68.26A47.8,47.8,0,0,0,88,128a8,8,0,0,0,0,16,32,32,0,0,1,0,64Zm104-44h-8a8,8,0,0,0,0,16h8a55.87,55.87,0,0,0,7.81-.56A32,32,0,1,1,168,144a8,8,0,0,0,0-16,47.8,47.8,0,0,0-32,12.26V72a32,32,0,0,1,64,0v6.73a8,8,0,0,0,5.33,7.54A40,40,0,0,1,192,164Zm16-52a8,8,0,0,1-8,8h-4a36,36,0,0,1-36-36V80a8,8,0,0,1,16,0v4a20,20,0,0,0,20,20h4A8,8,0,0,1,208,112ZM60,120H56a8,8,0,0,1,0-16h4A20,20,0,0,0,80,84V80a8,8,0,0,1,16,0v4A36,36,0,0,1,60,120Z"></path></symbol>
         <symbol id="images" viewBox="0 0 256 256"><path d="M216,40H72A16,16,0,0,0,56,56V72H40A16,16,0,0,0,24,88V200a16,16,0,0,0,16,16H184a16,16,0,0,0,16-16V184h16a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40ZM72,56H216v62.75l-10.07-10.06a16,16,0,0,0-22.63,0l-20,20-44-44a16,16,0,0,0-22.62,0L72,109.37ZM184,200H40V88H56v80a16,16,0,0,0,16,16H184Zm32-32H72V132l36-36,49.66,49.66a8,8,0,0,0,11.31,0L194.63,120,216,141.38V168ZM160,84a12,12,0,1,1,12,12A12,12,0,0,1,160,84Z"></path></symbol>
+        <!-- https://www.vobiz.ai/newhome/nav/logo-mark.svg -->
+        <symbol id="logo-vobiz" viewBox="0 0 32 32">
+          <image width="32" height="32" href="data:image/svg+xml;base64,PHN2ZyBwcmVzZXJ2ZUFzcGVjdFJhdGlvPSJub25lIiBvdmVyZmxvdz0idmlzaWJsZSIgc3R5bGU9ImRpc3BsYXk6IGJsb2NrOyIgd2lkdGg9IjQxLjkxMzUiIGhlaWdodD0iMjkuOTE0NiIgdmlld0JveD0iMCAwIDQxLjkxMzUgMjkuOTE0NiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGcgaWQ9Ikdyb3VwIDEyIj4KPGcgaWQ9IlZlY3RvciI+CjxwYXRoIGQ9Ik00MS45MTM1IDEuMTc0NDlDNDEuOTEzNSAwLjUxMzEyOSA0MS4zNzcyIC0wLjAyNTUxMzIgNDAuNzE2MyAwLjAwMDkzNDA4MkMzNy4xOTM0IDAuMTQxOTIxIDMzLjcxOTggMC45MDQyNDcgMzAuNDU2NyAyLjI1NTg1QzI2LjgyNDQgMy43NjAzNiAyMy41MjQgNS45NjU1NSAyMC43NDQgOC43NDU1MkMxNy45NjQgMTEuNTI1NSAxNS43NTg3IDE0LjgyNTggMTQuMjU0MiAxOC40NThDMTIuOTAyNiAyMS43MjExIDEyLjE0MDIgMjUuMTk0NiAxMS45OTkyIDI4LjcxNzRDMTEuOTcyOCAyOS4zNzgzIDEyLjUxMTQgMjkuOTE0NiAxMy4xNzI4IDI5LjkxNDZMMjYuMjA3NCAyOS45MTQ2QzI2Ljg2ODcgMjkuOTE0NiAyNy4zOTk4IDI5LjM3NzYgMjcuNDU0MyAyOC43MTg1QzI3LjU3OCAyNy4yMjMgMjcuOTMzMiAyNS43NTMzIDI4LjUwOTMgMjQuMzYyNUMyOS4yMzg0IDIyLjYwMjMgMzAuMzA3MSAyMS4wMDI5IDMxLjY1NDQgMTkuNjU1N0MzMy4wMDE2IDE4LjMwODUgMzQuNjAxMSAxNy4yMzk4IDM2LjM2MTMgMTYuNTEwN0MzNy43NTIyIDE1LjkzNDYgMzkuMjIxOSAxNS41Nzk0IDQwLjcxNzQgMTUuNDU1N0M0MS4zNzY1IDE1LjQwMTEgNDEuOTEzNSAxNC44NzAxIDQxLjkxMzUgMTQuMjA4OFYxLjE3NDQ5WiIgZmlsbD0iI0U4M0MwMCIvPgo8cGF0aCBkPSJNMCAxLjE3NDQ5QzAgMC41MTMxMjkgMC41MzcwMzkgLTAuMDI4MDg1NiAxLjE5NjIyIDAuMDI1ODE1NUMyLjc1MjI0IDAuMTUzMDUyIDQuMjgxNzEgMC41Mjc5ODMgNS43Mjg0NCAxLjEzOTIxQzcuNTQ0NTcgMS45MDY1MSA5LjE5NDc2IDMuMDMxMTUgMTAuNTg0OCA0LjQ0ODk0QzExLjk3NDggNS44NjY3MiAxMy4wNzc0IDcuNTQ5ODcgMTMuODI5NyA5LjQwMjNDMTQuNDMxOSAxMC44ODUzIDE0LjgwMDIgMTIuNDUzNSAxNC45MjMxIDE0LjA0ODhDMTQuOTczOSAxNC43MDgzIDE0LjQzMyAxNS4yNDUyIDEzLjc3MTYgMTUuMjQ1MkwxLjE5NzUzIDE1LjI0NTJDMC41MzYxNTIgMTUuMjQ1MiAwIDE0LjcwOSAwIDE0LjA0NzdWMS4xNzQ0OVoiIGZpbGw9IiNFODZBMDAiLz4KPC9nPgo8L2c+Cjwvc3ZnPgo="/>
+        </symbol>
+        <!-- https://livekit.com/brand -->
+        <symbol id="logo-livekit" viewBox="0 0 32 32">
+          <image width="32" height="32" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjMwIiBoZWlnaHQ9IjIzMCIgdmlld0JveD0iMCAwIDIzMCAyMzAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik0xMzcuODg0IDkyLjQ2NzVIOTIuMTE2N1YxMzguMjM1SDEzNy44ODRWOTIuNDY3NVoiIGZpbGw9IiMwMDJDRjIiLz4KPHBhdGggZD0iTTE4My42NTEgNDYuNzE4SDEzNy44ODRWOTIuNDg1MkgxODMuNjUxVjQ2LjcxOFoiIGZpbGw9IiMwMDJDRjIiLz4KPHBhdGggZD0iTTE4My42NTEgMTM4LjIzNEgxMzcuODg0VjE4NC4wMDJIMTgzLjY1MVYxMzguMjM0WiIgZmlsbD0iIzAwMkNGMiIvPgo8cGF0aCBkPSJNMjI5LjQgMC45NTA5MjhIMTgzLjYzM1Y0Ni43MTgxSDIyOS40VjAuOTUwOTI4WiIgZmlsbD0iIzAwMkNGMiIvPgo8cGF0aCBkPSJNMjI5LjQgMTgzLjk4NEgxODMuNjMzVjIyOS43NTFIMjI5LjRWMTgzLjk4NFoiIGZpbGw9IiMwMDJDRjIiLz4KPHBhdGggZD0iTTQ2LjM2NzMgMTgzLjk4NFYxMzguMjM1VjkyLjQ2NzRWNDYuNzE4MVYwLjk1MDkyOEgwLjYwMDA5OFY0Ni43MTgxVjkyLjQ2NzRWMTM4LjIzNVYxODMuOTg0VjIyOS43NTFINDYuMzY3M0g5Mi4xMTY1SDEzNy44ODRWMTgzLjk4NEg5Mi4xMTY1SDQ2LjM2NzNaIiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K"/>
+        </symbol>
+        <!-- https://aws.amazon.com/architecture/icons/ -->
+        <symbol id="logo-aws-ec2" viewBox="0 0 32 32">
+          <image width="32" height="32" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyB3aWR0aD0iNDBweCIgaGVpZ2h0PSI0MHB4IiB2aWV3Qm94PSIwIDAgNDAgNDAiIHZlcnNpb249IjEuMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayI+CiAgICA8dGl0bGU+SWNvbi1BcmNoaXRlY3R1cmUvMzIvQXJjaF9BbWF6b24tRUMyXzMyPC90aXRsZT4KICAgIDxnIGlkPSJJY29uLUFyY2hpdGVjdHVyZS8zMi9BcmNoX0FtYXpvbi1FQzJfMzIiIHN0cm9rZT0ibm9uZSIgc3Ryb2tlLXdpZHRoPSIxIiBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPgogICAgICAgIDxnIGlkPSJJY29uLUFyY2hpdGVjdHVyZS1CRy8zMi9Db21wdXRlIiBmaWxsPSIjRUQ3MTAwIj4KICAgICAgICAgICAgPHJlY3QgaWQ9IlJlY3RhbmdsZSIgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIj48L3JlY3Q+CiAgICAgICAgPC9nPgogICAgICAgIDxwYXRoIGQ9Ik0yNi4wNTIsMjcgTDI2LDEzLjk0OCBMMTMsMTQgTDEzLDI3LjA1MiBMMjYuMDUyLDI3IFogTTI3LDE0IEwyOSwxNCBMMjksMTUgTDI3LDE1IEwyNywxNyBMMjksMTcgTDI5LDE4IEwyNywxOCBMMjcsMjAgTDI5LDIwIEwyOSwyMSBMMjcsMjEgTDI3LDIzIEwyOSwyMyBMMjksMjQgTDI3LDI0IEwyNywyNiBMMjksMjYgTDI5LDI3IEwyNywyNyBMMjcsMjcuMDUyIEMyNywyNy41NzUgMjYuNTc0LDI4IDI2LjA1MiwyOCBMMjYsMjggTDI2LDMwIEwyNSwzMCBMMjUsMjggTDIzLDI4IEwyMywzMCBMMjIsMzAgTDIyLDI4IEwyMCwyOCBMMjAsMzAgTDE5LDMwIEwxOSwyOCBMMTcsMjggTDE3LDMwIEwxNiwzMCBMMTYsMjggTDE0LDI4IEwxNCwzMCBMMTMsMzAgTDEzLDI4IEwxMi45NDgsMjggQzEyLjQyNiwyOCAxMiwyNy41NzUgMTIsMjcuMDUyIEwxMiwyNyBMMTAsMjcgTDEwLDI2IEwxMiwyNiBMMTIsMjQgTDEwLDI0IEwxMCwyMyBMMTIsMjMgTDEyLDIxIEwxMCwyMSBMMTAsMjAgTDEyLDIwIEwxMiwxOCBMMTAsMTggTDEwLDE3IEwxMiwxNyBMMTIsMTUgTDEwLDE1IEwxMCwxNCBMMTIsMTQgTDEyLDEzLjk0OCBDMTIsMTMuNDI1IDEyLjQyNiwxMyAxMi45NDgsMTMgTDEzLDEzIEwxMywxMSBMMTQsMTEgTDE0LDEzIEwxNiwxMyBMMTYsMTEgTDE3LDExIEwxNywxMyBMMTksMTMgTDE5LDExIEwyMCwxMSBMMjAsMTMgTDIyLDEzIEwyMiwxMSBMMjMsMTEgTDIzLDEzIEwyNSwxMyBMMjUsMTEgTDI2LDExIEwyNiwxMyBMMjYuMDUyLDEzIEMyNi41NzQsMTMgMjcsMTMuNDI1IDI3LDEzLjk0OCBMMjcsMTQgWiBNMjEsMzMgTDcsMzMgTDcsMTkgTDksMTkgTDksMTggTDcuMDYyLDE4IEM2LjQ3NywxOCA2LDE4LjQ3NyA2LDE5LjA2MiBMNiwzMi45MzggQzYsMzMuNTIzIDYuNDc3LDM0IDcuMDYyLDM0IEwyMC45MzksMzQgQzIxLjUyNCwzNCAyMiwzMy41MjMgMjIsMzIuOTM4IEwyMiwzMSBMMjEsMzEgTDIxLDMzIFogTTM0LDcuMDYyIEwzNCwyMC45MzggQzM0LDIxLjUyMyAzMy41MjQsMjIgMzIuOTM5LDIyIEwzMCwyMiBMMzAsMjEgTDMzLDIxIEwzMyw3IEwxOSw3IEwxOSwxMCBMMTgsMTAgTDE4LDcuMDYyIEMxOCw2LjQ3NyAxOC40NzcsNiAxOS4wNjIsNiBMMzIuOTM5LDYgQzMzLjUyNCw2IDM0LDYuNDc3IDM0LDcuMDYyIEwzNCw3LjA2MiBaIiBpZD0iQW1hem9uLUVDMl9JY29uXzMyX1NxdWlkIiBmaWxsPSIjRkZGRkZGIj48L3BhdGg+CiAgICA8L2c+Cjwvc3ZnPg=="/>
+        </symbol>
+        <!-- Symbol cropped from the supplied Sarvam reference -->
+        <symbol id="logo-sarvam" viewBox="0 0 32 32">
+          <image width="32" height="32" href="data:image/webp;base64,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"/>
+        </symbol>
+        <!-- https://openai.com/brand/ -->
+        <symbol id="logo-openai" viewBox="0 0 32 32">
+          <image width="32" height="32" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNzE2IiBoZWlnaHQ9IjcxNiIgdmlld0JveD0iMCAwIDcxNiA3MTYiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01MDguNzQ5IDMxNy4zOTlDNTE2Ljc3NyAyODcuMzE0IDUwOC45OTEgMjUzLjg4NCA0ODUuMzg5IDIzMC4yODJDNDYxLjc4OCAyMDYuNjgxIDQyOC4zNiAxOTguODk1IDM5OC4yNzMgMjA2LjkyM0MzNzYuMjMxIDE4NC45MjggMzQzLjM5IDE3NC45NTYgMzExLjE0OCAxODMuNTk2QzI3OC45MDYgMTkyLjIzNCAyNTUuNDUgMjE3LjI5MiAyNDcuMzYgMjQ3LjM2MUMyMTcuMjkxIDI1NS40NTEgMTkyLjIzMyAyNzguOTEgMTgzLjU5NSAzMTEuMTQ5QzE3NC45NTcgMzQzLjM5MSAxODQuOTI3IDM3Ni4yMzIgMjA2LjkyNCAzOTguMjc0QzE5OC44OTYgNDI4LjM1OSAyMDYuNjgzIDQ2MS43ODkgMjMwLjI4NCA0ODUuMzkxQzI1My44ODUgNTA4Ljk5MiAyODcuMzEzIDUxNi43NzkgMzE3LjQwMSA1MDguNzVDMzM5LjQ0MiA1MzAuNzQ1IDM3Mi4yODYgNTQwLjcxNyA0MDQuNTI1IDUzMi4wNzlDNDM2Ljc2NyA1MjMuNDQxIDQ2MC4yMjMgNDk4LjM4NCA0NjguMzEzIDQ2OC4zMTVDNDk4LjM4MyA0NjAuMjI0IDUyMy40NCA0MzYuNzY2IDUzMi4wNzggNDA0LjUyNkM1NDAuNzE2IDM3Mi4yODUgNTMwLjc0NyAzMzkuNDQzIDUwOC43NDkgMzE3LjQwMlYzMTcuMzk5Wk00NzAuODk5IDI0NC43NzZDNDg2Ljg5MiAyNjAuNzcgNDkzLjQ4OCAyODIuNjAxIDQ5MC42ODcgMzAzLjQxMkw0MTUuNTc3IDI2MC4wNDZDNDEyLjQxMSAyNTguMjE4IDQwOC41MDkgMjU4LjIxOCA0MDUuMzQ1IDI2MC4wNDZMMzE3LjQwMSAzMTAuODJWMjc3LjUyNkMzMTcuNDAxIDI3NS4xOTEgMzE4LjY1MiAyNzMuMDA1IDMyMC42NzYgMjcxLjgzN0wzODcuNjQ0IDIzMy4xNzRDNDE0LjE3OCAyMTguMzUzIDQ0OC4zNDYgMjIyLjIyMyA0NzAuOTAxIDI0NC43NzZINDcwLjg5OVpNMzU3LjgzNyAzMTEuMTQ0TDM5OC4yNzUgMzM0LjQ5MVYzODEuMTg1TDM1Ny44MzcgNDA0LjUzMkwzMTcuMzk4IDM4MS4xODVWMzM0LjQ5MUwzNTcuODM3IDMxMS4xNDRaTTI2NC43NzYgMjY5LjY5M0MyNjUuMjA3IDIzOS4zMDUgMjg1LjY0NCAyMTEuNjQ5IDMxNi40NTMgMjAzLjM5M0MzMzguMyAxOTcuNTQgMzYwLjUwNSAyMDIuNzQ0IDM3Ny4xMjcgMjE1LjU3M0wzMDIuMDE0IDI1OC45MzdDMjk4Ljg0OCAyNjAuNzY0IDI5Ni44OTggMjY0LjE0NCAyOTYuODk4IDI2Ny43OThWMzY5LjM0NkwyNjguMDY1IDM1Mi42OTlDMjY2LjA0MyAzNTEuNTMxIDI2NC43NzYgMzQ5LjM1MyAyNjQuNzc2IDM0Ny4wMTdWMjY5LjY5MVYyNjkuNjkzWk0yMDMuMzkxIDMxNi40NTRDMjA5LjI0NCAyOTQuNjA4IDIyNC44NTQgMjc3Ljk3OCAyNDQuMjc2IDI2OS45OTlWMzU2LjczQzI0NC4yNzYgMzYwLjM4NCAyNDYuMjI2IDM2My43NjMgMjQ5LjM5MiAzNjUuNTkxTDMzNy4zMzcgNDE2LjM2NUwzMDguNTAzIDQzMy4wMTNDMzA2LjQ4MSA0MzQuMTgxIDMwMy45NjEgNDM0LjE4OCAzMDEuOTM5IDQzMy4wMkwyMzQuOTcxIDM5NC4zNTdDMjA4Ljg2OCAzNzguNzg5IDE5NS4xMzggMzQ3LjI2MSAyMDMuMzkxIDMxNi40NTRaTTI0NC43NzUgNDcwLjlDMjI4Ljc4MSA0NTQuOTA2IDIyMi4xODYgNDMzLjA3NSAyMjQuOTg2IDQxMi4yNjRMMzAwLjA5NiA0NTUuNjNDMzAzLjI2MyA0NTcuNDU3IDMwNy4xNjQgNDU3LjQ1NyAzMTAuMzI4IDQ1NS42M0wzOTguMjczIDQwNC44NTZWNDM4LjE0OUMzOTguMjczIDQ0MC40ODUgMzk3LjAyMiA0NDIuNjcxIDM5NC45OTcgNDQzLjgzOUwzMjguMDI5IDQ4Mi41MDJDMzAxLjQ5NSA0OTcuMzIyIDI2Ny4zMjcgNDkzLjQ1MiAyNDQuNzcyIDQ3MC45SDI0NC43NzVaTTQ1MC44OTcgNDQ1Ljk4MkM0NTAuNDY2IDQ3Ni4zNzEgNDMwLjAyOSA1MDQuMDI3IDM5OS4yMiA1MTIuMjgzQzM3Ny4zNzMgNTE4LjEzNiAzNTUuMTY4IDUxMi45MzIgMzM4LjU0NyA1MDAuMTAyTDQxMy42NTkgNDU2LjczOEM0MTYuODI2IDQ1NC45MTEgNDE4Ljc3NSA0NTEuNTMyIDQxOC43NzUgNDQ3Ljg3N1YzNDYuMzI5TDQ0Ny42MDkgMzYyLjk3N0M0NDkuNjMxIDM2NC4xNDUgNDUwLjg5NyAzNjYuMzIzIDQ1MC44OTcgMzY4LjY1OVY0NDUuOTg1VjQ0NS45ODJaTTUxMi4yODIgMzk5LjIyMUM1MDYuNDI5IDQyMS4wNjggNDkwLjgxOSA0MzcuNjk3IDQ3MS4zOTcgNDQ1LjY3NlYzNTguOTQ2QzQ3MS4zOTcgMzU1LjI5MiA0NjkuNDQ4IDM1MS45MTIgNDY2LjI4MSAzNTAuMDg1TDM3OC4zMzYgMjk5LjMxMUw0MDcuMTcgMjgyLjY2M0M0MDkuMTkyIDI4MS40OTUgNDExLjcxMiAyODEuNDg3IDQxMy43MzQgMjgyLjY1NUw0ODAuNzAyIDMyMS4zMThDNTA2LjgwNSAzMzYuODg3IDUyMC41MzYgMzY4LjQxNSA1MTIuMjgyIDM5OS4yMjFaIiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K"/>
+        </symbol>
+        <!-- https://supabase.com/brand -->
+        <symbol id="logo-supabase" viewBox="0 0 32 32">
+          <image width="32" height="32" href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTA5IiBoZWlnaHQ9IjExMyIgdmlld0JveD0iMCAwIDEwOSAxMTMiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik02My43MDc2IDExMC4yODRDNjAuODQ4MSAxMTMuODg1IDU1LjA1MDIgMTExLjkxMiA1NC45ODEzIDEwNy4zMTRMNTMuOTczOCA0MC4wNjI3TDk5LjE5MzUgNDAuMDYyN0MxMDcuMzg0IDQwLjA2MjcgMTExLjk1MiA0OS41MjI4IDEwNi44NTkgNTUuOTM3NEw2My43MDc2IDExMC4yODRaIiBmaWxsPSJ1cmwoI3BhaW50MF9saW5lYXIpIi8+CjxwYXRoIGQ9Ik02My43MDc2IDExMC4yODRDNjAuODQ4MSAxMTMuODg1IDU1LjA1MDIgMTExLjkxMiA1NC45ODEzIDEwNy4zMTRMNTMuOTczOCA0MC4wNjI3TDk5LjE5MzUgNDAuMDYyN0MxMDcuMzg0IDQwLjA2MjcgMTExLjk1MiA0OS41MjI4IDEwNi44NTkgNTUuOTM3NEw2My43MDc2IDExMC4yODRaIiBmaWxsPSJ1cmwoI3BhaW50MV9saW5lYXIpIiBmaWxsLW9wYWNpdHk9IjAuMiIvPgo8cGF0aCBkPSJNNDUuMzE3IDIuMDcxMDNDNDguMTc2NSAtMS41MzAzNyA1My45NzQ1IDAuNDQyOTM3IDU0LjA0MzQgNS4wNDFMNTQuNDg0OSA3Mi4yOTIySDkuODMxMTNDMS42NDAzOCA3Mi4yOTIyIC0yLjkyNzc1IDYyLjgzMjEgMi4xNjU1IDU2LjQxNzVMNDUuMzE3IDIuMDcxMDNaIiBmaWxsPSIjM0VDRjhFIi8+CjxkZWZzPgo8bGluZWFyR3JhZGllbnQgaWQ9InBhaW50MF9saW5lYXIiIHgxPSI1My45NzM4IiB5MT0iNTQuOTc0IiB4Mj0iOTQuMTYzNSIgeTI9IjcxLjgyOTUiIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KPHN0b3Agc3RvcC1jb2xvcj0iIzI0OTM2MSIvPgo8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMzRUNGOEUiLz4KPC9saW5lYXJHcmFkaWVudD4KPGxpbmVhckdyYWRpZW50IGlkPSJwYWludDFfbGluZWFyIiB4MT0iMzYuMTU1OCIgeTE9IjMwLjU3OCIgeDI9IjU0LjQ4NDQiIHkyPSI2NS4wODA2IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CjxzdG9wLz4KPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLW9wYWNpdHk9IjAiLz4KPC9saW5lYXJHcmFkaWVudD4KPC9kZWZzPgo8L3N2Zz4K"/>
+        </symbol>
       </defs>
 
       <g aria-hidden="true">
@@ -233,12 +257,12 @@ SOFTWARE.
         <use href="#card" x="1.35" y="1.45" class="ink second-stroke rough"/>
         <use href="#card" class="blue"/>
         <use href="#card" class="ink rough"/>
-        <use href="#broadcast" x="18" y="18" width="38" height="38" class="icon"/>
+        <use href="#logo-livekit" x="19" y="19" width="36" height="36"/>
         <text x="65" y="46" class="heading">LiveKit room</text>
         <circle cx="211" cy="19" r="13" class="paper ink rough"/>
         <text x="211" y="25" class="number">2</text>
         <text x="19" y="80" class="detail">Routes call audio</text>
-        <text x="19" y="105" class="detail">Bridges handoff calls</text>
+        <text x="19" y="105" class="detail">Bridges via Vobiz SIP</text>
       </g>
 
       <g transform="translate(342 348)">
@@ -259,8 +283,10 @@ SOFTWARE.
         <use href="#card" class="ink rough"/>
         <use href="#wave" x="18" y="18" width="38" height="38" class="icon"/>
         <text x="65" y="46" class="heading">Speech</text>
-        <text x="19" y="80" class="detail">Sarvam STT + TTS</text>
-        <text x="19" y="105" class="detail">OpenAI optional</text>
+        <use href="#logo-sarvam" x="17" y="62" width="23" height="23" style="mix-blend-mode:multiply"/>
+        <text x="46" y="80" class="detail">Sarvam STT + TTS</text>
+        <use href="#logo-openai" x="15" y="85" width="27" height="27"/>
+        <text x="46" y="105" class="detail">OpenAI optional</text>
       </g>
 
       <g transform="translate(35 554)">
@@ -270,7 +296,8 @@ SOFTWARE.
         <use href="#desktop" x="18" y="18" width="38" height="38" class="icon"/>
         <text x="65" y="42" class="heading">Recipient app</text>
         <text x="19" y="77" class="detail">Next.js + MapLibre</text>
-        <text x="19" y="101" class="detail">Google via Supabase</text>
+        <use href="#logo-supabase" x="19" y="87" width="17" height="17"/>
+        <text x="44" y="101" class="detail">Google via Supabase</text>
         <text x="19" y="125" class="detail">Sets gate and landmarks</text>
         <text x="19" y="149" class="detail">Follows call activity</text>
       </g>
@@ -283,6 +310,8 @@ SOFTWARE.
         <text x="79" y="55" class="api-title">Hono API</text>
         <text x="25" y="91" class="detail">Checks “Expecting a delivery”</text>
         <text x="25" y="116" class="detail">Keeps active sessions in memory</text>
+        <use href="#logo-aws-ec2" x="25" y="130" width="23" height="23"/>
+        <text x="57" y="147" class="detail">AWS EC2 · API and worker</text>
 
         <g transform="translate(18 181)">
           <use href="#inner-card" class="paper"/>
@@ -299,7 +328,8 @@ SOFTWARE.
           <use href="#inner-card" class="ink rough"/>
           <use href="#video" x="15" y="16" width="30" height="30" class="icon"/>
           <text x="53" y="39" class="heading">Route setup</text>
-          <text x="17" y="72" class="detail">FFmpeg → OpenAI vision</text>
+          <use href="#logo-openai" x="13" y="52" width="27" height="27"/>
+          <text x="44" y="72" class="detail">FFmpeg → OpenAI vision</text>
           <text x="17" y="98" class="detail">Finds landmarks in walk video</text>
           <text x="17" y="124" class="detail">Sarvam translates names</text>
         </g>
@@ -309,7 +339,7 @@ SOFTWARE.
         <use href="#card" x="1.35" y="1.45" class="ink second-stroke rough"/>
         <use href="#card" class="mint"/>
         <use href="#card" class="ink rough"/>
-        <use href="#database" x="18" y="18" width="38" height="38" class="icon"/>
+        <use href="#logo-supabase" x="21" y="21" width="32" height="32"/>
         <text x="65" y="46" class="heading">Postgres</text>
         <text x="19" y="80" class="detail">Supabase + PostGIS</text>
         <text x="19" y="105" class="detail">OSM, routes and calls</text>
@@ -329,7 +359,7 @@ SOFTWARE.
         <use href="#card" x="1.35" y="1.45" class="ink second-stroke rough"/>
         <use href="#card" class="orange"/>
         <use href="#card" class="ink rough"/>
-        <use href="#images" x="18" y="18" width="38" height="38" class="icon"/>
+        <use href="#logo-supabase" x="21" y="21" width="32" height="32"/>
         <text x="65" y="46" class="heading">Storage</text>
         <text x="19" y="80" class="detail">Supabase Storage</text>
         <text x="19" y="105" class="detail">Walk videos and photos</text>
@@ -347,7 +377,8 @@ SOFTWARE.
         <path class="arrow both" d="M973 611 Q1024 614 1076 612"/>
       </g>
 
-      <text x="306" y="209" class="label short-label">Plivo SIP</text>
+      <use href="#logo-vobiz" x="294" y="172" width="24" height="24"/>
+      <text x="306" y="209" class="label short-label">Vobiz SIP</text>
       <text x="510" y="326" class="label">call audio</text>
       <text x="306" y="402" class="label short-label">STT/TTS</text>
       <text x="630" y="360" class="label">utterance</text>
