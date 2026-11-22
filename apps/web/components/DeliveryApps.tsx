@@ -1,6 +1,6 @@
 /**
- * The delivery apps Locus works with, as small app tiles, shown to say "works with
- * orders from", not to imply a partnership. Marks: Swiggy, Zomato and bigbasket from
+ * Delivery apps whose riders Locus can guide, as small app tiles. There's no
+ * integration: Locus answers any rider who calls, whatever app they ride for. Marks: Swiggy, Zomato and bigbasket from
  * Simple Icons (CC0, simpleicons.org); Blinkit, Zepto, Flipkart and Amazon are the
  * brands' own logo files from Wikimedia Commons (public/brands), the Flipkart file
  * cropped to its bag mark and Zepto's wordmark set in white. Instamart has no logo

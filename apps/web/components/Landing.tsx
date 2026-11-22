@@ -80,7 +80,7 @@ export function Landing() {
           </p>
         )}
         <div className="works-with">
-          <span className="label">Works with orders from</span>
+          <span className="label">For riders from any app</span>
           <ul className="app-row">
             {DELIVERY_APPS.map((app) => (
               <li key={app.id}>
