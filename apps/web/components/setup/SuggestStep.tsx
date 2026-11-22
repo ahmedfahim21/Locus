@@ -18,6 +18,7 @@ const SOURCE_ICON = { map: MapTrifold, video: VideoCamera, street: Binoculars } 
 export function SuggestStep({
   door,
   skippedProposals,
+  renames,
   progress,
   onBack,
   onDone,
@@ -25,6 +26,8 @@ export function SuggestStep({
   door: LatLon;
   /** Walk proposals the recipient already skipped in the walk review. */
   skippedProposals: Set<string>;
+  /** Names the recipient gave walk landmarks in review, by proposal id. */
+  renames: Map<string, string>;
   progress: ReactNode;
   onBack: () => void;
   onDone: (kept: Suggestion[]) => void;
@@ -38,7 +41,12 @@ export function SuggestStep({
     api<Suggestions>(`/me/suggestions?lat=${door.lat}&lon=${door.lon}`)
       .then((res) => {
         if (cancelled) return;
-        const usable = { ...res, suggestions: res.suggestions.filter((s) => !(s.proposalId && skippedProposals.has(s.proposalId))) };
+        // Skipped walk landmarks are left out; renamed ones keep the recipient's name, in the drafted words too.
+        const named = (s: Suggestion) => {
+          const renamed = s.proposalId ? renames.get(s.proposalId) : undefined;
+          return renamed ? { ...s, name: renamed, text: s.text.split(s.name).join(renamed) } : s;
+        };
+        const usable = { ...res, suggestions: res.suggestions.filter((s) => !(s.proposalId && skippedProposals.has(s.proposalId))).map(named) };
         setData(usable);
         setKeep(new Set(usable.suggestions.filter((s) => s.recommended).map((s) => s.id)));
       })
@@ -49,7 +57,7 @@ export function SuggestStep({
     return () => {
       cancelled = true;
     };
-  }, [door.lat, door.lon, skippedProposals]);
+  }, [door.lat, door.lon, skippedProposals, renames]);
 
   const legs: RouteLeg[] | null = data ? [{ onRoads: true, line: data.route.line }] : null;
   const kept = data?.suggestions.filter((s) => keep.has(s.id)) ?? [];
