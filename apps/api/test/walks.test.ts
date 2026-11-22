@@ -361,7 +361,8 @@ describe("walks: keeping landmarks", () => {
         aliases: ["blue gate हिं", "blue gate ಕನ್ನ"],
         source: "typed",
         photoUrl: null,
-        kind: null,
+        // Typed, but its name says it's a gate.
+        kind: "gate",
         color: null,
         proposalId: null,
       },

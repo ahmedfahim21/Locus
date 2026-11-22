@@ -105,8 +105,9 @@ describe("recipient routes: profile, home, switch", () => {
     const t = setup();
     await t.call("PUT", "/me/profile", profile, TOKEN);
     const res = await t.call("PUT", "/me/home", homeBody, TOKEN);
-    const typed = { source: "typed", photoUrl: null, kind: null, color: null, proposalId: null };
-    const expectedCues = homeBody.cues.map((c) => ({ ...c, aliases: [`${c.landmark} हिं`, `${c.landmark} ಕನ್ನ`], ...typed }));
+    const typed = { source: "typed", photoUrl: null, color: null, proposalId: null };
+    // "green gate" says it's a gate; "Iyengar bakery" doesn't name a kind.
+    const expectedCues = homeBody.cues.map((c) => ({ ...c, aliases: [`${c.landmark} हिं`, `${c.landmark} ಕನ್ನ`], ...typed, kind: c.landmark === "green gate" ? "gate" : null }));
     const expectedHome = {
       handoffPoint: homeBody.handoffPoint,
       digipin: "4P3JK852C9",

@@ -79,6 +79,11 @@ const SYNONYMS: Record<string, string> = {
   vidyalaya: "school", shala: "school",
   bunk: "petrolpump", petrol: "petrolpump",
   chemist: "pharmacy",
+  // The last steps inside a building or society.
+  elevator: "lift",
+  seedhi: "stairs", sidhi: "stairs", seedhiyan: "stairs", seediyan: "stairs", sidiyan: "stairs", zeena: "stairs", staircase: "stairs", steps: "stairs", stair: "stairs",
+  guard: "security", chowkidar: "security", watchman: "security",
+  lobby: "entrance", entry: "entrance",
   neela: "blue", nila: "blue", neele: "blue", neeli: "blue", nile: "blue", laal: "red", lal: "red", hara: "green", peela: "yellow", safed: "white",
   nariyal: "coconut",
 };

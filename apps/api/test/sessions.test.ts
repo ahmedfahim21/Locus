@@ -333,6 +333,39 @@ describe("guide loop", () => {
     expect(t.store.turns.at(-1)).toMatchObject({ matchedOsmId: "node/103", matchedCueId: null });
   });
 
+  it("guides the last steps inside the building: society gate, lift, then the door", async () => {
+    const t = setup();
+    const door = t.store.homes[0]!.handoffPoint;
+    const near = (dLat: number) => ({ lat: door.lat + dLat, lon: door.lon });
+    const step = (id: string, ordinal: number, landmark: string, text: string, dLat: number, kind: string) => ({
+      id, ordinal, landmark, text, location: near(dLat), aliases: [], source: "typed" as const, photoPath: null, kind, color: null,
+    });
+    t.store.homes[0]!.cues = [
+      { ...t.store.homes[0]!.cues[0]! },
+      step("cue_g", 2, "Prestige society gate", "Gate pe security ko Fahim ka naam bataiye, phir Tower B.", 0.0006, "gate"),
+      step("cue_l", 3, "Tower B lift", "Lift se 4th floor, bahar nikal ke right.", 0.0001, "lift"),
+      step("cue_d", 4, "Flat 402", "402 ka darwaza, wahi rukiye.", 0, "other"),
+    ];
+    await guiding(t);
+    expect((await t.say("ses_1", "society gate pe hoon")).body.instruction).toBe("Gate pe security ko Fahim ka naam bataiye, phir Tower B.");
+    // "lift" is a word riders say; it names the lift step, not a place on the road.
+    expect((await t.say("ses_1", "tower b lift ke paas hoon")).body.instruction).toBe("Lift se 4th floor, bahar nikal ke right.");
+    expect(t.store.sessions.get("ses_1")!.currentCue).toBe(2);
+    expect(t.resolver.calls).toEqual([]);
+  });
+
+  it("matches the stairs in Hinglish ('seedhi')", async () => {
+    const t = setup();
+    const door = t.store.homes[0]!.handoffPoint;
+    t.store.homes[0]!.cues = [
+      { ...t.store.homes[0]!.cues[0]! },
+      { id: "cue_s", ordinal: 2, landmark: "Stairs near the lift", text: "Seedhi se 2nd floor aaiye.", location: { lat: door.lat + 0.0001, lon: door.lon }, aliases: [], source: "typed", photoPath: null, kind: "stairs", color: null },
+      { ...t.store.homes[0]!.cues[2]!, ordinal: 3 },
+    ];
+    await guiding(t);
+    expect((await t.say("ses_1", "seedhi ke paas khada hoon")).body.instruction).toBe("Seedhi se 2nd floor aaiye.");
+  });
+
   it("falls back to OpenAI only when the name match finds nothing", async () => {
     const t = setup();
     await guiding(t);

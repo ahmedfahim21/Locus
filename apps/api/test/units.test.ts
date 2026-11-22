@@ -1,3 +1,4 @@
+import { kindFromName } from "../src/enrich/vision.js";
 import { describe, expect, it } from "vitest";
 import { SignedUrlCache, type ObjectStorage } from "../src/storage/storage.js";
 import { candidatesFor, passesGate, scoreArm } from "../src/eval/ablation.js";
@@ -42,6 +43,21 @@ describe("normalization", () => {
   it("maps Hinglish place words to canonical tokens and drops fillers", () => {
     expect(tokens("Main Hanuman mandir ke peeche wali gali mein hoon")).toEqual(["hanuman", "temple", "lane"]);
     expect(tokens("petrol bunk ke saamne")).toEqual(["petrolpump"]);
+  });
+});
+
+describe("kindFromName", () => {
+  it("reads the last steps to the door from a typed name, in English or Hinglish", () => {
+    expect(kindFromName("Tower B lift")).toBe("lift");
+    expect(kindFromName("Elevator lobby")).toBe("lift");
+    expect(kindFromName("seedhi ke paas")).toBe("stairs");
+    expect(kindFromName("Staircase on the left")).toBe("stairs");
+    expect(kindFromName("Security cabin")).toBe("security");
+    expect(kindFromName("chowkidar")).toBe("security");
+    expect(kindFromName("Main entrance")).toBe("entrance");
+    expect(kindFromName("Society gate")).toBe("gate");
+    expect(kindFromName("Hanuman mandir")).toBe("temple");
+    expect(kindFromName("Iyengar bakery")).toBeNull();
   });
 });
 

@@ -1,3 +1,4 @@
+import { kindFromName } from "./enrich/vision.js";
 import { localLanguageAt } from "./geo/region.js";
 import { Hono, type Context } from "hono";
 import { cors } from "hono/cors";
@@ -28,7 +29,7 @@ import type { RoadGraph } from "./geo/roadGraph.js";
 import { MAX_UPLOAD_BYTES, VIDEO_TYPES, type ObjectStorage } from "./storage/storage.js";
 import type { Store } from "./store/store.js";
 
-export const MAX_CUES = 8;
+export const MAX_CUES = 12;
 export const RECENT_CALLS = 10;
 /** A last landmark this close to the door is the door itself; the route doesn't add a leg. */
 const DOOR_SAME_AS_CUE_M = 15;
@@ -365,7 +366,8 @@ export function recipientRoutes(deps: {
         ),
         source: (proposal ? "walkVideo" : (input.source ?? "typed")) satisfies CueSource,
         photoPath: proposal?.framePath ?? null,
-        kind: proposal?.kind ?? input.kind ?? null,
+        // A typed landmark's kind comes from its name ("Tower B lift"), for its 3D prop.
+        kind: proposal?.kind ?? input.kind ?? kindFromName(input.landmark),
         color: proposal?.color ?? input.color?.toLowerCase() ?? null,
       });
     }
