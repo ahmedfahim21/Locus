@@ -35,6 +35,8 @@ describe("DIGIPIN (official India Post vectors)", () => {
 describe("normalization", () => {
   it("romanizes Devanagari", () => {
     expect(romanize("हनुमान मंदिर")).toBe("hanumaan mandir");
+    // English loanwords use the candra o: नॉलेज, मॉल, ऑफिस.
+    expect(romanize("नॉलेज मॉल ऑफिस")).toBe("nolej mol ophis");
   });
 
   it("maps Hinglish place words to canonical tokens and drops fillers", () => {
@@ -61,6 +63,20 @@ describe("matchUtterance", () => {
     const cue = [{ id: "c", kind: "cue" as const, names: ["Second lane behind the temple"] }];
     expect(matchUtterance("gali mein hoon", cue)).toBeNull();
     expect(matchUtterance("second gali", cue)).toBeNull();
+  });
+
+  it("doesn't match a place on a generic part of its name when the rider named somewhere else", () => {
+    const places = [
+      { id: "kc", kind: "cue" as const, names: ["Knowledge City"] },
+      { id: "bp", kind: "feature" as const, names: ["Biodiversity Park"] },
+      { id: "itc", kind: "cue" as const, names: ["ITC Kohenur"] },
+    ];
+    expect(matchUtterance("Hitech City flyover ke neeche", places)).toBeNull();
+    expect(matchUtterance("नॉलेज पार्क", places)?.candidate.id).not.toBe("bp");
+    expect(matchUtterance("Taj hotel ke saamne", places)).toBeNull();
+    // The specific word still matches.
+    expect(matchUtterance("knowledge city ke paas", places)?.candidate.id).toBe("kc");
+    expect(matchUtterance("biodiversity park", places)?.candidate.id).toBe("bp");
   });
 
   it("matches a cue when only part of its name is heard, if no other place competes", () => {

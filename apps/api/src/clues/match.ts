@@ -12,11 +12,17 @@ const TOKEN_THRESHOLD = 0.8;
 
 /**
  * Words too common to identify a place on their own. A match needs at least
- * one heard token outside this set, so "gali mein hoon" can't match a cue.
+ * one heard token outside this set, so "gali mein hoon" can't match a cue, and
+ * "Hitech City" can't match "Knowledge City" on "city" alone. Such phrases go to
+ * the resolver, which sees the whole sentence.
  */
 const WEAK_TOKENS = new Set([
   "lane", "road", "shop", "circle", "gate", "house", "ghar", "building", "colony", "layout",
   "nagar", "stage", "phase", "block", "street", "second", "first", "third", "1st", "2nd", "3rd",
+  // Generic parts of place names: tech parks, malls, hotels, apartment blocks.
+  "city", "park", "tower", "towers", "complex", "centre", "center", "mall", "plaza", "square", "campus",
+  "office", "residency", "apartment", "apartments", "enclave", "heights", "garden", "gardens", "hall",
+  "hotel", "restaurant", "bank", "hospital", "school", "college", "market",
 ]);
 
 /** Skeletons are only trusted for longer words, so short ones ("ram", "room") can't collide. */

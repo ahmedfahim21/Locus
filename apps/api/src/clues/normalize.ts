@@ -7,9 +7,13 @@
 const DEVANAGARI_VOWELS: Record<string, string> = {
   "अ": "a", "आ": "aa", "इ": "i", "ई": "ee", "उ": "u", "ऊ": "oo", "ए": "e", "ऐ": "ai",
   "ओ": "o", "औ": "au", "ऋ": "ri",
+  // English loanwords: ऑफिस (office), ऑटो (auto).
+  "ऑ": "o", "ऍ": "e",
 };
 const DEVANAGARI_MATRAS: Record<string, string> = {
   "ा": "aa", "ि": "i", "ी": "ee", "ु": "u", "ू": "oo", "े": "e", "ै": "ai", "ो": "o", "ौ": "au",
+  // English loanwords: नॉलेज (knowledge), मॉल (mall), कॉलेज (college), डॉक्टर (doctor).
+  "ॉ": "o", "ॅ": "e",
   "ृ": "ri", "ं": "n", "ँ": "n", "ः": "h",
 };
 const DEVANAGARI_CONSONANTS: Record<string, string> = {
