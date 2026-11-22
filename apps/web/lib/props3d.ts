@@ -23,6 +23,11 @@ const KINDS: Record<string, { height: number; radius: number; sides: number; col
   food: { height: 5, radius: 3.5, sides: 4, color: "#ff922b" },
   building: { height: 10, radius: 6, sides: 4, color: "#adb5bd" },
   park: { height: 1, radius: 8, sides: 16, color: "#69db7c" },
+  // The last steps at the building: small, so they sit by the door without hiding it.
+  entrance: { height: 3, radius: 2.4, sides: 4, color: "#ced4da" },
+  security: { height: 2.6, radius: 1.6, sides: 4, color: "#4dabf7" },
+  lift: { height: 3.2, radius: 1.4, sides: 4, color: "#adb5bd" },
+  stairs: { height: 2, radius: 1.8, sides: 4, color: "#e9ecef" },
   other: { height: 4, radius: 3, sides: 4, color: "#ced4da" },
 };
 /** Props are drawn larger than life so they read at street zoom: this is a schematic, not a survey. */

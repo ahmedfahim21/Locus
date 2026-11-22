@@ -10,7 +10,7 @@ import { Map, MapMarker } from "../mapcn/Map";
 import { DoorPin, Stamp } from "../RouteMap";
 import { MapHandle } from "./MapHandle";
 
-const MAX_LANDMARKS = 8; // Same cap as the API (MAX_CUES).
+const MAX_LANDMARKS = 12; // Same cap as the API (MAX_CUES).
 
 type Draft = {
   key: number;
@@ -193,7 +193,7 @@ export function LandmarksStep({
           <h1 className="title">Landmarks on the way</h1>
           <p className="muted">
             Start from the main road. Name each place the way a rider would say it, then write what Locus should tell them
-            there. The last one can be your gate.
+            there. Finish with the last steps to your door: the society gate, the lift or stairs, your floor.
           </p>
         </div>
 
