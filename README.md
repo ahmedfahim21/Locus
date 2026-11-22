@@ -43,57 +43,20 @@ The API and call worker run on AWS EC2. Vercel hosts the web app, and Supabase p
 
 [Open the diagram as HTML](diagrams/architecture.html).
 
-## Run locally
+## Run it
 
-You need Node.js 22+, pnpm 10 and a Supabase project with Google sign-in. Copy [.env.example](.env.example) to `.env` at the repo root.
-
-The demo call needs only the web app, with `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` set:
+[AGENTS.md](AGENTS.md) has everything: prerequisites, every environment variable, the commands to install, seed and start each part, test logins, and journeys to try. In short, with Node.js 22+, pnpm 10 and a filled-in `.env`:
 
 ```bash
 pnpm install
-pnpm --filter @locus/web dev
-```
-
-Then open `http://localhost:3000/replay`.
-
-For the full app, add `http://localhost:3000` to Supabase's redirect URLs, fill in the API settings in `.env` (plus `SUPABASE_SECRET_KEY` for Storage) and install FFmpeg. Import the streets around your gate, using its coordinates and a radius in metres:
-
-```bash
 pnpm --filter @locus/api db:migrate
-pnpm --filter @locus/api osm:import 13.038 77.594 700
-pnpm --filter @locus/api dev
+pnpm --filter @locus/api osm:import 17.4314 78.3822 700 --from seed/osm-knowledge-city.json
+pnpm --filter @locus/api start
 ```
 
-Browser test calls also need LiveKit credentials and a worker key. Create the key, save it as `LOCUS_WORKER_API_KEY`, then start the worker in another terminal:
+Then, in another terminal, `pnpm --filter @locus/api seed:demo` and `pnpm --filter @locus/web dev`, and open http://localhost:3000.
 
-```bash
-pnpm --filter @locus/api admin client locus-worker --first-party
-```
-
-```bash
-pnpm --filter @locus/api worker dev
-```
-
-For phone calls, point your Vobiz number at LiveKit's inbound SIP trunk and configure a dispatch rule for `locus-guide`. Assign the number to the recipient and register it for outbound loop protection, substituting your E.164 number and recipient ID:
-
-```bash
-pnpm --filter @locus/api admin number +91XXXXXXXXXX YOUR_RECIPIENT_ID vobiz
-pnpm --filter @locus/api admin outbound +91XXXXXXXXXX
-```
-
-For outbound calls and handoffs, set the `VOBIZ_SIP_*` credentials from [.env.example](.env.example), then run `pnpm --filter @locus/api admin trunk +91XXXXXXXXXX`. Set `LIVEKIT_SIP_OUTBOUND_TRUNK_ID` and `LOCUS_OUTBOUND_NUMBER` from the command output. To check inbound routing, turn on “Expecting a delivery” and call the Vobiz number from another phone. [Vobiz’s LiveKit setup guide](https://www.vobiz.ai/integrations/livekit/)
-
-## Test
-
-```bash
-pnpm test
-```
-
-```bash
-pnpm typecheck
-```
-
-The API tests drive the HTTP routes against an in-memory store, so they need no database or keys.
+`pnpm test` and `pnpm typecheck` need no keys or database: the API tests drive the HTTP routes against an in-memory store.
 
 ## License
 
