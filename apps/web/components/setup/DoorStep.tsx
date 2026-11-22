@@ -8,7 +8,8 @@ import type { LatLon } from "../../lib/api";
 import { Map } from "../mapcn/Map";
 import { MapHandle } from "./MapHandle";
 
-const BENGALURU: LatLon = { lat: 12.9716, lon: 77.5946 };
+/** Where the gate map opens before you pin anything: Knowledge City, Hyderabad, where the demo route is. */
+const KNOWLEDGE_CITY: LatLon = { lat: 17.4314, lon: 78.3822 };
 
 export function DoorStep({
   initial,
@@ -56,7 +57,7 @@ export function DoorStep({
   return (
     <main className="setup">
       <div className="setup-map">
-        <Map center={initial ?? BENGALURU} zoom={initial ? 18 : 12} className="fill" label="Move the map so the white pin sits on your gate">
+        <Map center={initial ?? KNOWLEDGE_CITY} zoom={initial ? 18 : 15} className="fill" label="Move the map so the white pin sits on your gate">
           <MapHandle
             onMap={(m) => {
               map.current = m;

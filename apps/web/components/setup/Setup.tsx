@@ -13,6 +13,14 @@ import { SuggestStep } from "./SuggestStep";
 import { WalkStep, type KeptProposal } from "./WalkStep";
 import "./setup.css";
 
+/** `?near=lat,lon` starts the gate map there (AGENTS.md uses it, since test browsers can't share a location). */
+function nearFrom(value: string | null): { lat: number; lon: number } | null {
+  const [lat, lon] = (value ?? "").split(",").map(Number);
+  return lat !== undefined && lon !== undefined && Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180
+    ? { lat, lon }
+    : null;
+}
+
 export type Step = "about" | "door" | "walk" | "suggest" | "landmarks";
 const STEPS: Step[] = ["about", "door", "walk", "suggest", "landmarks"];
 
@@ -92,7 +100,7 @@ export function Setup() {
   if (effective === "door") {
     return (
       <DoorStep
-        initial={door ?? data.home?.handoffPoint ?? null}
+        initial={door ?? data.home?.handoffPoint ?? nearFrom(params.get("near"))}
         progress={progress}
         onBack={() => setStep("about")}
         onDone={(point) => {
