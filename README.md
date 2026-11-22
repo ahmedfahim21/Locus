@@ -4,7 +4,24 @@ Locus answers a delivery rider's call in Hinglish and talks them to your door, o
 
 Riders in Indian neighbourhoods get lost in the last 200 metres: same-looking lanes, gates without numbers, a pin that lands on the wrong building. Locus knows the way in from the main road and the landmarks a rider can actually see on it. When the rider calls, it works out where they are from what they describe and gives the next turn.
 
-Try it at [locus.ahmedfahim.dev](https://locus.ahmedfahim.dev), or [hear the demo call](https://locus.ahmedfahim.dev/replay) without signing in.
+## Try Locus
+
+### Hear the demo without signing in
+
+Open the demo and select “Play the call”. Follow the rider from the grey gate to the blue gate as the transcript and map update. Select a transcript line to jump to it, or switch the map to 3D. The replay uses scripted Hinglish audio, sample landmarks, and real streets in Hebbal, Bengaluru. [Play the demo](https://locus.ahmedfahim.dev/replay)
+
+### Test the live guide in your browser
+
+1. Sign in with Google. Enter your first name, choose a delivery app such as Swiggy, and add a phone number you control in international format. Add a short message for Locus to read if you miss a handoff, such as “Leave it with the security guard.” [Open Locus](https://locus.ahmedfahim.dev)
+2. Pin a gate in an Indian neighbourhood you know. You can skip the walk video and use map suggestions or choose “Add landmark at the pin” to enter your own. Pick two recognisable landmarks along the approach, give each a short direction, then select “Save route”.
+3. On Home, turn on “Expecting a delivery”. Select “Try a call”, then “Start call”, and allow microphone access. This browser test works without an assigned Locus phone number. [Open the test-call screen](https://locus.ahmedfahim.dev/test-call)
+4. Play the rider. Say “Anita ke liye, Swiggy se”, substituting your first name and chosen app. When asked where you are, name a saved landmark, for example “Main milk shop ke paas hoon.” Name the next landmark when prompted. Check that the transcript, map progress, and spoken directions agree with your saved route. End the call and open it from “Calls” on Home to review the transcript.
+
+For a screening check, start another call and give the wrong recipient name. Confirm that Locus asks for the name again and withholds route directions. If the browser blocks the mic, enable it for this site and retry.
+
+### Test a phone call or handoff
+
+If Home shows a Locus number, turn on “Expecting a delivery” and dial that number from another phone. If “Call the rider” appears under “Try a call”, leave your own `+91` number in the field and answer when it rings. To test a handoff, pass screening and say “Customer se baat karao”. Use separate rider and recipient phones you control so you can answer both legs. These phone options depend on the Vobiz SIP configuration and account setup.
 
 <img src="screenshots/home.webp" alt="Home screen: a 3D map of the route from the grey gate past the milk shop and medical store to the door, next to the delivery switch, the Locus number and recent calls" width="100%">
 
@@ -54,7 +71,7 @@ pnpm --filter @locus/web dev
 
 Then open `http://localhost:3000/replay`.
 
-For the full app, add `http://localhost:3000` to Supabase's redirect URLs, fill in the API settings in `.env` (plus `SUPABASE_SECRET_KEY` for Storage) and install FFmpeg. Import the streets around your gate, using its coordinates and a radius in metres:
+For the full app, add `http://localhost:3000` to Supabase's redirect URLs, fill in the database, API, Supabase, Sarvam and OpenAI settings in `.env`, and install FFmpeg with `ffprobe` on your `PATH`. Import the streets around your gate using its coordinates and a radius in metres:
 
 ```bash
 pnpm --filter @locus/api db:migrate
